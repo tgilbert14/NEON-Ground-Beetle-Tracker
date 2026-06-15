@@ -10,8 +10,8 @@ tell a rich story about each NEON site. This is the carabid sibling of the
 [NEON Small Mammal Tracker](https://github.com/tgilbert14/NEON-Small-Mammal-Tracker-App),
 sharing its Desert Data Labs house style and **bundle-first** data pattern.
 
-> ▶️ **Live app:** **<https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/>**
-> — hosted on Posit Connect Cloud.
+> ▶️ **Live app:** **<https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/>**
+> — a landing page that launches the live dashboard (hosted on Posit Connect Cloud).
 >
 > ✅ All **46 NEON terrestrial sites** are bundled from **real**
 > DP1.10022.001 records (`data/sites/*.rds`), with the cross-site index, ordination
