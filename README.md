@@ -10,11 +10,14 @@ tell a rich story about each NEON site. This is the carabid sibling of the
 [NEON Small Mammal Tracker](https://github.com/tgilbert14/NEON-Small-Mammal-Tracker-App),
 sharing its Desert Data Labs house style and **bundle-first** data pattern.
 
-> ⚠️ **Scaffold / MVP.** This is an early build. The bundled data for HARV, KONZ,
-> and JORN is an **illustrative demo** (`data-sample/beetle_demo.csv`) — *not*
-> real NEON records — so the app is usable before the real bundle is built. The
-> UI badges demo data clearly. Run `scripts/refresh_data.R` to download and
-> bundle the real product.
+> ▶️ **Live app:** **<https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/>**
+> — hosted on Posit Connect Cloud.
+>
+> ✅ All **46 NEON terrestrial sites** are bundled from **real**
+> DP1.10022.001 records (`data/sites/*.rds`), with the cross-site index, ordination
+> and indicators precomputed to `data/precomputed.rds` for a near-instant boot. The
+> tiny `data-sample/beetle_demo.csv` remains only as an offline fallback. Re-pull or
+> extend the bundle anytime with `scripts/refresh_data.R`.
 
 ## What it does
 
@@ -24,8 +27,8 @@ sharing its Desert Data Labs house style and **bundle-first** data pattern.
 | **Diversity** | Hill numbers (q0/q1/q2 effective species), Hurlbert rarefaction (richness at equal sample size), and species accumulation across bouts. |
 | **Seasonality** | Activity-density by month (catch per 100 trap-nights), overall or split by the top species. |
 | **Trends** | Inter-annual catch-per-effort with a fitted OLS trend line and a plain-English verdict (rising / declining / flat, with %/yr and p-value) — the insect-decline view. |
-| **Biogeography** | A national map sized by carabid richness — or by a chosen species' local abundance (a range map); a **PCoA community ordination** (Bray–Curtis) showing which site×plot×year communities resemble each other; an **indicator-species table** (Dufrêne–Legendre IndVal) naming each site's signature beetles; and a sortable comparison table. |
-| **About** | Data product, methods, and the demo-data caveat. |
+| **Biogeography** | A national map sized by carabid richness — or by a chosen species' local abundance (a range map); a **PCoA community ordination** (Bray–Curtis) showing which site×year communities resemble each other; an **indicator-species table** (Dufrêne–Legendre IndVal) naming each site's signature beetles; and a sortable comparison table. |
+| **About** | Data product, methods, and the live data-source note. |
 
 ## How the numbers work
 
@@ -63,7 +66,7 @@ shiny::runApp()
 ```
 
 The app opens to a splash; pick a state + site and **Load this site**, or open the
-Biogeography map and tap a marker. The demo sites (HARV, KONZ, JORN) load instantly.
+Biogeography map and tap a marker. All 46 bundled sites load instantly.
 
 ## Build the real data bundle
 
@@ -84,8 +87,11 @@ server.R                  data flow and all outputs
 R/helpers.R               analytical engine (Hill numbers, rarefaction, accumulation, assemble_beetles)
 R/site_metadata.R         site code -> name / state / domain / coords / bio
 scripts/refresh_data.R    build the per-site beetle bundle from NEON
-data-sample/beetle_demo.csv  illustrative demo bundle (NOT real NEON data)
+data/sites/<SITE>.rds     bundled per-site carabid data (real NEON — 46 sites)
+data/precomputed.rds      cached cross-site index + ordination + indicators (fast boot)
+data-sample/beetle_demo.csv  offline demo fallback (NOT real NEON data)
 www/styles.css            theme CSS
+manifest.json             Posit Connect Cloud deploy manifest (bundle-only)
 ```
 
 ## Built by Desert Data Labs
