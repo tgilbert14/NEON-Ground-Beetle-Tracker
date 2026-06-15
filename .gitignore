@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# refresh script scratch log (the bundled data/ rds files ARE committed)
+refresh_data.log

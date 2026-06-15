@@ -79,17 +79,31 @@ available_sites <- function() {
   sort(unique(c(bundled, demo)))
 }
 
-# National site index for the map: one row per available site with headline
-# numbers (richness, individuals, dominant species, source). Built once at boot.
-SITE_INDEX <- local({
+# ---- cross-site national views (computed once, cached) --------------------
+# Four objects power the Biogeography map, PCoA ordination, indicator table and
+# species range picker. Building them scans every bundled site and runs the
+# Bray-Curtis ordination + IndVal, so the result is cached to data/precomputed.rds
+# and reused on later boots — an instant cold start instead of a multi-second one.
+# Committed alongside the bundle, it makes the DEPLOYED app boot fast too.
+#
+# The cache auto-invalidates: it is rebuilt whenever the set of bundled sites
+# changes, or any site bundle is newer than the cache, so it can never serve data
+# out of sync with data/sites/.
+PRECOMP_FILE <- file.path("data", "precomputed.rds")
+
+build_national_index <- function() {
   sites <- available_sites()
-  if (!length(sites)) return(NULL)
-  rows <- lapply(sites, function(s) {
-    d <- load_site_bundle(s); if (is.null(d) || !nrow(d)) return(NULL)
+  empty <- list(sites = character(0), site_index = NULL, ordination = NULL,
+                indicators = NULL, species_sites = NULL)
+  if (!length(sites)) return(empty)
+  # one pass over the bundles: per-site headline row + a bound all-sites table
+  rows <- list(); all <- list()
+  for (s in sites) {
+    d <- load_site_bundle(s); if (is.null(d) || !nrow(d)) next
     ct <- community_table(d)
     sp <- ct[ct$species_level %in% TRUE, , drop = FALSE]   # richness = species only
     meta <- neon_sites[neon_sites$site == s, , drop = FALSE]
-    tibble::tibble(
+    rows[[s]] <- tibble::tibble(
       site = s,
       name = if (nrow(meta)) meta$name else s,
       lat  = if (nrow(meta)) meta$lat else NA_real_,
@@ -99,34 +113,40 @@ SITE_INDEX <- local({
       individuals = sum(ct$individuals),
       dominant = if (nrow(sp)) sp$scientificName[1] else ct$scientificName[1],
       source = attr(d, "source") %||% "neon")
-  })
-  rows <- rows[!vapply(rows, is.null, logical(1))]
-  if (!length(rows)) NULL else dplyr::bind_rows(rows)
+    d$siteID <- s; all[[s]] <- d
+  }
+  all_data <- if (!length(all)) NULL else dplyr::bind_rows(all)
+  list(
+    sites         = sites,
+    site_index    = if (!length(rows)) NULL else dplyr::bind_rows(rows),
+    ordination    = if (!is.null(all_data)) bray_ordination(all_data) else NULL,
+    indicators    = if (!is.null(all_data)) indicator_species(all_data) else NULL,
+    species_sites = if (!is.null(all_data)) species_site_table(all_data) else NULL)
+}
+
+# Is a cached index still valid for the current bundle?
+cache_is_fresh <- function(idx) {
+  if (is.null(idx) || is.null(idx$sites)) return(FALSE)
+  if (!setequal(idx$sites, available_sites())) return(FALSE)
+  rds <- list.files(SITE_DIR, pattern = "\\.rds$", full.names = TRUE)
+  if (!length(rds)) return(TRUE)
+  isTRUE(file.mtime(PRECOMP_FILE) >= max(file.mtime(rds)))
+}
+
+NATIONAL_INDEX <- local({
+  cached <- if (file.exists(PRECOMP_FILE))
+    tryCatch(readRDS(PRECOMP_FILE), error = function(e) NULL) else NULL
+  if (cache_is_fresh(cached)) return(cached)
+  idx <- build_national_index()
+  tryCatch(saveRDS(idx, PRECOMP_FILE, compress = "xz"), error = function(e) NULL)  # read-only deploy: just recompute next boot
+  idx
 })
 
-# ---- cross-site aggregates (national views) -------------------------------
-# All available sites' records, bound once at boot, for the ordination and the
-# species range-map picker (independent of whichever single site is loaded).
-ALL_DATA <- local({
-  sites <- available_sites()
-  if (!length(sites)) return(NULL)
-  ds <- lapply(sites, function(s) {
-    d <- load_site_bundle(s)
-    if (is.null(d) || !nrow(d)) return(NULL)
-    d$siteID <- s; d
-  })
-  ds <- ds[!vapply(ds, is.null, logical(1))]
-  if (!length(ds)) NULL else dplyr::bind_rows(ds)
-})
+SITE_INDEX    <- NATIONAL_INDEX$site_index
+ORDINATION    <- NATIONAL_INDEX$ordination
+INDICATORS    <- NATIONAL_INDEX$indicators
+SPECIES_SITES <- NATIONAL_INDEX$species_sites
 
-# PCoA ordination of every site x plot x year community (precomputed).
-ORDINATION <- if (!is.null(ALL_DATA)) bray_ordination(ALL_DATA) else NULL
-
-# Indicator species (IndVal) — which beetle signs which site (precomputed).
-INDICATORS <- if (!is.null(ALL_DATA)) indicator_species(ALL_DATA) else NULL
-
-# species -> sites with abundance, + the picker's choices (widest-ranging first).
-SPECIES_SITES <- if (!is.null(ALL_DATA)) species_site_table(ALL_DATA) else NULL
 species_choices <- function() {
   if (is.null(SPECIES_SITES)) return(NULL)
   sp <- SPECIES_SITES %>% dplyr::group_by(.data$scientificName) %>%
@@ -173,11 +193,6 @@ spin <- function(x) shinycssloaders::withSpinner(x, color = DDL$forest,
 info_pop <- function(title, ..., placement = "auto")
   bslib::popover(tags$span(class = "info-dot", bsicons::bs_icon("info-circle")),
                  ..., title = title, placement = placement)
-
-fmt_range <- function(a, b) {
-  if (is.null(a) || is.null(b) || is.na(a) || is.na(b)) return("")
-  sprintf("%s → %s", format(as.Date(a), "%b %Y"), format(as.Date(b), "%b %Y"))
-}
 
 # state pickers reused from the mammal app's metadata
 state_choices <- function() {

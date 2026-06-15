@@ -64,29 +64,7 @@ state_names <- c(
   VA = "Virginia", WA = "Washington", WI = "Wisconsin", WY = "Wyoming"
 )
 
-# State -> full-name choices, for the first (state) dropdown
-state_choices <- function() {
-  st <- sort(unique(neon_sites$state))
-  setNames(st, sprintf("%s (%d %s)", state_names[st], table(neon_sites$state)[st],
-                       ifelse(table(neon_sites$state)[st] == 1, "site", "sites")))
-}
-
-# Sites within one state -> "JORN — Jornada Experimental Range" choices
-sites_in_state <- function(st) {
-  rows <- neon_sites[neon_sites$state == st, ]
-  rows <- rows[order(rows$name), ]
-  if (nrow(rows) == 0) return(character(0))
-  setNames(rows$site, sprintf("%s — %s", rows$site, rows$name))
-}
-
-site_bio <- function(code) {
-  row <- neon_sites[neon_sites$site == code, ]
-  if (nrow(row) == 0) return(NULL)
-  row$bio[1]
-}
-
-site_label <- function(code) {
-  row <- neon_sites[neon_sites$site == code, ]
-  if (nrow(row) == 0) return(code)
-  sprintf("%s · %s, %s · NEON %s", row$name[1], row$site[1], row$state[1], row$domain[1])
-}
+# NOTE: the picker/label helpers (state_choices, sites_in_state, site_bio,
+# site_label) live in global.R, where they are scoped to only the sites that
+# actually have bundled data. This file is the canonical DATA (neon_sites +
+# state_names) only.

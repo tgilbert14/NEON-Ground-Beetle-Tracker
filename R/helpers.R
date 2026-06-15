@@ -14,12 +14,6 @@
 
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0 || (length(a) == 1 && is.na(a))) b else a
 
-mode_chr <- function(x) {
-  x <- x[!is.na(x) & x != ""]
-  if (length(x) == 0) return(NA_character_)
-  names(sort(table(x), decreasing = TRUE))[1]
-}
-
 # ---------------------------------------------------------------------------
 # QA/QC: is a scientificName resolved to SPECIES level?
 #
@@ -99,7 +93,15 @@ community_table <- function(d) {
                      .groups = "drop") %>%
     dplyr::arrange(dplyr::desc(.data$individuals))
   out$cpn <- if (tn > 0) round(100 * out$individuals / tn, 2) else NA_real_
-  out$species_level <- is_species_level(out$scientificName)
+  # species-level flag must match the rest of the app (rank-aware): prefer the
+  # per-row flag clean_beetle() set from NEON's authoritative taxonRank, and fall
+  # back to the name heuristic only when rank is absent (e.g. the demo CSV).
+  # Using is_species_level(name) here alone made the Overview/Diversity species
+  # set disagree with the QA note, ordination and indicators once a real bundle
+  # (which carries taxonRank) is loaded.
+  out$species_level <- if ("species_level" %in% names(d)) {
+    unname(tapply(d$species_level %in% TRUE, d$scientificName, any)[out$scientificName])
+  } else is_species_level(out$scientificName)
   attr(out, "qa") <- taxon_qa(d)
   out
 }
@@ -380,18 +382,24 @@ bray_ordination <- function(d, min_total = 3, min_samples = 4) {
   d <- species_only(d)              # community structure on named species only
   d <- d[!is.na(d$scientificName) & !is.na(d$individualCount), , drop = FALSE]
   if (!nrow(d)) return(NULL)
-  d$sample <- paste(d$siteID, d$plotID, d$year, sep = "|")
+  # one community per site x year — the cross-site biogeography unit. Aggregating
+  # across plots (was site x plot x year, ~3,100 samples) keeps the ordination
+  # legible AND turns the Bray-Curtis matrix + cmdscale eigen — formerly the app's
+  # dominant ~4-minute boot cost — into a sub-second build (~380 samples).
+  d$sample <- paste(d$siteID, d$year, sep = "|")
   agg <- stats::aggregate(individualCount ~ sample + scientificName, d, sum)
   tab <- stats::xtabs(individualCount ~ sample + scientificName, data = agg)
   mat <- matrix(as.numeric(tab), nrow = nrow(tab),
                 dimnames = list(rownames(tab), colnames(tab)))
   mat <- mat[rowSums(mat) >= min_total, , drop = FALSE]
   if (nrow(mat) < min_samples) return(NULL)
-  n <- nrow(mat); D <- matrix(0, n, n)
-  for (i in seq_len(n - 1)) for (j in (i + 1):n) {
-    num <- sum(abs(mat[i, ] - mat[j, ])); den <- sum(mat[i, ] + mat[j, ])
-    D[i, j] <- D[j, i] <- if (den > 0) num / den else 0
-  }
+  # Vectorized Bray-Curtis: the numerator sum|x_i - x_j| is the Manhattan distance
+  # (computed at C level by dist()), and the denominator sum(x_i + x_j) is
+  # rowSum_i + rowSum_j. Replaces an O(n^2) interpreted R double-loop that
+  # dominated startup.
+  rs <- rowSums(mat)
+  D <- as.matrix(stats::dist(mat, method = "manhattan")) / outer(rs, rs, "+")
+  D[!is.finite(D)] <- 0; diag(D) <- 0
   fit <- tryCatch(stats::cmdscale(stats::as.dist(D), k = 2, eig = TRUE),
                   error = function(e) NULL)
   if (is.null(fit)) return(NULL)

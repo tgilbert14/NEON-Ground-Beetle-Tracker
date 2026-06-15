@@ -153,7 +153,7 @@ ui <- bslib::page_sidebar(
         card(full_screen = TRUE,
           card_head("diagram-2", "Community ordination — who resembles whom",
             info_pop("PCoA ordination",
-              p("Every point is a ", tags$b("site × plot × year"), " beetle community, placed by ",
+              p("Every point is a ", tags$b("site × year"), " beetle community, placed by ",
                 tags$b("Bray–Curtis"), " dissimilarity (PCoA) so similar communities sit close together."),
               p("Points from the same site/biome cluster — the carabid biogeography signal. Computed across all bundled sites."))),
           spin(plotlyOutput("ordPlot", height = "440px"))),

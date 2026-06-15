@@ -53,19 +53,34 @@ function(input, output, session) {
   # ---- load a site --------------------------------------------------------
   load_site <- function(site) {
     if (is.null(site) || site == "") return(invisible())
+
+    # Visible feedback the moment a load starts. shiny::Progress messages flush
+    # over the websocket immediately (unlike showNotification, which only renders
+    # after the observer returns) so the bar appears even during a synchronous
+    # bundle read and persists through a slow live NEON pull. on.exit() guarantees
+    # it closes and the button re-enables on every return path below.
+    shinyjs::disable("loadBtn")
+    prog <- shiny::Progress$new(session)
+    on.exit({ prog$close(); shinyjs::enable("loadBtn") }, add = TRUE)
+    prog$set(message = sprintf("Loading %s…", site), value = 0.15)
+
     d0 <- load_site_bundle(site)
     if (is.null(d0) || !nrow(d0)) {
       # try a live fetch when no bundle/demo exists
       if (LIVE_FETCH) {
+        prog$set(value = 0.35, message = sprintf("Downloading %s from NEON…", site),
+                 detail = "first live pull can take a minute")
         d0 <- tryCatch(fetch_neon_beetles(site, input$dateRange[1], input$dateRange[2]),
                        error = function(e) { showNotification(paste("NEON fetch failed:",
                          conditionMessage(e)), type = "error"); NULL })
       }
       if (is.null(d0) || !nrow(d0)) {
-        showNotification("No beetle data bundled for that site yet.", type = "warning")
+        showNotification(sprintf("No beetle data bundled for %s yet — run scripts/refresh_data.R to pull it.", site),
+                         type = "warning")
         return(invisible())
       }
     }
+    prog$set(value = 0.7, detail = "summarising the community…")
     src <- attr(d0, "source") %||% "neon"
     d <- filter_window(d0, input$dateRange[1], input$dateRange[2])
     if (is.null(d) || !nrow(d)) {
@@ -78,6 +93,7 @@ function(input, output, session) {
     rv$label <- site_label(site)
     y1 <- format(min(d$date, na.rm = TRUE), "%Y"); y2 <- format(max(d$date, na.rm = TRUE), "%Y")
     rv$ctx <- paste0(site, " · ", if (y1 == y2) y1 else paste0(y1, "–", y2))
+    prog$set(value = 1, detail = "done")
     shinyjs::show("mainTabsWrap"); shinyjs::hide("splash")
     nav_select("tabs", "overview")
   }
@@ -433,10 +449,17 @@ function(input, output, session) {
         tags$li("Hill numbers (Hill 1973; Jost 2006); Hurlbert (1971) rarefaction; Gotelli & Colwell (2001) accumulation; Dufrêne & Legendre (1997) indicator value; NEON ground-beetle sampling design (Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744)."),
         tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs"),
                 " and normalise the 2018 trap-count and 2023 plot-count protocol changes via per-trap-night effort.")),
-      div(class = "about-note", bs_icon("exclamation-triangle"),
-        " The bundled demo (HARV, KONZ, JORN) is ", tags$b("illustrative, not real NEON data"),
-        " — it exists so the app is usable before the real bundle is built with ",
-        tags$code("scripts/refresh_data.R"), "."),
+      local({
+        demo_sites <- if (!is.null(SITE_INDEX)) SITE_INDEX$site[SITE_INDEX$source == "demo"] else character(0)
+        if (length(demo_sites))
+          div(class = "about-note", bs_icon("exclamation-triangle"),
+            HTML(sprintf(" %s shown from <b>illustrative demo data — not real NEON records</b>; run <code>scripts/refresh_data.R</code> to replace with the real product.",
+              paste(demo_sites, collapse = ", "))))
+        else
+          div(class = "about-note", bs_icon("patch-check-fill"),
+            sprintf(" All %d bundled sites use real NEON records (DP1.10022.001).",
+                    if (!is.null(SITE_INDEX)) nrow(SITE_INDEX) else 0L))
+      }),
       p(style = "margin-top:16px", "An educational data-exploration tool by Desert Data Labs. Not affiliated with NEON, Battelle, or the NSF.")
     )
   })
