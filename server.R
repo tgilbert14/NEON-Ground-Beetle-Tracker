@@ -32,8 +32,15 @@ function(input, output, session) {
 
   # ---- cascading state -> site picker ------------------------------------
   .states <- state_choices()
-  updateSelectInput(session, "stateSel", choices = .states,
-                    selected = if ("KS" %in% .states) "KS" else unname(.states)[1])
+  # Open on the richest site so the first thing a user sees is real data — not an
+  # arbitrary "Kansas" default, and not an empty splash. The site-change auto-load
+  # (below) then drives every subsequent pick.
+  .firstSite <- if (!is.null(SITE_INDEX) && nrow(SITE_INDEX))
+                  SITE_INDEX$site[which.max(SITE_INDEX$richness)] else NULL
+  .firstState <- if (!is.null(.firstSite)) neon_sites$state[neon_sites$site == .firstSite][1]
+                 else unname(.states)[1]
+  rv$pendingSite <- .firstSite
+  updateSelectInput(session, "stateSel", choices = .states, selected = .firstState)
   observeEvent(input$stateSel, {
     sites <- sites_in_state(input$stateSel)
     sel <- if (!is.null(rv$pendingSite) && rv$pendingSite %in% sites) rv$pendingSite
@@ -51,17 +58,23 @@ function(input, output, session) {
   shinyjs::hide("mainTabsWrap")
 
   # ---- load a site --------------------------------------------------------
-  load_site <- function(site) {
+  # snap = TRUE (a freshly picked site) resets the date window to THAT site's real
+  # coverage, since a fixed default would silently hide data for sites whose years
+  # fall outside it. snap = FALSE (the Load button) honours the user's window but
+  # still auto-widens rather than scolding if it excludes every record.
+  load_site <- function(site, snap = FALSE) {
     if (is.null(site) || site == "") return(invisible())
+    if (isTRUE(rv$loading)) return(invisible())     # ignore re-taps / overlapping loads
+    rv$loading <- TRUE
 
-    # Visible feedback the moment a load starts. shiny::Progress messages flush
-    # over the websocket immediately (unlike showNotification, which only renders
-    # after the observer returns) so the bar appears even during a synchronous
-    # bundle read and persists through a slow live NEON pull. on.exit() guarantees
-    # it closes and the button re-enables on every return path below.
+    # Visible feedback the moment a load starts. shiny::Progress flushes over the
+    # websocket immediately (unlike showNotification) so the bar shows even during a
+    # synchronous bundle read and persists through a slow live pull. on.exit()
+    # guarantees the bar closes, the button re-enables, and the guard clears on
+    # every return path below.
     shinyjs::disable("loadBtn")
     prog <- shiny::Progress$new(session)
-    on.exit({ prog$close(); shinyjs::enable("loadBtn") }, add = TRUE)
+    on.exit({ prog$close(); shinyjs::enable("loadBtn"); rv$loading <- FALSE }, add = TRUE)
     prog$set(message = sprintf("Loading %s…", site), value = 0.15)
 
     d0 <- load_site_bundle(site)
@@ -82,10 +95,20 @@ function(input, output, session) {
     }
     prog$set(value = 0.7, detail = "summarising the community…")
     src <- attr(d0, "source") %||% "neon"
-    d <- filter_window(d0, input$dateRange[1], input$dateRange[2])
+
+    cover <- range(d0$date, na.rm = TRUE)
+    if (snap) {
+      win <- cover
+      updateDateRangeInput(session, "dateRange", start = cover[1], end = cover[2])
+    } else {
+      win <- as.Date(c(input$dateRange[1], input$dateRange[2]))
+    }
+    d <- filter_window(d0, win[1], win[2])
     if (is.null(d) || !nrow(d)) {
-      showNotification("No beetle records in that date window — widen it.", type = "warning")
-      return(invisible())
+      d <- d0      # never dead-end on an empty window — show the site's full range
+      updateDateRangeInput(session, "dateRange", start = cover[1], end = cover[2])
+      showNotification(sprintf("No records in that window — showing %s's full range (%s–%s).",
+        site, format(cover[1], "%Y"), format(cover[2], "%Y")), type = "message")
     }
     attr(d, "source") <- src
     rv$data  <- d
@@ -96,8 +119,29 @@ function(input, output, session) {
     prog$set(value = 1, detail = "done")
     shinyjs::show("mainTabsWrap"); shinyjs::hide("splash")
     nav_select("tabs", "overview")
+    session$sendCustomMessage("gbt_remember", site)   # persist last site for next visit
   }
-  observeEvent(input$loadBtn, load_site(input$site))
+  # The Load button re-applies the current (possibly narrowed) date window.
+  observeEvent(input$loadBtn, load_site(input$site, snap = FALSE))
+  # Picking a site (directly, via the state cascade, or via a map tap that drives
+  # the dropdowns) auto-loads it — one mental model, no "why is nothing happening".
+  # ignoreInit keeps the intro splash visible on first launch.
+  observeEvent(input$site, load_site(input$site, snap = TRUE),
+               ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # Restore the last-used site (localStorage) or a ?site=SRER URL param on connect.
+  observeEvent(input$restore_site, {
+    s <- input$restore_site
+    if (is.null(s) || !(s %in% available_sites())) return()
+    m <- neon_sites[neon_sites$site == s, ]
+    if (!nrow(m)) return()
+    if (identical(input$stateSel, m$state))
+      updateSelectInput(session, "site", selected = s)            # same state → triggers auto-load
+    else {
+      rv$pendingSite <- s
+      updateSelectInput(session, "stateSel", selected = m$state)  # cascade → site → auto-load
+    }
+  }, once = TRUE)
 
   output$srcNote <- renderUI({
     if (is.null(rv$data)) return(NULL)
@@ -115,7 +159,7 @@ function(input, output, session) {
     div(class = "splash",
       div(class = "splash-icon", "\U0001FAB2"),
       h3("Pick a site to begin"),
-      p("Choose a state and site at left, then ", tags$b("Load this site"),
+      p("Choose a state and site at left — it ", tags$b("loads automatically"),
         " — or open the Biogeography map and tap a marker."),
       if (!is.null(SITE_INDEX))
         p(class = "splash-sub", sprintf("%d site%s with beetle data available.",
@@ -155,8 +199,9 @@ function(input, output, session) {
               individuals, " individuals · ", bouts, " bouts<br>",
               cpn, " per 100 trap-nights<extra></extra>")) %>%
       plotly_theme(legend = FALSE) %>%
-      plotly::layout(xaxis = list(title = "individuals"), yaxis = list(title = ""),
-                     margin = list(l = 200)) %>%
+      plotly::layout(xaxis = list(title = "individuals"),
+                     yaxis = list(title = "", automargin = TRUE),  # fits names; shrinks on phones
+                     margin = list(l = 10, r = 70)) %>%             # r: room for outside /100TN labels
       plotly::add_annotations(text = rv$ctx, x = 1, y = 1.04, xref = "paper", yref = "paper",
         xanchor = "right", showarrow = FALSE, font = list(color = "#6b7a89", size = 11))
   })
@@ -202,7 +247,7 @@ function(input, output, session) {
   output$hillPlot <- renderPlotly({
     d <- rv$data; req(d)
     hn <- hill_numbers(sp_counts(d))
-    if (is.na(hn$q0)) return(note_plot("Not enough data for diversity"))
+    if (is.na(hn$q0)) return(note_plot("Not enough data for diversity<br><span style='font-size:13px'>try widening the date window at left</span>"))
     df <- data.frame(q = c("q0\nrichness", "q1\ncommon", "q2\ndominant"),
                      v = c(hn$q0, hn$q1, hn$q2))
     plot_ly(df, x = ~q, y = ~v, type = "bar",
@@ -226,7 +271,7 @@ function(input, output, session) {
   output$rarePlot <- renderPlotly({
     d <- rv$data; req(d)
     rc <- rarefaction_curve(sp_counts(d))
-    if (is.null(rc)) return(note_plot("Not enough individuals to rarefy"))
+    if (is.null(rc)) return(note_plot("Not enough individuals to rarefy<br><span style='font-size:13px'>try widening the date window at left</span>"))
     plot_ly() %>%
       add_trace(x = rc$n, y = rc$hi, type = "scatter", mode = "lines",
                 line = list(width = 0), showlegend = FALSE, hoverinfo = "skip") %>%
@@ -244,7 +289,7 @@ function(input, output, session) {
   output$accumPlot <- renderPlotly({
     d <- rv$data; req(d)
     ac <- accumulation_by_bout(d)
-    if (is.null(ac)) return(note_plot("Not enough bouts for accumulation"))
+    if (is.null(ac)) return(note_plot("Not enough bouts for accumulation<br><span style='font-size:13px'>try widening the date window at left</span>"))
     plot_ly() %>%
       add_trace(x = ac$bouts, y = ac$richness + ac$sd, type = "scatter", mode = "lines",
                 line = list(width = 0), showlegend = FALSE, hoverinfo = "skip") %>%
@@ -271,6 +316,16 @@ function(input, output, session) {
       return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"),
         HTML(sprintf(" Only %d years of data — too few to fit a trend yet.", nrow(t)))))
     }
+    # Under ~5 years a regression p-value is noise — show the apparent direction
+    # but don't dress it up with a decimal the info-popover itself says to ignore.
+    if (nrow(t) < 5) {
+      appdir <- if (slope > 0) "an apparent rise" else if (slope < 0) "an apparent decline" else "little change"
+      pcttxt <- if (is.finite(pct)) sprintf(" (~%+.0f%%/yr)", pct) else ""
+      return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"),
+        HTML(sprintf(" Over %d years, catch-per-effort shows <b>%s</b>%s — but %d years is too few to test reliably; read the direction, not the decimal.%s",
+          nrow(t), appdir, pcttxt, nrow(t),
+          if (identical(attr(t, "metric_kind"), "count")) " <i>(raw counts — no effort data)</i>" else ""))))
+    }
     sig <- is.finite(p) && p < 0.05
     dir <- if (!sig) "flat" else if (slope > 0) "up" else "down"
     word <- switch(dir, up = "rising", down = "declining", flat = "roughly flat")
@@ -290,7 +345,7 @@ function(input, output, session) {
   output$trendPlot <- renderPlotly({
     t <- trend_data()
     if (is.null(t) || nrow(t) < 2)
-      return(note_plot("Need at least two years of data for a trend"))
+      return(note_plot("Need at least two years of data for a trend<br><span style='font-size:13px'>try widening the date window at left</span>"))
     kind <- attr(t, "metric_kind") %||% "cpn"
     ytitle <- if (kind == "cpn") "catch per 100 trap-nights" else "individuals caught"
     p <- plot_ly(x = ~t$year, y = ~t$metric, type = "scatter", mode = "lines+markers",
@@ -313,7 +368,7 @@ function(input, output, session) {
     d <- rv$data; req(d)
     if (isTRUE(input$seasonBySpecies)) {
       s <- seasonality(d, by_species = TRUE)
-      if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data"))
+      if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
       pal <- rv$pal; p <- plot_ly()
       for (sp in unique(s$scientificName)) {
         ss <- s[s$scientificName == sp, ]
@@ -328,7 +383,7 @@ function(input, output, session) {
         yaxis = list(title = "catch per 100 trap-nights")))
     }
     s <- seasonality(d, by_species = FALSE)
-    if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data"))
+    if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
     plot_ly(x = month.abb[s$mon], y = s$cpn, type = "scatter", mode = "lines+markers",
             fill = "tozeroy", fillcolor = "rgba(19,99,43,0.16)",
             line = list(color = "#13632b", width = 3), marker = list(size = 7, color = "#13632b"),
@@ -391,8 +446,15 @@ function(input, output, session) {
   observeEvent(input$map_marker_click, {
     s <- input$map_marker_click$id; req(s)
     m <- neon_sites[neon_sites$site == s, ]
-    if (nrow(m)) { rv$pendingSite <- s; updateSelectInput(session, "stateSel", selected = m$state) }
-    load_site(s)
+    if (!nrow(m)) return()
+    # drive the pickers; the cascade / site-change observer does the single load,
+    # so the dropdowns and the loaded charts can't disagree (no race).
+    if (identical(input$stateSel, m$state))
+      updateSelectInput(session, "site", selected = s)
+    else {
+      rv$pendingSite <- s
+      updateSelectInput(session, "stateSel", selected = m$state)
+    }
   })
 
   output$siteTable <- DT::renderDT({
@@ -400,7 +462,7 @@ function(input, output, session) {
     tab <- si[order(-si$richness), c("site", "name", "state", "richness", "individuals", "dominant", "source")]
     names(tab) <- c("Site", "Name", "State", "Species", "Individuals", "Dominant species", "Source")
     DT::datatable(tab, rownames = FALSE, selection = "none",
-                  options = list(pageLength = 10, dom = "tp")) %>%
+                  options = list(pageLength = 10, dom = "tp", scrollX = TRUE)) %>%
       DT::formatCurrency("Individuals", currency = "", interval = 3, mark = ",", digits = 0)
   })
 
@@ -412,7 +474,7 @@ function(input, output, session) {
     tab <- ind[, c("scientificName", "indicator_site", "indval", "specificity", "fidelity", "total")]
     names(tab) <- c("Species", "Indicator of", "IndVal", "Specificity %", "Fidelity %", "Total caught")
     DT::datatable(tab, rownames = FALSE, selection = "none",
-                  options = list(pageLength = 12, dom = "tp", order = list(list(2, "desc")))) %>%
+                  options = list(pageLength = 12, dom = "tp", scrollX = TRUE, order = list(list(2, "desc")))) %>%
       DT::formatStyle("Species", fontStyle = "italic") %>%
       DT::formatStyle("IndVal",
         background = DT::styleColorBar(c(0, 100), "#cfe6d6"),

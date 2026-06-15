@@ -16,7 +16,18 @@ ui <- bslib::page_sidebar(
   tags$head(
     tags$link(rel = "stylesheet",
       href = "https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap"),
-    tags$link(rel = "stylesheet", href = "styles.css")
+    tags$link(rel = "stylesheet", href = "styles.css"),
+    # Remember the last site across visits, and honour ?site=SRER in the URL so a
+    # site is bookmarkable/shareable. Polls until Shiny + jQuery exist (load-order
+    # safe); every step is wrapped so a privacy-locked localStorage never breaks boot.
+    tags$script(HTML(
+      "(function(){function init(){if(!window.Shiny||!window.jQuery){return setTimeout(init,50);} ",
+      "jQuery(document).on('shiny:connected',function(){try{",
+      "var p=new URLSearchParams(window.location.search).get('site');",
+      "var s=p||localStorage.getItem('gbt_site');",
+      "if(s){Shiny.setInputValue('restore_site',s,{priority:'event'});}}catch(e){}});",
+      "Shiny.addCustomMessageHandler('gbt_remember',function(s){try{if(s){localStorage.setItem('gbt_site',s);}}catch(e){}});",
+      "}init();})();"))
   ),
   useShinyjs(),
 
@@ -44,7 +55,10 @@ ui <- bslib::page_sidebar(
     actionButton("loadBtn", tagList(bs_icon("bug-fill"), " Load this site"),
                  class = "btn-primary btn-lg w-100"),
     div(class = "demo-hint", bs_icon("info-circle"),
-        " Bundled sites load instantly. Live NEON pulls (where enabled) take a moment."),
+        if (isTRUE(LIVE_FETCH))
+          " Picking a site loads it automatically. Bundled sites are instant; live NEON pulls take a moment. Adjust the date window and tap Load to refine."
+        else
+          " Picking a site loads it automatically — the date window snaps to that site's coverage. Narrow it and tap Load to zoom in."),
 
     uiOutput("srcNote"),
 
