@@ -49,6 +49,20 @@ function(input, output, session) {
     updateSelectInput(session, "site", choices = sites, selected = sel)
   }, ignoreNULL = TRUE)
 
+  # ---- compare-site picker (optional second site to contrast) -------------
+  .siteChoices <- function(exclude = NULL) {
+    sc <- available_sites(); sc <- sc[sc != (exclude %||% "")]
+    labs <- vapply(sc, function(s) { m <- neon_sites[neon_sites$site == s, ]
+      if (nrow(m)) sprintf("%s · %s", s, m$name) else s }, character(1))
+    c("(no comparison)" = "", stats::setNames(sc, labs))
+  }
+  updateSelectInput(session, "compareSite", choices = .siteChoices(.firstSite), selected = "")
+  observeEvent(input$site, {
+    keep <- if (!is.null(input$compareSite) && nzchar(input$compareSite) &&
+                !identical(input$compareSite, input$site)) input$compareSite else ""
+    updateSelectInput(session, "compareSite", choices = .siteChoices(input$site), selected = keep)
+  }, ignoreInit = TRUE)
+
   output$siteBio <- renderUI({
     req(input$site); b <- site_bio(input$site)
     if (is.null(b)) return(NULL)
@@ -142,6 +156,16 @@ function(input, output, session) {
       updateSelectInput(session, "stateSel", selected = m$state)  # cascade → site → auto-load
     }
   }, once = TRUE)
+
+  # Optional comparison site, loaded over its full coverage. Effort-normalised
+  # metrics (catch per 100 trap-nights) keep the contrast fair across year spans.
+  compareData <- reactive({
+    s <- input$compareSite
+    if (is.null(s) || !nzchar(s)) return(NULL)
+    d <- load_site_bundle(s)
+    if (is.null(d) || !nrow(d)) return(NULL)
+    d
+  })
 
   output$srcNote <- renderUI({
     if (is.null(rv$data)) return(NULL)
@@ -248,8 +272,24 @@ function(input, output, session) {
     d <- rv$data; req(d)
     hn <- hill_numbers(sp_counts(d))
     if (is.na(hn$q0)) return(note_plot("Not enough data for diversity<br><span style='font-size:13px'>try widening the date window at left</span>"))
-    df <- data.frame(q = c("q0\nrichness", "q1\ncommon", "q2\ndominant"),
-                     v = c(hn$q0, hn$q1, hn$q2))
+    qlab <- c("q0\nrichness", "q1\ncommon", "q2\ndominant")
+    cmp <- compareData()
+    if (!is.null(cmp)) {                       # two-site grouped comparison
+      hb <- hill_numbers(sp_counts(cmp))
+      return(plot_ly() %>%
+        add_trace(x = qlab, y = c(hn$q0, hn$q1, hn$q2), type = "bar", name = input$site,
+                  marker = list(color = "#13632b"), text = round(c(hn$q0, hn$q1, hn$q2), 1),
+                  textposition = "outside",
+                  hovertemplate = paste0("<b>", input$site, "</b><br>%{x}: %{y:.2f}<extra></extra>")) %>%
+        add_trace(x = qlab, y = c(hb$q0, hb$q1, hb$q2), type = "bar", name = input$compareSite,
+                  marker = list(color = "#AB0520"), text = round(c(hb$q0, hb$q1, hb$q2), 1),
+                  textposition = "outside",
+                  hovertemplate = paste0("<b>", input$compareSite, "</b><br>%{x}: %{y:.2f}<extra></extra>")) %>%
+        plotly_theme() %>%
+        plotly::layout(barmode = "group", xaxis = list(title = ""),
+                       yaxis = list(title = "effective species")))
+    }
+    df <- data.frame(q = qlab, v = c(hn$q0, hn$q1, hn$q2))
     plot_ly(df, x = ~q, y = ~v, type = "bar",
             marker = list(color = c("#13632b", "#1a7f37", "#5cb56e")),
             text = ~round(v, 1), textposition = "outside",
@@ -266,6 +306,22 @@ function(input, output, session) {
               "a moderately uneven community" else "a community dominated by a few species"
     div(class = "hill-note", bs_icon("info-circle"),
       HTML(sprintf(" Evenness q1/q0 = <b>%.2f</b> — %s.", hn$even, word)))
+  })
+
+  # plain-English verdict banner (same pattern as the Trends banner)
+  output$diversityVerdict <- renderUI({
+    d <- rv$data; req(d)
+    hn <- hill_numbers(sp_counts(d))
+    if (is.na(hn$q0)) return(NULL)
+    even_word <- if (is.na(hn$even)) "a single-species catch"
+                 else if (hn$even >= 0.6) "an even community"
+                 else if (hn$even >= 0.35) "a moderately uneven community"
+                 else "a community dominated by a few species"
+    cls <- if (is.na(hn$even) || hn$even < 0.35) "trend-flat"
+           else if (hn$even >= 0.6) "trend-up" else "trend-info"
+    div(class = paste("trend-verdict", cls), bs_icon("diagram-3-fill"),
+      HTML(sprintf(" <b>%d</b> beetle species here — q1 = <b>%.1f</b> common, q2 = <b>%.1f</b> dominant — %s.",
+        as.integer(hn$q0), hn$q1, hn$q2, even_word)))
   })
 
   output$rarePlot <- renderPlotly({
@@ -366,6 +422,27 @@ function(input, output, session) {
   # ---- Seasonality --------------------------------------------------------
   output$seasonPlot <- renderPlotly({
     d <- rv$data; req(d)
+    cmp <- compareData()
+    if (!is.null(cmp)) {                       # contrast two sites' activity curves
+      sA <- seasonality(d, by_species = FALSE)
+      sB <- seasonality(cmp, by_species = FALSE)
+      if ((is.null(sA) || !nrow(sA)) && (is.null(sB) || !nrow(sB)))
+        return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
+      p <- plot_ly()
+      if (!is.null(sA) && nrow(sA))
+        p <- p %>% add_trace(x = month.abb[sA$mon], y = sA$cpn, type = "scatter",
+          mode = "lines+markers", name = input$site,
+          line = list(color = "#13632b", width = 3), marker = list(size = 7, color = "#13632b"),
+          hovertemplate = paste0("<b>", input$site, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
+      if (!is.null(sB) && nrow(sB))
+        p <- p %>% add_trace(x = month.abb[sB$mon], y = sB$cpn, type = "scatter",
+          mode = "lines+markers", name = input$compareSite,
+          line = list(color = "#AB0520", width = 3, dash = "dot"), marker = list(size = 7, color = "#AB0520"),
+          hovertemplate = paste0("<b>", input$compareSite, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
+      return(plotly_theme(p) %>% plotly::layout(
+        xaxis = list(title = "", categoryorder = "array", categoryarray = month.abb),
+        yaxis = list(title = "catch per 100 trap-nights")))
+    }
     if (isTRUE(input$seasonBySpecies)) {
       s <- seasonality(d, by_species = TRUE)
       if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
@@ -391,6 +468,20 @@ function(input, output, session) {
       plotly_theme(legend = FALSE) %>%
       plotly::layout(xaxis = list(title = "", categoryorder = "array", categoryarray = month.abb),
                      yaxis = list(title = "catch per 100 trap-nights"))
+  })
+
+  # plain-English seasonality verdict (peak month + active window)
+  output$seasonVerdict <- renderUI({
+    d <- rv$data; req(d)
+    if (!is.null(compareData())) return(NULL)   # verdict is per-site; hidden while comparing
+    s <- seasonality(d, by_species = FALSE)
+    if (is.null(s) || !nrow(s)) return(NULL)
+    peak <- s$mon[which.max(s$cpn)]
+    act <- sort(s$mon[s$cpn >= 0.2 * max(s$cpn, na.rm = TRUE)])
+    win <- if (length(act) >= 2) sprintf("%s–%s", month.abb[min(act)], month.abb[max(act)]) else month.abb[peak]
+    div(class = "trend-verdict trend-info", bs_icon("calendar-heart"),
+      HTML(sprintf(" Activity peaks in <b>%s</b>; the warm-season window runs <b>%s</b>.",
+        month.abb[peak], win)))
   })
 
   # ---- Biogeography -------------------------------------------------------

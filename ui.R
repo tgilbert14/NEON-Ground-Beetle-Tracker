@@ -27,6 +27,8 @@ ui <- bslib::page_sidebar(
       "var s=p||localStorage.getItem('gbt_site');",
       "if(s){Shiny.setInputValue('restore_site',s,{priority:'event'});}}catch(e){}});",
       "Shiny.addCustomMessageHandler('gbt_remember',function(s){try{if(s){localStorage.setItem('gbt_site',s);}}catch(e){}});",
+      "function hideOv(){var o=document.getElementById('bootOverlay');if(o){o.classList.add('is-hidden');setTimeout(function(){if(o&&o.parentNode){o.parentNode.removeChild(o);}},600);}}",
+      "jQuery(document).one('shiny:idle',hideOv);setTimeout(hideOv,8000);",   # fallback if idle never fires
       "}init();})();"))
   ),
   useShinyjs(),
@@ -62,6 +64,11 @@ ui <- bslib::page_sidebar(
 
     uiOutput("srcNote"),
 
+    div(class = "compare-pick",
+      selectInput("compareSite",
+        label = tagList(bs_icon("layers-half"), " Compare with (optional)"),
+        choices = NULL, width = "100%")),
+
     hr(class = "deck-hr"),
     div(class = "deck-foot",
       bs_icon("database"), " NEON ", tags$code("DP1.10022.001"),
@@ -71,6 +78,12 @@ ui <- bslib::page_sidebar(
                    bs_icon("box-arrow-up-right"), " Desert Data Labs")
     )
   ),
+
+  # ---- boot / cold-start overlay (removed by JS once Shiny goes idle) -----
+  div(id = "bootOverlay", class = "boot-overlay",
+    div(class = "boot-bug", "\U0001FAB2"),
+    div(class = "boot-msg", "Waking up the Ground Beetle Tracker…"),
+    div(class = "boot-sub", "Loading 46 NEON sites")),
 
   # ---- hero + stats ------------------------------------------------------
   div(class = "app-hero",
@@ -101,6 +114,7 @@ ui <- bslib::page_sidebar(
 
       nav_panel(
         title = tagList(bs_icon("diagram-3-fill"), " Diversity"), value = "diversity",
+        uiOutput("diversityVerdict"),
         uiOutput("qaNote"),
         layout_columns(col_widths = c(5, 7),
           card(full_screen = TRUE,
@@ -132,6 +146,7 @@ ui <- bslib::page_sidebar(
         title = tagList(bs_icon("calendar-heart"), " Seasonality"), value = "seasonality",
         div(class = "tab-intro", bs_icon("info-circle"),
             " Beetle activity isn't constant — pitfall catch tracks the warm season and each species' own peak."),
+        uiOutput("seasonVerdict"),
         card(full_screen = TRUE,
           card_head("activity", "Activity-density by month (catch per 100 trap-nights)",
             info_pop("Seasonality",
