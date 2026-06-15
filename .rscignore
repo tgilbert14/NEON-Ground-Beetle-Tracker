@@ -1,0 +1,9 @@
+# Files excluded from the Posit Connect Cloud bundle.
+# scripts/refresh_data.R is a BUILD-TIME tool: it library()s neonUtilities to
+# rebuild data/sites/*.rds. The deployed app is bundle-only (loads the committed
+# rds), so excluding it keeps the heavy neonUtilities dependency out of the
+# manifest and the runtime image.
+scripts/
+refresh_data.log
+.Rproj.user/
+.Rhistory
