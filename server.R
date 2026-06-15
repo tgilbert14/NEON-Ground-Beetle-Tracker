@@ -127,7 +127,7 @@ function(input, output, session) {
     attr(d, "source") <- src
     rv$data  <- d
     rv$pal   <- make_species_pal(d)
-    rv$label <- site_label(site)
+    rv$label <- site_label(site); rv$siteCode <- site
     y1 <- format(min(d$date, na.rm = TRUE), "%Y"); y2 <- format(max(d$date, na.rm = TRUE), "%Y")
     rv$ctx <- paste0(site, " · ", if (y1 == y2) y1 else paste0(y1, "–", y2))
     prog$set(value = 1, detail = "done")
@@ -178,6 +178,39 @@ function(input, output, session) {
     showNotification(sprintf("Comparing %s vs %s — shown on the Diversity & Seasonality tabs.",
       input$site, s), type = "message", duration = 5)
   }, ignoreInit = TRUE)
+
+  # ---- Surprise me: hop to a random site (fun, low-friction exploration) ---
+  do_surprise <- function() {
+    pool <- setdiff(available_sites(), input$site %||% "")
+    if (!length(pool)) pool <- available_sites()
+    if (!length(pool)) return()
+    s <- if (length(pool) == 1) pool else sample(pool, 1)
+    m <- neon_sites[neon_sites$site == s, ]
+    if (!nrow(m)) return()
+    if (identical(input$stateSel, m$state)) updateSelectInput(session, "site", selected = s)
+    else { rv$pendingSite <- s; updateSelectInput(session, "stateSel", selected = m$state) }
+  }
+  observeEvent(input$surpriseBtn, do_surprise())
+  observeEvent(input$welcomeSurprise, { removeModal(); do_surprise() })
+
+  # ---- first-visit welcome (once per browser; gated client-side) -----------
+  observeEvent(input$first_visit, {
+    showModal(modalDialog(
+      title = NULL, easyClose = TRUE, footer = NULL,
+      div(class = "welcome",
+        div(class = "welcome-bug", "\U0001FAB2"),
+        h3("Welcome to the Ground Beetle Tracker"),
+        p("Explore ground-beetle (Carabidae) biodiversity across ", tags$b("46 NEON sites"),
+          " — who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. Real data, instant loads."),
+        tags$ul(class = "welcome-list",
+          tags$li(tags$b("Pick a state & site"), " at left — it loads automatically."),
+          tags$li(tags$b("Open Biogeography"), " and tap any site on the national map."),
+          tags$li(tags$b("Compare two sites"), " to contrast a desert with a forest.")),
+        div(class = "welcome-cta",
+          actionButton("welcomeSurprise", tagList(bs_icon("shuffle"), " Surprise me"), class = "btn-success"),
+          modalButton("Start exploring →")))
+    ))
+  }, once = TRUE)
 
   output$srcNote <- renderUI({
     if (is.null(rv$data)) return(NULL)
@@ -518,12 +551,33 @@ function(input, output, session) {
           siteID, sp, fmt_int(individualCount)), htmltools::HTML)))
     }
     pal <- c(neon = "#13632b", demo = "#c9a300")
-    base %>% addCircleMarkers(data = si, lng = ~lng, lat = ~lat, layerId = ~site,
+    m <- base %>% addCircleMarkers(data = si, lng = ~lng, lat = ~lat, layerId = ~site,
         radius = ~pmax(6, sqrt(richness) * 4), color = ~unname(pal[source]),
         fillOpacity = 0.7, stroke = TRUE, weight = 1.5,
         label = ~lapply(sprintf("<b>%s</b> · %s<br>%d species · %s individuals<br>dominant: <i>%s</i>%s",
           site, name, richness, fmt_int(individuals), dominant,
           ifelse(source == "demo", "<br><b>demo data</b>", "")), htmltools::HTML))
+    cur <- isolate(rv$siteCode)   # ring the loaded site so the map ↔ single-site view connect
+    if (!is.null(cur)) {
+      cs <- si[si$site == cur, , drop = FALSE]
+      if (nrow(cs) && !is.na(cs$lat))
+        m <- m %>% addCircleMarkers(lng = cs$lng, lat = cs$lat, radius = 15, color = "#FFD200",
+          weight = 3, fill = FALSE, opacity = 1, group = "currentSite",
+          options = pathOptions(interactive = FALSE))
+    }
+    m
+  })
+
+  # keep the gold "you are here" ring in sync as sites load (no full re-render)
+  observeEvent(rv$siteCode, {
+    req(rv$siteCode); si <- SITE_INDEX; if (is.null(si)) return()
+    if (!is.null(input$rangeSpecies) && nzchar(input$rangeSpecies)) return()  # skip in species-range mode
+    cs <- si[si$site == rv$siteCode, , drop = FALSE]
+    if (!nrow(cs) || is.na(cs$lat)) return()
+    leafletProxy("map") %>% clearGroup("currentSite") %>%
+      addCircleMarkers(lng = cs$lng, lat = cs$lat, radius = 15, color = "#FFD200",
+        weight = 3, fill = FALSE, opacity = 1, group = "currentSite",
+        options = pathOptions(interactive = FALSE))
   })
 
   # cross-site community ordination (PCoA on Bray-Curtis)
