@@ -67,7 +67,9 @@ ui <- bslib::page_sidebar(
     div(class = "compare-pick",
       selectInput("compareSite",
         label = tagList(bs_icon("layers-half"), " Compare with (optional)"),
-        choices = NULL, width = "100%")),
+        choices = NULL, width = "100%"),
+      div(class = "demo-hint", bs_icon("info-circle"),
+          " Overlaid on the Diversity & Seasonality tabs.")),
 
     hr(class = "deck-hr"),
     div(class = "deck-foot",

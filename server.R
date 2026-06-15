@@ -167,6 +167,18 @@ function(input, output, session) {
     d
   })
 
+  # Picking a comparison only changes the Diversity & Seasonality charts, so give
+  # immediate feedback: hop to a compare-enabled tab (if not already on one) and
+  # announce what's being compared — no submit button needed, it's live.
+  observeEvent(input$compareSite, {
+    s <- input$compareSite
+    if (is.null(s) || !nzchar(s)) return()
+    if (!isTRUE(input$tabs %in% c("diversity", "seasonality")))
+      nav_select("tabs", "diversity")
+    showNotification(sprintf("Comparing %s vs %s — shown on the Diversity & Seasonality tabs.",
+      input$site, s), type = "message", duration = 5)
+  }, ignoreInit = TRUE)
+
   output$srcNote <- renderUI({
     if (is.null(rv$data)) return(NULL)
     if (identical(attr(rv$data, "source"), "demo"))
