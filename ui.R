@@ -150,7 +150,7 @@ ui <- bslib::page_sidebar(
         card(full_screen = TRUE,
           card_head("activity", "Activity-density by month (catch per 100 trap-nights)",
             info_pop("Seasonality",
-              p("Mean ", tags$b("catch per 100 trap-nights"), " by calendar month — the community activity curve. Toggle to split it by the top species."))),
+              p("Mean ", tags$b("catch per 100 trap-nights"), " by calendar month — the whole-community activity curve, pooling ", tags$b("every ground beetle (Carabidae) trapped"), " at this site, including records left at genus/family. Toggle to split it by the top species."))),
           div(class = "season-toggle",
             checkboxInput("seasonBySpecies", "Split by species", value = FALSE)),
           spin(plotlyOutput("seasonPlot", height = "440px")))

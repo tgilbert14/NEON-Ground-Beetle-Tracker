@@ -462,10 +462,10 @@ function(input, output, session) {
     s <- seasonality(d, by_species = FALSE)
     if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
     plot_ly(x = month.abb[s$mon], y = s$cpn, type = "scatter", mode = "lines+markers",
-            fill = "tozeroy", fillcolor = "rgba(19,99,43,0.16)",
+            name = "all ground beetles", fill = "tozeroy", fillcolor = "rgba(19,99,43,0.16)",
             line = list(color = "#13632b", width = 3), marker = list(size = 7, color = "#13632b"),
             hovertemplate = "%{x}: %{y:.1f} per 100 trap-nights<extra></extra>") %>%
-      plotly_theme(legend = FALSE) %>%
+      plotly_theme(legend = TRUE) %>%   # single labelled series: it's the whole carabid catch, all taxa pooled
       plotly::layout(xaxis = list(title = "", categoryorder = "array", categoryarray = month.abb),
                      yaxis = list(title = "catch per 100 trap-nights"))
   })
