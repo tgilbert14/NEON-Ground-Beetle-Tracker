@@ -19,6 +19,23 @@ sharing its Desert Data Labs house style and **bundle-first** data pattern.
 > tiny `data-sample/beetle_demo.csv` remains only as an offline fallback. Re-pull or
 > extend the bundle anytime with `scripts/refresh_data.R`.
 
+## A look inside
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/bet_community.png" alt="Carabid community composition ranked by abundance" width="100%"><br><sub><b>Overview</b> — every species ranked by abundance, labelled with catch per 100 trap-nights.</sub></td>
+    <td width="50%"><img src="assets/bet_diversity.png" alt="Diversity profile and rarefaction curve" width="100%"><br><sub><b>Diversity</b> — Hill numbers (q0/q1/q2) and rarefaction, with the species-vs-higher-taxa QA note.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/bet_seasonality.png" alt="Seasonal activity-density split by species" width="100%"><br><sub><b>Seasonality</b> — activity-density by month, split by species to reveal each one's peak.</sub></td>
+    <td width="50%"><img src="assets/bet_trends.png" alt="Inter-annual catch-per-effort with fitted trend" width="100%"><br><sub><b>Trends</b> — inter-annual catch-per-effort with a fitted trend: the insect-decline view.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/bet_siteCompare.png" alt="Bray-Curtis community ordination of all sites" width="100%"><br><sub><b>Biogeography</b> — a Bray–Curtis PCoA placing every site×year community; sites cluster by biome.</sub></td>
+    <td width="50%"><img src="assets/bet_indcatorSpecies.png" alt="Indicator species table by IndVal" width="100%"><br><sub><b>Indicator species</b> — each site's signature beetles by Dufrêne–Legendre IndVal.</sub></td>
+  </tr>
+</table>
+
 ## What it does
 
 | Tab | What you see |
@@ -29,6 +46,8 @@ sharing its Desert Data Labs house style and **bundle-first** data pattern.
 | **Trends** | Inter-annual catch-per-effort with a fitted OLS trend line and a plain-English verdict (rising / declining / flat, with %/yr and p-value) — the insect-decline view. |
 | **Biogeography** | A national map sized by carabid richness — or by a chosen species' local abundance (a range map); a **PCoA community ordination** (Bray–Curtis) showing which site×year communities resemble each other; an **indicator-species table** (Dufrêne–Legendre IndVal) naming each site's signature beetles; and a sortable comparison table. |
 | **About** | Data product, methods, and the live data-source note. |
+
+Pick a site and it loads automatically (the date window snaps to that site's real coverage); tap a marker on the map to jump there, or hit **Surprise me** for a random site. Choose a **Compare with** site to overlay any second site on the Diversity and Seasonality charts — a prairie next to a forest.
 
 ## How the numbers work
 
