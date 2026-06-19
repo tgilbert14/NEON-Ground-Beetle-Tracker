@@ -296,33 +296,89 @@ function(input, output, session) {
     }
   )
 
-  # ---- tidy long-table CSV export (the analysis-ready download) ------------
+  # ---- tidy long-table export, bundled with a codebook + provenance --------
   # The loaded site's records as one row per plot x bout x species, plus a derived
   # catch-per-100-trap-nights so the effort-normalised metric travels with the raw
-  # counts. Loads straight into R/pandas — the deliverable an ecologist actually wants.
+  # counts. Loads straight into R/pandas. We ship it as a .zip carrying the data,
+  # a column codebook, and a README provenance stamp so the download is
+  # self-documenting (a researcher can use it cold). When no zip binary exists
+  # (some minimal images), we fall back to the plain tidy CSV — never error.
+  .zip_available <- function() nzchar(Sys.which(Sys.getenv("R_ZIPCMD", "zip")))
+  .build_export_df <- function(d) {
+    tn <- suppressWarnings(as.numeric(d$trapnights))
+    out <- data.frame(
+      siteID                 = d$siteID %||% (rv$siteCode %||% NA_character_),
+      plotID                 = d$plotID,
+      collectDate            = as.character(d$date),
+      year                   = d$year,
+      month                  = d$mon,
+      taxonID                = d$taxonID,
+      scientificName         = d$scientificName,
+      taxonRank              = d$taxonRank,
+      species_level          = d$species_level,
+      individualCount        = d$individualCount,
+      trapnights             = tn,
+      cpn_per_100_trapnights = ifelse(!is.na(tn) & tn > 0, round(100 * d$individualCount / tn, 3), NA_real_),
+      source                 = attr(d, "source") %||% "neon",
+      stringsAsFactors = FALSE)
+    out[order(out$collectDate, -out$individualCount), , drop = FALSE]
+  }
   output$reportCsv <- downloadHandler(
-    filename = function() sprintf("NEON-beetles-%s-%s.csv",
-      rv$siteCode %||% "site", format(Sys.Date(), "%Y%m%d")),
+    filename = function() sprintf("NEON-beetles-%s-%s.%s",
+      rv$siteCode %||% "site", format(Sys.Date(), "%Y%m%d"),
+      if (.zip_available()) "zip" else "csv"),
     content = function(file) {
       d <- rv$data; req(d)
-      tn <- suppressWarnings(as.numeric(d$trapnights))
-      out <- data.frame(
-        siteID                 = d$siteID %||% (rv$siteCode %||% NA_character_),
-        plotID                 = d$plotID,
-        collectDate            = as.character(d$date),
-        year                   = d$year,
-        month                  = d$mon,
-        taxonID                = d$taxonID,
-        scientificName         = d$scientificName,
-        taxonRank              = d$taxonRank,
-        species_level          = d$species_level,
-        individualCount        = d$individualCount,
-        trapnights             = tn,
-        cpn_per_100_trapnights = ifelse(!is.na(tn) & tn > 0, round(100 * d$individualCount / tn, 3), NA_real_),
-        source                 = attr(d, "source") %||% "neon",
-        stringsAsFactors = FALSE)
-      out <- out[order(out$collectDate, -out$individualCount), , drop = FALSE]
-      utils::write.csv(out, file, row.names = FALSE, na = "")
+      out <- .build_export_df(d)
+      cb  <- beetle_export_codebook()
+      if (!setequal(names(out), cb$column))   # drift guard: codebook ↔ data columns
+        warning("CSV export codebook out of sync: ",
+                paste(setdiff(names(out), cb$column), collapse = ", "))
+      site <- rv$siteCode %||% "site"
+      if (!.zip_available()) { utils::write.csv(out, file, row.names = FALSE, na = ""); return(invisible()) }
+
+      base <- sprintf("NEON-beetles-%s-%s", site, format(Sys.Date(), "%Y%m%d"))
+      tmp  <- tempfile("gbtcsv"); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
+      f_data <- file.path(tmp, paste0(base, ".csv"))
+      f_cb   <- file.path(tmp, paste0(base, "-codebook.csv"))
+      f_rm   <- file.path(tmp, "README.txt")
+      utils::write.csv(out, f_data, row.names = FALSE, na = "")
+      utils::write.csv(cb,  f_cb,   row.names = FALSE, na = "")
+      win <- tryCatch(as.character(as.Date(c(input$dateRange[1], input$dateRange[2]))),
+                      error = function(e) c(NA, NA))
+      writeLines(c(
+        "NEON Ground Beetle Tracker — data export",
+        "========================================",
+        sprintf("Site:         %s", rv$label %||% site),
+        "Data product: NEON DP1.10022.001 (Ground beetles sampled from pitfall traps)",
+        sprintf("Coverage:     %s", rv$ctx %||% ""),
+        sprintf("Date window:  %s to %s", win[1], win[2]),
+        sprintf("Rows:         %d", nrow(out)),
+        sprintf("Source:       %s", attr(d, "source") %||% "neon"),
+        sprintf("Exported:     %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+        "",
+        "Files",
+        "-----",
+        sprintf("%s.csv          tidy data, one row per plot x bout x taxon", base),
+        sprintf("%s-codebook.csv column dictionary (name, type, units, definition)", base),
+        "",
+        "Method notes",
+        "------------",
+        "- Effort-normalised catch (cpn_per_100_trapnights) absorbs NEON's 2018 trap-count",
+        "  and 2023 plot-count protocol changes, so years and sites compare fairly.",
+        "- scientificName reconciles parataxonomist IDs with authoritative expert IDs;",
+        "  species_level flags binomial resolution (Hoekman et al. 2017, Ecosphere 8(4):e01744).",
+        "- Richness / diversity / ordination / indicators use species_level == TRUE only;",
+        "  total abundance keeps every beetle trapped.",
+        "",
+        "An educational data-exploration tool by Desert Data Labs. Not affiliated with",
+        "NEON, Battelle, or the NSF."
+      ), f_rm)
+      ok <- tryCatch({
+        utils::zip(file, files = c(f_data, f_cb, f_rm), flags = "-j -q")
+        file.exists(file) && file.size(file) > 0
+      }, error = function(e) FALSE)
+      if (!isTRUE(ok)) utils::write.csv(out, file, row.names = FALSE, na = "")  # last-ditch
     }
   )
 
@@ -744,7 +800,11 @@ function(input, output, session) {
     p <- plot_ly(pts, x = ~value, y = ~cpue, type = "scatter", mode = "markers",
             marker = list(color = meta$color, size = 9, line = list(color = "#fff", width = 1)),
             hovertemplate = ~paste0("%{x} ", meta$unit, " · %{y:.1f} /100TN<br>", format(date, "%b %Y"), "<extra></extra>"))
-    if (nrow(pts) >= 8 && abs(stats::cor(pts$value, pts$cpue, use = "complete.obs")) >= 0.2) {
+    # fit only when there's enough signal: >=8 months AND |r|>=0.2. Guard the cor()
+    # against a constant driver (sd 0 -> cor NA -> if(NA) would crash the chart).
+    rr <- if (stats::sd(pts$value) > 0 && stats::sd(pts$cpue) > 0)
+            abs(suppressWarnings(stats::cor(pts$value, pts$cpue))) else NA_real_
+    if (nrow(pts) >= 8 && is.finite(rr) && rr >= 0.2) {
       fit <- stats::lm(cpue ~ value, pts); xr <- range(pts$value)
       yy <- stats::predict(fit, newdata = data.frame(value = xr))
       p <- p %>% add_trace(x = xr, y = yy, type = "scatter", mode = "lines", inherit = FALSE,
@@ -1001,7 +1061,10 @@ function(input, output, session) {
                 " still counts every beetle trapped. The Diversity tab shows exactly how many records this excludes."),
         tags$li("Hill numbers (Hill 1973; Jost 2006); Hurlbert (1971) rarefaction; Gotelli & Colwell (2001) accumulation; Dufrêne & Legendre (1997) indicator value; NEON ground-beetle sampling design (Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744)."),
         tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs"),
-                " and normalise the 2018 trap-count and 2023 plot-count protocol changes via per-trap-night effort.")),
+                " and normalise the 2018 trap-count and 2023 plot-count protocol changes via per-trap-night effort."),
+        tags$li(tags$b("Download the data."), " The ", tags$b("Data + codebook"),
+                " button exports the loaded site as a tidy one-row-per-plot×bout×species table, bundled with a column ",
+                tags$b("codebook"), " and a provenance README so it loads straight into R/pandas and documents itself.")),
       local({
         demo_sites <- if (!is.null(SITE_INDEX)) SITE_INDEX$site[SITE_INDEX$source == "demo"] else character(0)
         if (length(demo_sites))

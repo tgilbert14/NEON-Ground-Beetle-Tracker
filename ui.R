@@ -63,7 +63,7 @@ ui <- bslib::page_sidebar(
                  class = "btn-outline-success w-100 mt-2"),
     downloadButton("reportPdf", tagList(bs_icon("file-earmark-pdf"), " Site report (PDF)"),
                    class = "btn-outline-secondary w-100 mt-2"),
-    downloadButton("reportCsv", tagList(bs_icon("filetype-csv"), " Data (CSV)"),
+    downloadButton("reportCsv", tagList(bs_icon("filetype-csv"), " Data + codebook"),
                    class = "btn-outline-secondary w-100 mt-2"),
     div(class = "demo-hint", bs_icon("info-circle"),
         if (isTRUE(LIVE_FETCH))

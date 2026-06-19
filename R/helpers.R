@@ -371,6 +371,31 @@ beetle_blurb <- function(scientificName) {
 fmt_int <- function(x) formatC(x, format = "d", big.mark = ",")
 
 # ---------------------------------------------------------------------------
+# Codebook (data dictionary) for the CSV export — one row per exported column.
+# Single source of truth so the shipped codebook can never drift from the data;
+# the download handler asserts these `column` names match the frame it writes.
+# Keep the rows in the SAME order the export writes its columns.
+# ---------------------------------------------------------------------------
+beetle_export_codebook <- function() {
+  tibble::tribble(
+    ~column,                  ~type,      ~units,                          ~definition,
+    "siteID",                 "string",   "",                              "NEON four-letter site code (e.g. SRER, HARV).",
+    "plotID",                 "string",   "",                              "NEON plot identifier within the site (e.g. HARV_001).",
+    "collectDate",            "date",     "ISO 8601 (YYYY-MM-DD)",         "Date the pitfall bout was collected.",
+    "year",                   "integer",  "",                              "Calendar year of collectDate.",
+    "month",                  "integer",  "1-12",                          "Calendar month of collectDate.",
+    "taxonID",                "string",   "",                              "NEON taxon code for the identification.",
+    "scientificName",         "string",   "",                              "Scientific name - expert-taxonomist call where available, otherwise parataxonomist; may be a genus or family for unresolved IDs.",
+    "taxonRank",              "string",   "",                              "Taxonomic rank of scientificName (species, genus, family, ...), from NEON's expert table where available.",
+    "species_level",          "boolean",  "TRUE/FALSE",                    "TRUE when resolved to species/subspecies. Richness, diversity, ordination and indicator metrics use TRUE rows only; total abundance uses all rows.",
+    "individualCount",        "integer",  "individuals",                   "Number of individuals of this taxon in this plot x bout sample.",
+    "trapnights",             "numeric",  "trap-nights",                   "Trap-night effort for this plot x bout (sum of daysOfTrapping over traps set). Empty when NEON effort data is absent.",
+    "cpn_per_100_trapnights", "numeric",  "individuals / 100 trap-nights", "Effort-normalised catch = 100 x individualCount / trapnights. Empty when trapnights is missing or zero.",
+    "source",                 "string",   "",                              "'neon' = real NEON records; 'demo' = illustrative sample data."
+  )
+}
+
+# ---------------------------------------------------------------------------
 # assemble_beetles() — turn a neonUtilities loadByProduct() result for
 # DP1.10022.001 into the app's tidy long schema:
 #   siteID, plotID, collectDate, taxonID, scientificName, taxonRank,

@@ -63,3 +63,32 @@ for (s in sites) {
 
 cat(sprintf("\nDone. Bundle now has %d site files.\n",
             length(list.files(out_dir, pattern = "\\.rds$"))))
+
+# ---- rebuild cross-site cache + deploy manifest ---------------------------
+# A data refresh that stopped here would ship a STALE precomputed.rds (wrong
+# ordination / indicators) and an unregenerated manifest.json. Do both now so the
+# bundle, the cross-site cache, and the deploy manifest are always in lockstep.
+cat("\nRebuilding cross-site precompute cache…\n")
+tryCatch(source("scripts/precompute.R"),
+         error = function(e) cat("  precompute FAILED:", conditionMessage(e), "\n"))
+
+if (requireNamespace("rsconnect", quietly = TRUE)) {
+  cat("Regenerating manifest.json (explicit appFiles; excludes scripts/ so neonUtilities stays out)…\n")
+  app_files <- c("global.R", "server.R", "ui.R",
+                 list.files("R",           full.names = TRUE, recursive = TRUE),
+                 list.files("www",         full.names = TRUE, recursive = TRUE),
+                 list.files("data",        full.names = TRUE, recursive = TRUE),
+                 list.files("data-sample", full.names = TRUE, recursive = TRUE))
+  app_files <- app_files[file.exists(app_files)]
+  tryCatch({
+    rsconnect::writeManifest(appDir = ".", appFiles = app_files)
+    cat(sprintf("  manifest.json regenerated (%d app files).\n", length(app_files)))
+  }, error = function(e) cat("  writeManifest FAILED:", conditionMessage(e), "\n"))
+} else {
+  cat("rsconnect not installed — skipping manifest regen (run rsconnect::writeManifest() yourself).\n")
+}
+
+cat("\nNext steps:\n")
+cat("  git add data/sites data/precomputed.rds manifest.json\n")
+cat("  git commit -m \"chore(beetle): refresh NEON bundles + rebuild precompute/manifest\"\n")
+cat("  git push\n")

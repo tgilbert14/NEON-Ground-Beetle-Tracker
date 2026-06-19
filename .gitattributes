@@ -1,0 +1,10 @@
+# Treat data bundles + images as binary so git never applies line-ending
+# (autocrlf) conversion to them. The cross-site cache fingerprint md5-hashes the
+# .rds bundles, so their bytes must be identical across clones — this guarantees it.
+*.rds binary
+*.png binary
+
+# Deterministic LF line endings for text inputs across clones (keeps diffs and any
+# text-derived signals stable regardless of a contributor's core.autocrlf setting).
+*.csv text eol=lf
+*.R   text eol=lf

@@ -142,15 +142,35 @@ load_site_env <- function(site) {
 # and reused on later boots — an instant cold start instead of a multi-second one.
 # Committed alongside the bundle, it makes the DEPLOYED app boot fast too.
 #
-# The cache auto-invalidates: it is rebuilt whenever the set of bundled sites
-# changes, or any site bundle is newer than the cache, so it can never serve data
-# out of sync with data/sites/.
+# The cache auto-invalidates at cold boot: it is rebuilt whenever the set of
+# bundled sites changes, or any bundle's md5 differs from the fingerprint stored
+# in the cache (see precompute_fingerprint / cache_is_fresh). Authoritatively, a
+# data refresh always force-rebuilds it via scripts/precompute.R, so the cache is
+# never left out of sync with data/sites/ after a refresh.
 PRECOMP_FILE <- file.path("data", "precomputed.rds")
+
+# A content fingerprint of the bundle: sorted "<file>:<md5>" over every site rds.
+# file.mtime was the old freshness signal, but git does NOT preserve mtimes — on
+# a fresh Connect Cloud checkout that made the cache either rebuild every cold
+# boot or (worse) trust a stale file. We hash the .rds bundles instead: they are
+# BINARY (git stores them byte-for-byte, no line-ending munging), so the md5 is
+# identical across clones AND changes whenever a bundle's content changes — even
+# an in-place edit that preserves byte size. Reading 46 xz bundles (~0.7 MB total)
+# to md5 them is sub-50 ms, and only happens when a fingerprinted cache exists.
+# The demo CSV is deliberately NOT hashed: it is a text file (line-ending /
+# autocrlf sensitive, so not clone-stable), and demo sites already show up in
+# available_sites(), so adding/removing one is caught by the site-set check below.
+precompute_fingerprint <- function() {
+  rds <- sort(list.files(SITE_DIR, pattern = "\\.rds$", full.names = TRUE))
+  if (!length(rds)) return("")
+  sums <- unname(tools::md5sum(rds))
+  paste(sprintf("%s:%s", basename(rds), sums), collapse = "|")
+}
 
 build_national_index <- function() {
   sites <- available_sites()
   empty <- list(sites = character(0), site_index = NULL, ordination = NULL,
-                indicators = NULL, species_sites = NULL)
+                indicators = NULL, species_sites = NULL, fingerprint = precompute_fingerprint())
   if (!length(sites)) return(empty)
   # one pass over the bundles: per-site headline row + a bound all-sites table
   rows <- list(); all <- list()
@@ -177,16 +197,20 @@ build_national_index <- function() {
     site_index    = if (!length(rows)) NULL else dplyr::bind_rows(rows),
     ordination    = if (!is.null(all_data)) bray_ordination(all_data) else NULL,
     indicators    = if (!is.null(all_data)) indicator_species(all_data) else NULL,
-    species_sites = if (!is.null(all_data)) species_site_table(all_data) else NULL)
+    species_sites = if (!is.null(all_data)) species_site_table(all_data) else NULL,
+    fingerprint   = precompute_fingerprint())
 }
 
 # Is a cached index still valid for the current bundle?
 cache_is_fresh <- function(idx) {
   if (is.null(idx) || is.null(idx$sites)) return(FALSE)
   if (!setequal(idx$sites, available_sites())) return(FALSE)
-  rds <- list.files(SITE_DIR, pattern = "\\.rds$", full.names = TRUE)
-  if (!length(rds)) return(TRUE)
-  isTRUE(file.mtime(PRECOMP_FILE) >= max(file.mtime(rds)))
+  fp <- idx$fingerprint
+  # legacy cache (built before fingerprints existed): a matching site set is the
+  # best we can check — accept it rather than rebuilding on every cold boot. The
+  # next scripts/precompute.R run writes a fingerprinted cache and this goes strict.
+  if (is.null(fp)) return(TRUE)
+  identical(fp, precompute_fingerprint())
 }
 
 NATIONAL_INDEX <- local({
