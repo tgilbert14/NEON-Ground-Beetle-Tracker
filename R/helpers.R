@@ -533,3 +533,163 @@ indicator_species <- function(d, min_total = 5) {
   res <- do.call(rbind, rows)
   tibble::as_tibble(res[order(-res$indval), ])
 }
+
+# ---------------------------------------------------------------------------
+# Environmental overlays — "compare beetle activity with environment". Ported
+# from the Small Mammal Tracker (whose author wrote these as pure data/plotly
+# utilities to reuse verbatim); the only beetle-specific change is the RESPONSE
+# variable in the two correlation functions: monthly catch per 100 trap-nights
+# (beetle CPN) instead of the mammal CPUE. See global.R ENV_LAYERS / load_site_env.
+# ---------------------------------------------------------------------------
+
+# Shift a monthly env table's dates forward by `lag` months — a driver often
+# LEADS the response (a rain pulse precedes the activity it feeds).
+shift_env <- function(env, lag = 0) {
+  if (is.null(env) || !nrow(env)) return(env)
+  env$date <- as.Date(env$date)
+  lag <- as.integer(lag %||% 0)
+  if (lag != 0) { lt <- as.POSIXlt(env$date); lt$mon <- lt$mon + lag; env$date <- as.Date(lt) }
+  env
+}
+
+# Monthly beetle CPN time series (per ym): 100 * total individuals / trap-nights,
+# where trap-nights = sum over unique (plot, bout). The response both correlation
+# helpers below share.
+.beetle_cpn_series <- function(d) {
+  if (is.null(d) || !nrow(d) || !"ym" %in% names(d)) return(NULL)
+  dd <- d[!is.na(d$ym), , drop = FALSE]
+  if (!nrow(dd)) return(NULL)
+  cap <- stats::aggregate(individualCount ~ ym, dd, sum, na.rm = TRUE)
+  eff <- unique(dd[, c("plotID", "collectDate", "ym", "trapnights")])
+  eff <- stats::aggregate(trapnights ~ ym, eff, sum, na.rm = TRUE)
+  m <- merge(cap, eff, by = "ym")
+  m <- m[m$trapnights > 0, , drop = FALSE]
+  if (!nrow(m)) return(NULL)
+  m$cpue <- 100 * m$individualCount / m$trapnights   # name 'cpue' to match the ported code
+  m$date <- as.Date(paste0(m$ym, "-01"))
+  m[order(m$date), c("ym", "date", "cpue")]
+}
+
+# Collapse a monthly env table to a 12-point calendar-month climatology (mean of
+# each metric across years) for the by-month activity overlay; `lag` rotates the
+# months so a leading driver lines up with the activity month.
+env_climatology <- function(env, layer, lag = 0) {
+  meta <- ENV_LAYERS[[layer]]
+  if (is.null(meta) || is.null(env) || !(meta$col %in% names(env))) return(NULL)
+  e <- env; e$date <- as.Date(e$date)
+  e$.v <- suppressWarnings(as.numeric(e[[meta$col]]))
+  e <- e[!is.na(e$.v), , drop = FALSE]
+  if (!nrow(e)) return(NULL)
+  e$mon <- as.integer(format(e$date, "%m"))
+  clim <- stats::aggregate(.v ~ mon, data = e, FUN = mean, na.rm = TRUE)
+  lag <- as.integer(lag %||% 0)
+  if (lag != 0) clim$mon <- ((clim$mon - 1 + lag) %% 12) + 1
+  clim <- clim[order(clim$mon), ]
+  clim$value <- round(clim$.v, 1)
+  clim[, c("mon", "value")]
+}
+
+# Layout spec for an env overlay's secondary axis.
+env_axis_spec <- function(layer, side = "right", overlaying = "y", show = TRUE) {
+  meta <- ENV_LAYERS[[layer]]
+  if (is.null(meta)) return(list(overlaying = overlaying, side = side, visible = FALSE))
+  list(title = if (show) sprintf("%s (%s)", meta$label, meta$unit) else "",
+       overlaying = overlaying, side = side, rangemode = "tozero",
+       showgrid = FALSE, zeroline = FALSE, color = meta$color, showticklabels = show)
+}
+
+# Scan lags 0..max_lag for the strongest DESEASONALIZED correlation between this
+# site's monthly beetle CPN and a lagged driver. Both series have their
+# calendar-month climatology removed first, so r reflects year-to-year ANOMALIES
+# (not the shared "both peak in summer" cycle, which would inflate |r|). Returns
+# best lag + Pearson r, or NULL when there's too little monthly overlap.
+env_corr_scan <- function(d, env, layer, max_lag = 12) {
+  meta <- ENV_LAYERS[[layer]]
+  if (is.null(meta) || is.null(env) || !(meta$col %in% names(env))) return(NULL)
+  m <- .beetle_cpn_series(d)
+  if (is.null(m) || nrow(m) < 8) return(NULL)             # honest monthly-overlap floor
+  ev <- env; ev$date <- as.Date(ev$date)
+  ev$.v <- suppressWarnings(as.numeric(ev[[meta$col]]))
+  ev <- ev[!is.na(ev$.v), c("date", ".v"), drop = FALSE]
+  if (!nrow(ev)) return(NULL)
+  deseason <- function(val, date) {
+    mon <- as.integer(format(date, "%m"))
+    clim <- tapply(val, mon, mean, na.rm = TRUE)
+    val - as.numeric(clim[as.character(mon)])
+  }
+  m$cpue <- deseason(m$cpue, m$date)
+  ev$.v  <- deseason(ev$.v, ev$date)
+  best <- list(lag = NA_integer_, r = NA_real_, n = 0L)
+  for (lag in 0:max_lag) {
+    e2 <- ev; lt <- as.POSIXlt(e2$date); lt$mon <- lt$mon + lag; e2$date <- as.Date(lt)
+    j <- merge(m[, c("date", "cpue")], e2, by = "date")
+    if (nrow(j) >= 8 && stats::sd(j$cpue, na.rm = TRUE) > 0 && stats::sd(j$.v, na.rm = TRUE) > 0) {
+      r <- suppressWarnings(stats::cor(j$cpue, j$.v))
+      if (!is.na(r) && (is.na(best$r) || abs(r) > abs(best$r)))
+        best <- list(lag = lag, r = round(r, 2), n = nrow(j))
+    }
+  }
+  if (is.na(best$r)) return(NULL)
+  best$label <- meta$label; best$unit <- meta$unit
+  best
+}
+
+# Month-matched (beetle CPN, lagged driver) pairs for the response scatter.
+env_response_points <- function(d, env, layer, lag = 0) {
+  meta <- ENV_LAYERS[[layer]]
+  if (is.null(meta) || is.null(env) || !(meta$col %in% names(env))) return(NULL)
+  m <- .beetle_cpn_series(d)
+  if (is.null(m)) return(NULL)
+  e <- shift_env(env, lag)
+  e$.v <- suppressWarnings(as.numeric(e[[meta$col]]))
+  e <- e[!is.na(e$.v), c("date", ".v"), drop = FALSE]
+  j <- merge(m[, c("date", "cpue")], e, by = "date")
+  if (nrow(j) < 3) return(NULL)
+  j$year <- as.integer(format(j$date, "%Y"))
+  names(j)[names(j) == ".v"] <- "value"
+  tibble::as_tibble(j[order(j$date), c("date", "year", "value", "cpue")])
+}
+
+# Best-lag correlation for EVERY available driver, ranked by |r| — the data
+# behind the "which driver does activity track best?" panel.
+env_corr_all <- function(d, env, max_lag = 12) {
+  if (is.null(d) || is.null(env)) return(NULL)
+  rows <- lapply(names(ENV_LAYERS), function(k) {
+    meta <- ENV_LAYERS[[k]]
+    if (!(meta$col %in% names(env)) || !any(!is.na(env[[meta$col]]))) return(NULL)
+    sc <- env_corr_scan(d, env, k, max_lag)
+    if (is.null(sc)) return(NULL)
+    data.frame(layer = k, label = meta$label, color = meta$color,
+               lag = sc$lag, r = sc$r, n = sc$n, stringsAsFactors = FALSE)
+  })
+  rows <- rows[!vapply(rows, is.null, logical(1))]
+  if (!length(rows)) return(NULL)
+  tibble::as_tibble(do.call(rbind, rows)[order(-abs(do.call(rbind, rows)$r)), ])
+}
+
+# ec_corr_color() — single source of truth for the hue of a (driver, r) pair:
+# identity->hue family, direction->pole (only where sign is ALSO geometric),
+# magnitude->loudness (weak links fade to the surface; |r|<0.2 -> neutral grey).
+EC_CORR_POLES <- list(
+  precip  = list(pos = c("#1f6fb2", "#5aa9e6"), neg = c("#b07a35", "#d8a85a")),
+  temp    = list(pos = c("#d9480f", "#ff7a45"), neg = c("#2f7fb5", "#6cc4ec")),
+  flower  = list(pos = c("#c2255c", "#f06595"), neg = c("#7a8a99", "#9aa7b5")),
+  greenup = list(pos = c("#2b8a3e", "#69db7c"), neg = c("#9c6644", "#c08457")),
+  fruit   = list(pos = c("#9c6644", "#c08457"), neg = c("#2f7fb5", "#6cc4ec"))
+)
+blend_hex <- function(a, b, w) {
+  ca <- grDevices::col2rgb(a); cb <- grDevices::col2rgb(b)
+  m <- round(ca * (1 - w) + cb * w)
+  grDevices::rgb(m[1], m[2], m[3], maxColorValue = 255)
+}
+ec_corr_color <- function(layer, r, dark = FALSE) {
+  if (length(r) != 1 || is.na(r)) return("#8a97a8")
+  s <- abs(r)
+  if (s < 0.2) return("#8a97a8")
+  pole <- EC_CORR_POLES[[layer]]
+  base <- if (is.null(pole)) (ENV_LAYERS[[layer]]$color %||% "#8a97a8")
+          else (if (r >= 0) pole$pos else pole$neg)[[if (dark) 2L else 1L]]
+  surf <- if (dark) "#18241f" else "#ffffff"
+  w <- if (s >= 0.6) 0 else if (s >= 0.35) 0.15 else 0.40
+  blend_hex(base, surf, w)
+}

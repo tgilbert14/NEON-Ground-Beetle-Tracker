@@ -79,6 +79,58 @@ available_sites <- function() {
   sort(unique(c(bundled, demo)))
 }
 
+# ---- environmental overlays (co-located NEON products) --------------------
+# Reused verbatim from the Small Mammal Tracker: the SAME monthly per-site env
+# bundles (data/env/<SITE>.rds — precip / air temp / plant phenology) work here,
+# because beetle and mammal sites are the same NEON terrestrial network. The
+# registry the UI + plots read; `lead` flags drivers expected to LEAD activity.
+ENV_DIR <- "data/env"
+ENV_LAYERS <- list(
+  precip  = list(col = "precip_mm",     label = "Precipitation",       unit = "mm/mo",
+                 dpid = "DP1.00044.001", agg = "sum",   color = "#2f7fb5", lead = TRUE,  dig = 0),
+  temp    = list(col = "temp_c",        label = "Air temperature",     unit = "°C",
+                 dpid = "DP1.00002.001", agg = "mean",  color = "#d9480f", lead = FALSE, dig = 1),
+  flower  = list(col = "flowering_pct", label = "Plants flowering",    unit = "% in flower",
+                 dpid = "DP1.10055.001", agg = "share", color = "#d6336c", lead = TRUE,  dig = 0),
+  greenup = list(col = "greenup_pct",   label = "Green-up (leaf-out)", unit = "% leafing out",
+                 dpid = "DP1.10055.001", agg = "share", color = "#2f9e44", lead = TRUE,  dig = 0),
+  fruit   = list(col = "fruiting_pct",  label = "Plants fruiting",     unit = "% in fruit",
+                 dpid = "DP1.10055.001", agg = "share", color = "#9c6644", lead = TRUE,  dig = 0)
+)
+# Overlay-picker choices: only layers that actually have data for the loaded site.
+env_layer_choices <- function(env) {
+  base <- c("None" = "none")
+  if (is.null(env) || !nrow(env)) return(base)
+  have <- vapply(names(ENV_LAYERS), function(k) {
+    col <- ENV_LAYERS[[k]]$col
+    col %in% names(env) && any(!is.na(env[[col]]))
+  }, logical(1))
+  if (!any(have)) return(base)
+  labs <- vapply(ENV_LAYERS[have], function(m) sprintf("%s (%s)", m$label, m$unit), character(1))
+  c(base, stats::setNames(names(ENV_LAYERS)[have], labs))
+}
+ENV_DEMO <- local({
+  f <- "data-sample/env_demo.csv"
+  if (!file.exists(f)) return(NULL)
+  d <- tryCatch(utils::read.csv(f, stringsAsFactors = FALSE), error = function(e) NULL)
+  if (is.null(d) || !nrow(d)) return(NULL)
+  tibble::as_tibble(d)
+})
+# Load a site's monthly env table, or NULL. Real bundle first, then demo fallback.
+load_site_env <- function(site) {
+  if (is.null(site) || site == "") return(NULL)
+  f <- file.path(ENV_DIR, paste0(site, ".rds"))
+  if (file.exists(f)) {
+    e <- tryCatch(readRDS(f), error = function(e) NULL)
+    if (!is.null(e) && nrow(e)) { e$date <- as.Date(e$date); attr(e, "source") <- "neon"; return(tibble::as_tibble(e)) }
+  }
+  if (!is.null(ENV_DEMO) && "siteID" %in% names(ENV_DEMO)) {
+    e <- ENV_DEMO[ENV_DEMO$siteID == site, , drop = FALSE]
+    if (nrow(e)) { e$date <- as.Date(e$date); attr(e, "source") <- "demo"; return(tibble::as_tibble(e)) }
+  }
+  NULL
+}
+
 # ---- cross-site national views (computed once, cached) --------------------
 # Four objects power the Biogeography map, PCoA ordination, indicator table and
 # species range picker. Building them scans every bundled site and runs the

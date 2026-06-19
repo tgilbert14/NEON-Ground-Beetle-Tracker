@@ -142,6 +142,10 @@ function(input, output, session) {
     rv$label <- site_label(site); rv$siteCode <- site
     y1 <- format(min(d$date, na.rm = TRUE), "%Y"); y2 <- format(max(d$date, na.rm = TRUE), "%Y")
     rv$ctx <- paste0(site, " · ", if (y1 == y2) y1 else paste0(y1, "–", y2))
+    # co-located environmental overlays for THIS site (reused from the mammal app)
+    rv$env <- load_site_env(site)
+    updateSelectInput(session, "envLayer", choices = env_layer_choices(rv$env), selected = "none")
+    updateSliderInput(session, "envLag", value = 0)
     prog$set(value = 1, detail = "done")
     shinyjs::show("mainTabsWrap"); shinyjs::hide("splash")
     nav_select("tabs", "overview")
@@ -556,6 +560,67 @@ function(input, output, session) {
   })
 
   # ---- Seasonality --------------------------------------------------------
+  # ---- environmental overlays (which driver does beetle activity track?) ----
+  output$hasEnv <- reactive({ e <- rv$env; !is.null(e) && nrow(e) > 0 && length(env_layer_choices(e)) > 1 })
+  outputOptions(output, "hasEnv", suspendWhenHidden = FALSE)
+
+  output$envSourceNote <- renderUI({
+    e <- rv$env; if (is.null(e)) return(NULL)
+    if (identical(attr(e, "source") %||% "neon", "demo"))
+      div(class = "env-source env-demo", bs_icon("exclamation-triangle"),
+          HTML(" Illustrative <b>demo</b> environment — not real NEON values."))
+    else
+      div(class = "env-source env-real", bs_icon("patch-check"),
+          HTML(" Co-located NEON env products for this site (precip / air temperature / plant phenology)."))
+  })
+
+  output$envDriverRank <- renderPlotly({
+    d <- rv$data; e <- rv$env; req(d, !is.null(e))
+    rk <- env_corr_all(d, e)
+    if (is.null(rk) || !nrow(rk)) return(note_plot("Not enough overlapping months<br>to rank drivers here", "\U0001F326"))
+    rk <- rk[order(abs(rk$r)), ]
+    cols <- vapply(seq_len(nrow(rk)), function(i) ec_corr_color(rk$layer[i], rk$r[i], is_dark()), character(1))
+    plot_ly(rk, x = ~r, y = ~factor(label, levels = label), type = "bar", orientation = "h",
+            marker = list(color = cols),
+            text = ~sprintf("r=%.2f · lag %d", r, lag), textposition = "outside",
+            hovertemplate = ~paste0("<b>", label, "</b><br>r = ", r, " at ", lag,
+              "-mo lag<br>n = ", n, " months<extra></extra>")) %>%
+      plotly_theme(legend = FALSE) %>%
+      plotly::layout(xaxis = list(title = "deseasonalized correlation r (−1…+1)", range = c(-1, 1), zeroline = TRUE),
+                     yaxis = list(title = "", automargin = TRUE), margin = list(l = 10, r = 78))
+  })
+
+  output$envCorrNote <- renderUI({
+    d <- rv$data; e <- rv$env; if (is.null(d) || is.null(e)) return(NULL)
+    rk <- env_corr_all(d, e); if (is.null(rk) || !nrow(rk)) return(NULL)
+    top <- rk[1, ]; dir <- if (top$r >= 0) "more" else "fewer"
+    cls <- if (abs(top$r) >= 0.5) "trend-up" else "trend-info"
+    div(class = paste("trend-verdict", cls), bs_icon("bar-chart-steps"),
+      HTML(sprintf(" Beetle activity here tracks <b>%s</b> most closely — r = <b>%.2f</b> at a <b>%d-month</b> lag (%s beetles when the driver is high). It's a lead worth a look, not proof of cause; r² means about <b>%.0f%%</b> of the month-to-month swings line up.",
+        top$label, top$r, top$lag, dir, 100 * top$r^2)))
+  })
+
+  output$envScatter <- renderPlotly({
+    d <- rv$data; e <- rv$env; req(d, !is.null(e))
+    layer <- input$envLayer
+    if (is.null(layer) || layer == "none") return(note_plot("Pick a driver above<br>to see the response", "\U0001F326"))
+    pts <- env_response_points(d, e, layer, input$envLag %||% 0)
+    if (is.null(pts) || nrow(pts) < 3) return(note_plot("Not enough matched months<br>at this lag"))
+    meta <- ENV_LAYERS[[layer]]; col <- if (is_dark()) "#5cc985" else DDL$forest
+    p <- plot_ly(pts, x = ~value, y = ~cpue, type = "scatter", mode = "markers",
+            marker = list(color = meta$color, size = 9, line = list(color = "#fff", width = 1)),
+            hovertemplate = ~paste0("%{x} ", meta$unit, " · %{y:.1f} /100TN<br>", format(date, "%b %Y"), "<extra></extra>"))
+    if (stats::sd(pts$value) > 0) {
+      fit <- stats::lm(cpue ~ value, pts); xr <- range(pts$value)
+      yy <- stats::predict(fit, newdata = data.frame(value = xr))
+      p <- p %>% add_trace(x = xr, y = yy, type = "scatter", mode = "lines", inherit = FALSE,
+        line = list(color = col, width = 2, dash = "dash"), hoverinfo = "skip", showlegend = FALSE)
+    }
+    p %>% plotly_theme(legend = FALSE) %>%
+      plotly::layout(xaxis = list(title = sprintf("%s (%s, lag %d mo)", meta$label, meta$unit, input$envLag %||% 0)),
+                     yaxis = list(title = "catch per 100 trap-nights"))
+  })
+
   output$seasonPlot <- renderPlotly({
     d <- rv$data; req(d)
     cmp <- compareData()
@@ -597,13 +662,28 @@ function(input, output, session) {
     }
     s <- seasonality(d, by_species = FALSE)
     if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
-    plot_ly(x = month.abb[s$mon], y = s$cpn, type = "scatter", mode = "lines+markers",
+    p <- plot_ly(x = month.abb[s$mon], y = s$cpn, type = "scatter", mode = "lines+markers",
             name = "all ground beetles", fill = "tozeroy", fillcolor = "rgba(19,99,43,0.16)",
             line = list(color = "#13632b", width = 3), marker = list(size = 7, color = "#13632b"),
-            hovertemplate = "%{x}: %{y:.1f} per 100 trap-nights<extra></extra>") %>%
-      plotly_theme(legend = TRUE) %>%   # single labelled series: it's the whole carabid catch, all taxa pooled
+            hovertemplate = "%{x}: %{y:.1f} per 100 trap-nights<extra></extra>")
+    # optional environmental overlay (calendar-month climatology) on a right axis
+    layer <- input$envLayer; has_ov <- !is.null(layer) && layer != "none" && !is.null(rv$env)
+    if (has_ov) {
+      clim <- env_climatology(rv$env, layer, input$envLag %||% 0); meta <- ENV_LAYERS[[layer]]
+      if (!is.null(clim) && nrow(clim)) {
+        nm <- meta$label; if ((input$envLag %||% 0) != 0) nm <- sprintf("%s · lag %d mo", nm, as.integer(input$envLag))
+        p <- p %>% add_trace(x = month.abb[clim$mon], y = clim$value, yaxis = "y2", type = "scatter",
+          mode = "lines", fill = "tozeroy", name = nm,
+          line = list(color = meta$color, width = 1.6, shape = "spline"),
+          fillcolor = paste0(meta$color, "1f"),
+          hovertemplate = paste0(meta$label, "<br>%{x}: %{y} ", meta$unit, "<extra></extra>"))
+      } else has_ov <- FALSE
+    }
+    p %>% plotly_theme(legend = TRUE) %>%
       plotly::layout(xaxis = list(title = "", categoryorder = "array", categoryarray = month.abb),
-                     yaxis = list(title = "catch per 100 trap-nights"))
+                     yaxis = list(title = "catch per 100 trap-nights"),
+                     yaxis2 = if (has_ov) env_axis_spec(layer)
+                              else list(overlaying = "y", side = "right", visible = FALSE))
   })
 
   # plain-English seasonality verdict (peak month + active window)
