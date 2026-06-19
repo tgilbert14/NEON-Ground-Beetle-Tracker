@@ -60,6 +60,8 @@ ui <- bslib::page_sidebar(
                  class = "btn-primary btn-lg w-100"),
     actionButton("surpriseBtn", tagList(bs_icon("shuffle"), " Surprise me"),
                  class = "btn-outline-success w-100 mt-2"),
+    downloadButton("reportPdf", tagList(bs_icon("file-earmark-pdf"), " Site report (PDF)"),
+                   class = "btn-outline-secondary w-100 mt-2"),
     div(class = "demo-hint", bs_icon("info-circle"),
         if (isTRUE(LIVE_FETCH))
           " Picking a site loads it automatically. Bundled sites are instant; live NEON pulls take a moment. Adjust the date window and tap Load to refine."
