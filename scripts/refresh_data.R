@@ -42,7 +42,8 @@ for (s in sites) {
   cat(sprintf("• %-5s downloading…\n", s))
   raw <- tryCatch(
     loadByProduct(dpID = "DP1.10022.001", site = s, startdate = start_d, enddate = end_d,
-                  package = "basic", check.size = "F"),
+                  package = "basic", check.size = "F",
+                  token = Sys.getenv("NEON_TOKEN", unset = "")),
     error = function(e) { cat(sprintf("    ERROR %s: %s\n", s, conditionMessage(e))); NULL })
   if (is.null(raw)) next
 

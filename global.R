@@ -246,7 +246,8 @@ fetch_neon_beetles <- function(site, start_date, end_date) {
   raw <- loadByProduct(dpID = NEON_DPID, site = site,
                        startdate = format(as.Date(start_date), "%Y-%m"),
                        enddate   = format(as.Date(end_date), "%Y-%m"),
-                       package = "basic", check.size = "F")
+                       package = "basic", check.size = "F",
+                       token = Sys.getenv("NEON_TOKEN", unset = ""))
   assemble_beetles(raw)   # see scripts/refresh_data.R for the shared assembler
 }
 
