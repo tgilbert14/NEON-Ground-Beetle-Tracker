@@ -268,3 +268,6 @@ site_bio <- function(site) {
   m <- neon_sites[neon_sites$site == site, ]
   if (nrow(m)) m$bio else NULL
 }
+
+# Server-side PDF site report (sourced last — needs DDL + helpers + ENV_LAYERS).
+source("R/report_pdf.R", local = FALSE)

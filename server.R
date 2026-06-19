@@ -268,6 +268,17 @@ function(input, output, session) {
   })
 
   # ---- Overview: community bar -------------------------------------------
+  # ---- server-side PDF site report ----------------------------------------
+  output$reportPdf <- downloadHandler(
+    filename = function() sprintf("NEON-beetles-%s-%s.pdf",
+      rv$siteCode %||% "site", format(Sys.Date(), "%Y%m%d")),
+    content = function(file) {
+      d <- rv$data; req(d)
+      is_demo <- identical(attr(d, "source") %||% "neon", "demo")
+      render_beetle_report(file, d, rv$label %||% (rv$siteCode %||% "Site"), is_demo, rv$env)
+    }
+  )
+
   # "answer up front" banner for the Overview — the community-composition story
   output$overviewVerdict <- renderUI({
     d <- rv$data; req(d)
