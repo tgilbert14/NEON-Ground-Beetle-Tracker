@@ -41,7 +41,9 @@ ui <- bslib::page_sidebar(
       div(
         div(class = "brand-title", "Ground Beetle Tracker"),
         div(class = "brand-sub", "NEON carabid biodiversity")
-      )
+      ),
+      # light/dark toggle — bslib flips data-bs-theme; charts read input$colorMode
+      div(class = "mode-toggle", input_dark_mode(id = "colorMode", mode = "light"))
     ),
 
     selectInput("stateSel", label = tagList(bs_icon("geo-alt-fill"), " 1 · Pick a state"),

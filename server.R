@@ -6,16 +6,28 @@
 function(input, output, session) {
 
   # ---- small plot helpers -------------------------------------------------
+  # is the dark theme active? Driven by the sidebar input_dark_mode("colorMode").
+  # Reading it inside the shared plot helpers makes every chart that calls them
+  # take a reactive dependency on the toggle, so they re-render on theme switch.
+  is_dark <- function() identical(input$colorMode, "dark")
+
   plotly_theme <- function(p, legend = TRUE) {
+    dark <- is_dark()
+    ink  <- if (dark) "#e7efe9" else "#1f2a30"
+    grid <- if (dark) "rgba(220,235,225,0.10)" else "rgba(31,42,48,0.08)"
+    zero <- if (dark) "rgba(220,235,225,0.22)" else "rgba(31,42,48,0.15)"
+    legc <- if (dark) "#bcd0c4" else "#344049"
     p %>% plotly::layout(
       paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)",
-      font = list(color = "#1f2a30", family = "Rubik"),
-      xaxis = list(gridcolor = "rgba(31,42,48,0.08)", zerolinecolor = "rgba(31,42,48,0.15)"),
-      yaxis = list(gridcolor = "rgba(31,42,48,0.08)", zerolinecolor = "rgba(31,42,48,0.15)"),
+      font = list(color = ink, family = "Rubik"),
+      xaxis = list(gridcolor = grid, zerolinecolor = zero),
+      yaxis = list(gridcolor = grid, zerolinecolor = zero),
       margin = list(l = 55, r = 30, t = 36, b = 46),
       showlegend = legend,
-      legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.16),
-      hoverlabel = list(bgcolor = "rgba(19,99,43,0.96)", bordercolor = "#FFD200",
+      legend = list(bgcolor = "rgba(0,0,0,0)", orientation = "h", x = 0.5, xanchor = "center",
+                    y = -0.16, font = list(color = legc)),
+      hoverlabel = list(bgcolor = if (dark) "rgba(9,28,18,0.96)" else "rgba(19,99,43,0.96)",
+                        bordercolor = "#FFD200",
                         font = list(color = "#fff", family = "Rubik", size = 13))) %>%
       plotly::config(displayModeBar = FALSE, responsive = TRUE)
   }
@@ -24,7 +36,7 @@ function(input, output, session) {
       paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)",
       xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
       annotations = list(list(text = paste0(icon, "<br>", msg), showarrow = FALSE,
-        font = list(color = "#6b7a85", size = 15), align = "center"))) %>%
+        font = list(color = if (is_dark()) "#9fb0a6" else "#6b7a85", size = 15), align = "center"))) %>%
       plotly::config(displayModeBar = FALSE)
   }
 
