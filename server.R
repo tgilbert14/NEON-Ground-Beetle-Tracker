@@ -319,6 +319,71 @@ function(input, output, session) {
     div(class = "meet-grid", cards)
   })
 
+  # ---- occupancy: how WIDESPREAD each species is (abundant != everywhere) ---
+  output$occupancyPlot <- renderPlotly({
+    d <- rv$data; req(d)
+    oc <- occupancy_table(d)
+    if (is.null(oc) || !nrow(oc)) return(note_plot("Not enough plot×bout samples<br>to estimate occupancy here", "\U0001F4CD"))
+    n_samp <- attr(oc, "n_samp")
+    oc <- utils::head(oc, 12); oc <- oc[order(oc$occ), ]
+    cols <- unname(rv$pal[oc$scientificName]); cols[is.na(cols)] <- DDL$forest
+    plot_ly(oc, x = ~occ, y = ~factor(scientificName, levels = scientificName),
+            type = "bar", orientation = "h", marker = list(color = cols),
+            text = ~paste0(occ, "%"), textposition = "outside",
+            hovertemplate = ~paste0("<b>", scientificName, "</b><br>caught in ", present,
+              " of ", n_samp, " sampling bouts (", occ, "%)<extra></extra>")) %>%
+      plotly_theme(legend = FALSE) %>%
+      plotly::layout(xaxis = list(title = "% of sampling bouts present", range = c(0, 100)),
+                     yaxis = list(title = "", automargin = TRUE), margin = list(l = 10, r = 55)) %>%
+      plotly::add_annotations(text = rv$ctx, x = 1, y = 1.04, xref = "paper", yref = "paper",
+        xanchor = "right", showarrow = FALSE, font = list(color = "#6b7a89", size = 11))
+  })
+
+  # ---- phenology heatmap: each species' own activity window -----------------
+  output$phenoHeat <- renderPlotly({
+    d <- rv$data; req(d)
+    pm <- phenology_matrix(d)
+    if (is.null(pm)) return(note_plot("Not enough species-level catch<br>for a phenology heatmap"))
+    dark <- is_dark()
+    scale <- if (dark) list(c(0, "#16231d"), c(0.5, "#2e7d4e"), c(1, "#7fe0a3"))
+             else      list(c(0, "#f1f7f2"), c(0.5, "#5aa873"), c(1, "#0f5325"))
+    yrs <- suppressWarnings(range(d$year, na.rm = TRUE))
+    # the subtitle rides ON the figure (survives a screenshot) so a pooled cell
+    # is never mistaken for a single year; shading is anchored at 0 but its top
+    # is per-site (this site's busiest cell), noted in the info-pop.
+    sub <- if (all(is.finite(yrs)))
+      sprintf("monthly avg /100 trap-nights · %s pooled",
+              if (yrs[1] == yrs[2]) yrs[1] else paste0(yrs[1], "\U2013", yrs[2]))
+      else "monthly avg /100 trap-nights"
+    plot_ly(x = pm$months, y = pm$species, z = pm$z, type = "heatmap",
+            colorscale = scale, zmin = 0, xgap = 1, ygap = 1,
+            hovertemplate = "<b>%{y}</b><br>%{x}: %{z} per 100 trap-nights<extra></extra>",
+            colorbar = list(title = list(text = "/100TN", font = list(size = 11)), thickness = 12)) %>%
+      plotly_theme(legend = FALSE) %>%
+      plotly::layout(xaxis = list(title = "", side = "top", tickfont = list(size = 11)),
+                     yaxis = list(title = "", automargin = TRUE, autorange = "reversed"),
+                     margin = list(l = 10, t = 58),
+                     annotations = list(list(text = sub, x = 0, y = 1.12, xref = "paper", yref = "paper",
+                       xanchor = "left", showarrow = FALSE,
+                       font = list(size = 11, color = if (dark) "#9fb0a6" else "#6b7a89"))))
+  })
+
+  # ---- rank-abundance (Whittaker): the dominance/evenness shape -------------
+  output$rankAbundance <- renderPlotly({
+    d <- rv$data; req(d)
+    ra <- rank_abundance(d)
+    ra <- if (is.null(ra)) NULL else ra[is.finite(ra$rel) & ra$rel > 0, , drop = FALSE]   # log axis drops 0/NA silently
+    if (is.null(ra) || nrow(ra) < 2) return(note_plot("Too few species<br>for a rank-abundance curve"))
+    col <- if (is_dark()) "#5cc985" else DDL$forest
+    plot_ly(ra, x = ~rank, y = ~rel, type = "scatter", mode = "lines+markers",
+            line = list(color = col, width = 2), marker = list(color = col, size = 6),
+            hovertemplate = ~paste0("#", rank, "  <b>", scientificName, "</b><br>",
+              rel, "% of species-level individuals (", individuals, ")<extra></extra>")) %>%
+      plotly_theme(legend = FALSE) %>%
+      plotly::layout(xaxis = list(title = "species rank (most → least abundant)"),
+                     yaxis = list(title = "% of species-level individuals (log)", type = "log"))
+  })
+
   # ---- Diversity ----------------------------------------------------------
   # species-level abundance vector — the input every richness metric must use
   sp_counts <- function(d) {
