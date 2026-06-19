@@ -264,6 +264,20 @@ function(input, output, session) {
   })
 
   # ---- Overview: community bar -------------------------------------------
+  # "answer up front" banner for the Overview — the community-composition story
+  output$overviewVerdict <- renderUI({
+    d <- rv$data; req(d)
+    ct <- community_table(d); req(!is.null(ct), nrow(ct))
+    sp <- ct[ct$species_level %in% TRUE, , drop = FALSE]
+    if (!nrow(sp)) return(NULL)
+    top <- sp[which.max(sp$individuals), ]
+    share <- round(100 * top$individuals / sum(sp$individuals))
+    cls <- if (share >= 50) "trend-flat" else "trend-up"   # one species dominating = amber, not "good"
+    div(class = paste("trend-verdict", cls), bs_icon("bar-chart-line-fill"),
+      HTML(sprintf(" <b>%d</b> carabid species identified here. Most abundant: <b><i>%s</i></b> — <b>%d%%</b> of named individuals (%s per 100 trap-nights).",
+        nrow(sp), top$scientificName, share, top$cpn)))
+  })
+
   output$commBar <- renderPlotly({
     d <- rv$data; req(d)
     ct <- community_table(d); if (is.null(ct) || !nrow(ct)) return(note_plot("No community data"))
@@ -544,6 +558,22 @@ function(input, output, session) {
   # ---- Biogeography -------------------------------------------------------
   updateSelectInput(session, "rangeSpecies",
                     choices = c("All species (richness)" = "", species_choices()))
+
+  # "answer up front" banner for Biogeography — where this site sits nationally
+  output$biogeoVerdict <- renderUI({
+    req(input$site)
+    si <- SITE_INDEX
+    if (is.null(si) || !nrow(si)) return(NULL)
+    row <- si[si$site == input$site, , drop = FALSE]
+    if (!nrow(row) || is.na(row$richness[1])) return(NULL)
+    M <- nrow(si); r <- row$richness[1]
+    rank <- sum(si$richness > r, na.rm = TRUE) + 1L
+    pct <- rank / M
+    cls <- if (pct <= 0.34) "trend-up" else if (pct >= 0.67) "trend-flat" else "trend-info"
+    div(class = paste("trend-verdict", cls), bs_icon("geo-alt-fill"),
+      HTML(sprintf(" <b>%s</b> ranks <b>#%d of %d</b> NEON sites for carabid richness — <b>%d</b> species recorded across all years.",
+        row$name[1], rank, M, as.integer(r))))
+  })
 
   output$map <- renderLeaflet({
     si <- SITE_INDEX

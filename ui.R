@@ -107,6 +107,7 @@ ui <- bslib::page_sidebar(
 
       nav_panel(
         title = tagList(bs_icon("collection"), " Overview"), value = "overview",
+        uiOutput("overviewVerdict"),
         card(full_screen = TRUE,
           card_head("bar-chart-line-fill", "Carabid community — most abundant first",
             info_pop("Community composition",
@@ -184,6 +185,7 @@ ui <- bslib::page_sidebar(
           div(class = "map-controls",
             selectInput("rangeSpecies", tagList(bs_icon("search"), " Map a species' range"),
                         choices = NULL, width = "280px"))),
+        uiOutput("biogeoVerdict"),
         spin(leafletOutput("map", height = "540px")),
         card(full_screen = TRUE,
           card_head("diagram-2", "Community ordination — who resembles whom",
