@@ -3226,13 +3226,13 @@
       "checksum": "181c615063347333767e494e0401d8ef"
     },
     "server.R": {
-      "checksum": "ef73dbf163ddd543b6d3d0e9e1807c72"
+      "checksum": "fed60d30b4e2605790ca9b57b28221c8"
     },
     "ui.R": {
-      "checksum": "ce472d0d477740c36d759d11a55ea3d6"
+      "checksum": "2b7ae62ead992488457ce7a16fa201fa"
     },
     "www/styles.css": {
-      "checksum": "0921538d07e5d80ae2a5c6446eff6dd2"
+      "checksum": "aeb585d6d7d9e10fb530526c20567b8b"
     }
   },
   "users": null
