@@ -3072,6 +3072,147 @@
     }
   },
   "files": {
+    "data/env/ABBY.rds": {
+      "checksum": "7ab41721cc285cd950c65775f7c43658"
+    },
+    "data/env/BARR.rds": {
+      "checksum": "1020c5c061f7e71e6953d4be6c79a51e"
+    },
+    "data/env/BART.rds": {
+      "checksum": "97857c5c73c363806c30c1e9c53e6718"
+    },
+    "data/env/BLAN.rds": {
+      "checksum": "c7cccf0d174507f83c4752046aeb0f57"
+    },
+    "data/env/BONA.rds": {
+      "checksum": "1e8418347ace1cfe41ae210fc9e1a832"
+    },
+    "data/env/CLBJ.rds": {
+      "checksum": "fc0eebf48e3385ce043f07e9eb5878c0"
+    },
+    "data/env/CPER.rds": {
+      "checksum": "653574d5b7ffd339d906fb62b2103c26"
+    },
+    "data/env/DCFS.rds": {
+      "checksum": "c926a7f0d88ad74c1886d67938679801"
+    },
+    "data/env/DEJU.rds": {
+      "checksum": "238d9fb927a826f03dd9fb2dec92ff05"
+    },
+    "data/env/DELA.rds": {
+      "checksum": "e695eb5e9e68a3e176f610e43586587e"
+    },
+    "data/env/DSNY.rds": {
+      "checksum": "8db13303672a4dd438e9794edfe99927"
+    },
+    "data/env/GRSM.rds": {
+      "checksum": "429806a2a3ce807d915f4ec24cd89f99"
+    },
+    "data/env/GUAN.rds": {
+      "checksum": "b7527f13313cb3f7291f6859dff21a1a"
+    },
+    "data/env/HARV.rds": {
+      "checksum": "3f29c94393353da53c370ace7b536f48"
+    },
+    "data/env/HEAL.rds": {
+      "checksum": "93d53c83e6893263d1e4847878c67d79"
+    },
+    "data/env/JERC.rds": {
+      "checksum": "6bb27b4e8117eed5efb9d5f69588cc7a"
+    },
+    "data/env/JORN.rds": {
+      "checksum": "c9f369763f6aa84601ff243cc812fc38"
+    },
+    "data/env/KONA.rds": {
+      "checksum": "7a0a4a96fbaa8a45e57438ea07f3506e"
+    },
+    "data/env/KONZ.rds": {
+      "checksum": "11088f0c0fc8e0fb70c350dd66b17ea9"
+    },
+    "data/env/LAJA.rds": {
+      "checksum": "9e52b747bc07093ffd053d75ccecaa39"
+    },
+    "data/env/LENO.rds": {
+      "checksum": "2369db3a78fc09f973db33b527693f9f"
+    },
+    "data/env/MLBS.rds": {
+      "checksum": "11b9d39ec4a387e50707038bed3239a5"
+    },
+    "data/env/MOAB.rds": {
+      "checksum": "108a030954f7cc48910f3bf8a7cb2f3b"
+    },
+    "data/env/NIWO.rds": {
+      "checksum": "92fa002e31bd50b10f8ea614146318cf"
+    },
+    "data/env/NOGP.rds": {
+      "checksum": "0701a1a8e8c74ac1db43817715927187"
+    },
+    "data/env/OAES.rds": {
+      "checksum": "40f855d3ca2c342033bb7150f406a554"
+    },
+    "data/env/ONAQ.rds": {
+      "checksum": "ea2b2175310406ce214c970ec61f5626"
+    },
+    "data/env/ORNL.rds": {
+      "checksum": "74b78d7350eab4ce583e8d52d45fca4b"
+    },
+    "data/env/OSBS.rds": {
+      "checksum": "eec017aa62724fdaf9374ea9c45e9523"
+    },
+    "data/env/RMNP.rds": {
+      "checksum": "720c807ea516ec9268b8c1f4792265c4"
+    },
+    "data/env/SCBI.rds": {
+      "checksum": "f1ea6608f5d1532209948afe6e3b5ec4"
+    },
+    "data/env/SERC.rds": {
+      "checksum": "063d5f5cf5d4998a5dc73c249c28e786"
+    },
+    "data/env/SJER.rds": {
+      "checksum": "fef688271492659c8bb0a13eba8a4f82"
+    },
+    "data/env/SOAP.rds": {
+      "checksum": "6102942d7f7d0a3c4fe782289291a89d"
+    },
+    "data/env/SRER.rds": {
+      "checksum": "687bc204c40db16a8b51af5dcb654a83"
+    },
+    "data/env/STEI.rds": {
+      "checksum": "0294da14891501f7203917ad57e8685c"
+    },
+    "data/env/STER.rds": {
+      "checksum": "4f05df4302279a6f8153570b856e614f"
+    },
+    "data/env/TALL.rds": {
+      "checksum": "6ecf9485a930800e49a8249fe40efb9b"
+    },
+    "data/env/TEAK.rds": {
+      "checksum": "a3b34172971866a2ac0383963d5bea6a"
+    },
+    "data/env/TOOL.rds": {
+      "checksum": "918ffceb3e266fb14daa084e68a29626"
+    },
+    "data/env/TREE.rds": {
+      "checksum": "d7dc43f4564ca2a18eecb41849a32dac"
+    },
+    "data/env/UKFS.rds": {
+      "checksum": "a75b6328f9760678ca2697c7dcffede8"
+    },
+    "data/env/UNDE.rds": {
+      "checksum": "5ddddc7fd8ea21e3c7fc7d32db0bf34a"
+    },
+    "data/env/WOOD.rds": {
+      "checksum": "7dab7d438b6407a7460a86b4417916c5"
+    },
+    "data/env/WREF.rds": {
+      "checksum": "3655de626c8cf0caa11270767a366274"
+    },
+    "data/env/YELL.rds": {
+      "checksum": "09eaf8b677d24ddcc48b6fa0e23e6040"
+    },
+    "data-sample/env_demo.csv": {
+      "checksum": "7e335a0b4e978711168ca5aa677b3778"
+    },
     "data-sample/beetle_demo.csv": {
       "checksum": "a9ad29c08cc66c6a45cafba55fb6b1dc"
     },
@@ -3217,22 +3358,22 @@
       "checksum": "1f4db8d5975b3ac812f98da68ca36951"
     },
     "global.R": {
-      "checksum": "4832a6ba773df70ef86c5a765f985620"
+      "checksum": "6762f9680272743f7248f67a5b5a6b62"
     },
     "R/helpers.R": {
-      "checksum": "1e206e040b2e40cefa5ed4a5fe79a54c"
+      "checksum": "3ab50389bfc1b38cad1e87bc59d69622"
     },
     "R/site_metadata.R": {
       "checksum": "181c615063347333767e494e0401d8ef"
     },
     "server.R": {
-      "checksum": "06d762d3b362b229ed2749a94cf91b68"
+      "checksum": "d2842885412751d2b962090d9e387097"
     },
     "ui.R": {
-      "checksum": "e5100f08313d26ca6345b83355e78899"
+      "checksum": "6315d8a5fc715876410d4ae348008ccf"
     },
     "www/styles.css": {
-      "checksum": "aeb585d6d7d9e10fb530526c20567b8b"
+      "checksum": "c86721188cc0465a15b8a342b82fe264"
     }
   },
   "users": null
