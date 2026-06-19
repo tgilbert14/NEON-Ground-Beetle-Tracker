@@ -261,21 +261,29 @@ render_beetle_report <- function(file, d, label, is_demo = FALSE, env = NULL) {
   } else y <- draw_para("Not enough monthly data to characterise seasonality.", y, 9.5, PG$muted)
 
   y <- draw_h4("Inter-annual trend", y)
-  yr <- d[!is.na(d$year), , drop = FALSE]
-  if (nrow(yr) && length(unique(yr$year)) >= 2) {
-    cap <- stats::aggregate(individualCount ~ year, yr, sum)
-    eff <- unique(yr[, c("plotID", "collectDate", "year", "trapnights")])
-    eff <- stats::aggregate(trapnights ~ year, eff, sum)
-    m <- merge(cap, eff, by = "year"); m <- m[m$trapnights > 0, , drop = FALSE]
-    if (nrow(m) >= 2) {
-      m$cpn <- 100 * m$individualCount / m$trapnights
-      fit <- stats::lm(cpn ~ year, m); sl <- stats::coef(fit)[2]
-      pv <- tryCatch(summary(fit)$coefficients[2, 4], error = function(e) NA_real_)
-      dir <- if (is.na(pv) || pv > 0.1) "roughly flat" else if (sl > 0) "rising" else "declining"
-      y <- draw_para(sprintf(paste("Across %d years, effort-adjusted catch is %s (%+.1f per 100 trap-nights/yr%s).",
-        "Short series are noisy - read the direction, not the decimal."),
-        length(unique(m$year)), dir, sl,
-        if (is.na(pv)) "" else sprintf(", p = %.2f", pv)), y, 9.5, gapAfter = 0.06)
+  # One trend implementation: call the same annual_trend() the dashboard uses,
+  # including its under-5-years guard, so the report and the app never disagree
+  # (and a no-effort bundle falls back to raw counts instead of emitting nothing).
+  tr <- tryCatch(annual_trend(d), error = function(e) NULL)
+  if (!is.null(tr) && nrow(tr) >= 2) {
+    ny <- length(unique(tr$year)); sl <- attr(tr, "slope"); pv <- attr(tr, "p"); pct <- attr(tr, "pct_per_yr")
+    metric_txt <- if (identical(attr(tr, "metric_kind"), "count")) "raw catch (no effort data)"
+                  else "effort-adjusted catch per 100 trap-nights"
+    if (is.null(sl) || !is.finite(sl) || ny < 5) {
+      appdir <- if (!is.null(sl) && is.finite(sl)) {
+        if (sl > 0) "an apparent rise" else if (sl < 0) "an apparent decline" else "little change"
+      } else "no fittable trend"
+      y <- draw_para(sprintf(paste("Across %d years, %s shows %s. %d years is too few to test reliably -",
+        "read the direction, not the decimal."), ny, metric_txt, appdir, ny), y, 9.5, gapAfter = 0.06)
+    } else {
+      sig <- is.finite(pv) && pv < 0.05
+      dir <- if (!sig) "roughly flat" else if (sl > 0) "rising" else "declining"
+      pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (%+.0f%%/yr)", pct) else ""
+      ptxt <- if (sig) sprintf("statistically clear, p = %.3f", pv)
+              else if (is.finite(pv)) sprintf("not distinguishable from no change, p = %.2f", pv)
+              else "not testable"
+      y <- draw_para(sprintf("Across %d years, %s is %s%s - %s.", ny, metric_txt, dir, pcttxt, ptxt),
+        y, 9.5, gapAfter = 0.06)
     }
   } else y <- draw_para("Fewer than two years in this window - no trend.", y, 9.5, PG$muted)
 
@@ -284,10 +292,22 @@ render_beetle_report <- function(file, d, label, is_demo = FALSE, env = NULL) {
     rk <- tryCatch(env_corr_all(d, env), error = function(e) NULL)
     if (!is.null(rk) && nrow(rk)) {
       top <- rk[1, ]
+      pv <- tryCatch(env_corr_pvalue(d, env), error = function(e) NULL)
       y <- draw_h4("Environmental driver", y)
-      y <- draw_para(sprintf(paste("Beetle activity tracks %s most closely (deseasonalized r = %.2f at a %d-month",
-        "lag). A correlation, not a cause - a lead worth investigating."),
-        top$label, top$r, top$lag), y, 9.5, PG$muted)
+      # carry the selection-visibility text the live banner shows (matched n,
+      # search space, permutation p) into the static report, which travels
+      # without the interactive caveats.
+      ptxt <- if (!is.null(pv) && is.finite(pv$p)) {
+        if (pv$p < 0.05)
+          sprintf(", permutation p = %s across the %d driver-by-lag combinations searched",
+                  if (pv$p < 0.01) "<0.01" else sprintf("%.2f", pv$p), pv$n_search)
+        else
+          sprintf(", but permutation p = %.2f across the %d driver-by-lag combinations searched - not distinguishable from chance",
+                  pv$p, pv$n_search)
+      } else sprintf(", best of %d driver-by-lag combinations searched", nrow(rk) * 13L)
+      y <- draw_para(sprintf(paste("Beetle activity tracks %s most closely (deseasonalized r = %.2f at a %d-month lag,",
+        "n = %d months%s). A correlation, not a cause - a lead worth investigating."),
+        top$label, top$r, top$lag, top$n, ptxt), y, 9.5, PG$muted)
     }
   }
   y <- embed_chart(chart_season(d), y, height_in = 2.9)

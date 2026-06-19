@@ -589,13 +589,17 @@ env_climatology <- function(env, layer, lag = 0) {
   clim[, c("mon", "value")]
 }
 
-# Layout spec for an env overlay's secondary axis.
+# Layout spec for an env overlay's secondary axis. Anchor at zero only for
+# non-negative ("fillable") drivers; temperature gets a free axis so a negative
+# winter mean isn't clamped against an artificial floor.
 env_axis_spec <- function(layer, side = "right", overlaying = "y", show = TRUE) {
   meta <- ENV_LAYERS[[layer]]
   if (is.null(meta)) return(list(overlaying = overlaying, side = side, visible = FALSE))
-  list(title = if (show) sprintf("%s (%s)", meta$label, meta$unit) else "",
-       overlaying = overlaying, side = side, rangemode = "tozero",
+  spec <- list(title = if (show) sprintf("%s (%s)", meta$label, meta$unit) else "",
+       overlaying = overlaying, side = side,
        showgrid = FALSE, zeroline = FALSE, color = meta$color, showticklabels = show)
+  if (isTRUE(meta$fillable)) spec$rangemode <- "tozero"
+  spec
 }
 
 # Scan lags 0..max_lag for the strongest DESEASONALIZED correlation between this
@@ -665,6 +669,92 @@ env_corr_all <- function(d, env, max_lag = 12) {
   rows <- rows[!vapply(rows, is.null, logical(1))]
   if (!length(rows)) return(NULL)
   tibble::as_tibble(do.call(rbind, rows)[order(-abs(do.call(rbind, rows)$r)), ])
+}
+
+# Permutation null for the WHOLE driver × lag dredge ------------------------
+# env_corr_all() reports the single best |r| out of (n drivers × 13 lags) ≈ 65
+# candidates. With only ~8–150 monthly anomalies, the largest of that many
+# correlations is sizeable even under pure noise, so a raw "Strong link" verdict
+# over-claims. This asks the honest question: how often does a best-of-dredge
+# correlation THIS large arise from chance alignment? We circularly rotate every
+# env series in time by a random whole-month offset (preserving each driver's
+# autocorrelation, its deseasonalized structure, and the drivers' shared
+# collinearity) and re-run the full scan, recording the null's max |r|. The
+# rotation only destroys the true temporal alignment with the beetle series.
+#   p = (1 + #{null max|r| >= observed}) / (1 + #perms)
+# Cyclic shifts give at most n-1 distinct permutations, so a thin series honestly
+# yields a coarse, conservative p (e.g. n = 8 -> floor ~ 1/8) rather than a
+# falsely precise one. Seeded so the p is stable across re-renders.
+env_corr_pvalue <- function(d, env, max_lag = 12, nperm = 99, min_n = 8) {
+  if (is.null(d) || is.null(env)) return(NULL)
+  m <- .beetle_cpn_series(d)
+  if (is.null(m) || nrow(m) < min_n) return(NULL)
+  # deseasonalize a value vector by removing its per-calendar-month climatology
+  deseason_vec <- function(val, dt) {
+    mon  <- as.integer(format(dt, "%m"))
+    clim <- tapply(val, mon, mean, na.rm = TRUE)
+    val - as.numeric(clim[as.character(mon)])
+  }
+  midx <- function(dt) { lt <- as.POSIXlt(dt); 12L * (lt$year + 1900L) + lt$mon }  # integer month index
+
+  bdate  <- as.Date(m$date)
+  b_anom <- deseason_vec(m$cpue, bdate)
+  bm     <- midx(bdate)
+
+  ev <- env; ev$date <- as.Date(ev$date); ev <- ev[order(ev$date), , drop = FALSE]
+  evm  <- midx(ev$date)
+  cols <- intersect(vapply(ENV_LAYERS, function(z) z$col, character(1)), names(ev))
+  cols <- cols[vapply(cols, function(cc) any(!is.na(ev[[cc]])), logical(1))]
+  if (!length(cols)) return(NULL)
+
+  # Lay beetle + every driver on ONE dense monthly axis (NA for gaps), so a lag
+  # is a cheap vector shift and a rotation is a cheap index permute — no merge()
+  # in the inner loop. ~250x faster than re-running the full scan per permutation.
+  allm <- seq.int(min(c(bm, evm)), max(c(bm, evm)))
+  M    <- length(allm)
+  bvec <- rep(NA_real_, M); bvec[match(bm, allm)] <- b_anom
+  drivers <- lapply(cols, function(cc) {
+    v <- suppressWarnings(as.numeric(ev[[cc]])); keep <- !is.na(v)
+    if (!any(keep)) return(NULL)
+    vec <- rep(NA_real_, M); vec[match(evm[keep], allm)] <- deseason_vec(v[keep], ev$date[keep]); vec
+  })
+  drivers <- drivers[!vapply(drivers, is.null, logical(1))]
+  if (!length(drivers)) return(NULL)
+
+  # strongest |r| over all (driver, lag) pairs; beetle[t] vs driver[t - lag]
+  best_absr <- function(dvs) {
+    best <- NA_real_
+    for (vec in dvs) for (L in 0:max_lag) {
+      ds <- if (L == 0) vec else c(rep(NA_real_, L), vec[seq_len(M - L)])
+      ok <- is.finite(bvec) & is.finite(ds)
+      if (sum(ok) >= min_n) {
+        bx <- bvec[ok]; dx <- ds[ok]
+        if (stats::sd(bx) > 0 && stats::sd(dx) > 0) {
+          r <- abs(suppressWarnings(stats::cor(bx, dx)))
+          if (is.finite(r) && (is.na(best) || r > best)) best <- r
+        }
+      }
+    }
+    best
+  }
+  observed <- best_absr(drivers)
+  if (!is.finite(observed) || M < min_n + 1L) return(NULL)
+
+  old <- if (exists(".Random.seed", envir = .GlobalEnv)) get(".Random.seed", envir = .GlobalEnv) else NULL
+  on.exit(if (!is.null(old)) assign(".Random.seed", old, envir = .GlobalEnv), add = TRUE)
+  set.seed(7L)
+  shifts <- sample(seq_len(M - 1L), min(nperm, M - 1L))   # distinct non-zero circular shifts
+  null_max <- vapply(shifts, function(k) {
+    idx <- ((seq_len(M) - 1L + k) %% M) + 1L              # same rotation for every driver -> keeps collinearity
+    best_absr(lapply(drivers, function(vec) vec[idx]))
+  }, numeric(1))
+  null_max <- null_max[is.finite(null_max)]
+  if (!length(null_max)) return(NULL)
+  list(observed  = round(observed, 2),
+       p         = (1 + sum(null_max >= observed - 1e-9)) / (1 + length(null_max)),
+       nperm     = length(null_max),
+       n_search  = length(drivers) * (max_lag + 1L),
+       n_drivers = length(drivers))
 }
 
 # ec_corr_color() — single source of truth for the hue of a (driver, r) pair:
