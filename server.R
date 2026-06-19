@@ -144,8 +144,14 @@ function(input, output, session) {
     rv$ctx <- paste0(site, " · ", if (y1 == y2) y1 else paste0(y1, "–", y2))
     # co-located environmental overlays for THIS site (reused from the mammal app)
     rv$env <- load_site_env(site)
-    updateSelectInput(session, "envLayer", choices = env_layer_choices(rv$env), selected = "none")
-    updateSliderInput(session, "envLag", value = 0)
+    ch <- env_layer_choices(rv$env)
+    # default the overlay to the MOST-correlated driver at its best lag (the
+    # ranking's #1), so the env story shows on load instead of a blank "None".
+    rk0 <- tryCatch(env_corr_all(d, rv$env), error = function(e) NULL)
+    sel0 <- if (!is.null(rk0) && nrow(rk0)) rk0$layer[1] else "none"
+    lag0 <- if (!is.null(rk0) && nrow(rk0)) as.integer(rk0$lag[1]) else 0L
+    updateSelectInput(session, "envLayer", choices = ch, selected = if (sel0 %in% ch) sel0 else "none")
+    updateSliderInput(session, "envLag", value = lag0)
     prog$set(value = 1, detail = "done")
     shinyjs::show("mainTabsWrap"); shinyjs::hide("splash")
     nav_select("tabs", "overview")
@@ -601,14 +607,46 @@ function(input, output, session) {
                      yaxis = list(title = "", automargin = TRUE), margin = list(l = 10, r = 78))
   })
 
+  # switching the overlay driver snaps the lag slider to THAT driver's best match
+  # (the slider still lets you explore any other lag). ignoreInit so it doesn't
+  # fight load_site's initial best-driver default.
+  observeEvent(input$envLayer, {
+    if (is.null(input$envLayer) || input$envLayer == "none" || is.null(rv$env)) return()
+    sc <- tryCatch(env_corr_scan(rv$data, rv$env, input$envLayer), error = function(e) NULL)
+    updateSliderInput(session, "envLag", value = if (!is.null(sc) && !is.na(sc$lag)) as.integer(sc$lag) else 0L)
+  }, ignoreInit = TRUE)
+
+  # styled "answer up front" — eyebrow · hero sentence + hero r-value · metadata
+  # (same .ec design as the Small Mammal Tracker: strength drives the rail + verdict
+  # word, SIGN drives the r-value colour + arrow + more/fewer, on separate channels).
   output$envCorrNote <- renderUI({
     d <- rv$data; e <- rv$env; if (is.null(d) || is.null(e)) return(NULL)
     rk <- env_corr_all(d, e); if (is.null(rk) || !nrow(rk)) return(NULL)
-    top <- rk[1, ]; dir <- if (top$r >= 0) "more" else "fewer"
-    cls <- if (abs(top$r) >= 0.5) "trend-up" else "trend-info"
-    div(class = paste("trend-verdict", cls), bs_icon("bar-chart-steps"),
-      HTML(sprintf(" Beetle activity here tracks <b>%s</b> most closely — r = <b>%.2f</b> at a <b>%d-month</b> lag (%s beetles when the driver is high). It's a lead worth a look, not proof of cause; r² means about <b>%.0f%%</b> of the month-to-month swings line up.",
-        top$label, top$r, top$lag, dir, 100 * top$r^2)))
+    top <- rk[1, ]
+    strength <- abs(top$r); pos <- top$r >= 0; dir <- if (pos) "more" else "fewer"
+    rail <- if (strength >= 0.6) "rail-strong" else if (strength >= 0.35) "rail-mod" else "rail-weak"
+    slabel <- if (strength >= 0.6) "Strong" else if (strength >= 0.35) "Moderate"
+              else if (strength >= 0.2) "Weak" else "Negligible"
+    glyph <- if (pos) "arrow-up-right" else "arrow-down-right"
+    demo <- identical(attr(e, "source") %||% "neon", "demo")
+    div(class = paste("ec", rail),
+      style = sprintf("--ec-driver-hue:%s;", ENV_LAYERS[[top$layer]]$color %||% "#8a97a8"),
+      div(class = "ec-eyebrow", bs_icon("graph-up-arrow"), tags$span("environmental tracking"),
+        if (demo) tags$span(class = "ec-demo", "demo overlay") else NULL),
+      div(class = "ec-hero",
+        div(class = "ec-hero-text",
+          tags$span(class = "ec-strength", slabel), " link with ",
+          tags$span(class = "ec-driver", tolower(top$label))),
+        div(class = paste("ec-rvalue", if (pos) "ec-sgn-pos" else "ec-sgn-neg"),
+          title = "correlation coefficient, -1 to +1 — see the (i) above for what it means",
+          bs_icon(glyph), HTML(sprintf("r&nbsp;%+.2f", top$r)))),
+      div(class = "ec-foot",
+        tags$span(class = "ec-meta", bs_icon("clock-history"),
+          if (top$lag == 0) "same-month signal" else HTML(sprintf("<b>%d-mo</b> lead", top$lag))),
+        tags$span(class = "ec-meta-dot"),
+        tags$span(class = "ec-meta", bs_icon("calendar3"), HTML(sprintf("<b>%d</b> months matched", top$n))),
+        tags$span(class = paste("ec-meta ec-dir", if (pos) "ec-sgn-pos" else "ec-sgn-neg"),
+          HTML(sprintf("higher \U2192 <b>%s</b> beetles", dir)))))
   })
 
   output$envScatter <- renderPlotly({
