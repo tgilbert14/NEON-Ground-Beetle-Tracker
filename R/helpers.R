@@ -264,10 +264,15 @@ annual_trend <- function(d) {
 }
 
 # Stable species -> color map so a species is the same color everywhere.
+# Colour-blind-safe base (Okabe & Ito 2008, minus the black/yellow that read
+# poorly over the forest theme and in dark mode) used directly for the usual
+# handful of species; only ramped when a site has more species than the base.
 make_species_pal <- function(d) {
   sp <- sort(unique(d$scientificName[!is.na(d$scientificName)]))
   if (length(sp) == 0) return(character(0))
-  cols <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(8, "Dark2"))(length(sp))
+  base <- c("#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#7E5CC9", "#1a7f37")
+  cols <- if (length(sp) <= length(base)) base[seq_along(sp)]
+          else grDevices::colorRampPalette(base)(length(sp))
   stats::setNames(cols, sp)
 }
 

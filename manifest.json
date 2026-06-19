@@ -3220,16 +3220,16 @@
       "checksum": "4832a6ba773df70ef86c5a765f985620"
     },
     "R/helpers.R": {
-      "checksum": "fad6a17e096cefd958286dd5bed35fc0"
+      "checksum": "d34b77aad89a87977f5a97e739c3655d"
     },
     "R/site_metadata.R": {
       "checksum": "181c615063347333767e494e0401d8ef"
     },
     "server.R": {
-      "checksum": "fed60d30b4e2605790ca9b57b28221c8"
+      "checksum": "75e04a1f17b66b216710b44c0018657e"
     },
     "ui.R": {
-      "checksum": "2b7ae62ead992488457ce7a16fa201fa"
+      "checksum": "fe95ce414dc37ceb26dd555eb79e6923"
     },
     "www/styles.css": {
       "checksum": "aeb585d6d7d9e10fb530526c20567b8b"
