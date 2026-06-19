@@ -244,7 +244,7 @@ app_theme <- bs_theme(
 
 # ---- small UI utilities (shared by ui.R and server.R) ---------------------
 spin <- function(x) shinycssloaders::withSpinner(x, color = DDL$forest,
-                                                 proxy.height = "300px")
+                                                 proxy.height = "300px", hide.ui = FALSE)
 
 info_pop <- function(title, ..., placement = "auto")
   bslib::popover(tags$span(class = "info-dot", bsicons::bs_icon("info-circle")),
@@ -275,3 +275,5 @@ site_bio <- function(site) {
 
 # Server-side PDF site report (sourced last — needs DDL + helpers + ENV_LAYERS).
 source("R/report_pdf.R", local = FALSE)
+
+invisible(gc())

@@ -253,3 +253,30 @@ body { background: var(--bg); color: var(--ink); }
   .ec-hero { flex-direction: column; align-items: flex-start; gap: 5px; }
   .ec-hero-text { font-size: 14px; } .ec-rvalue { font-size: 28px; } .ec-dir { margin-left: 0; flex-basis: 100%; }
 }
+
+/* ---- DataTables dark-mode overrides ----
+   DT renders its own chrome that doesn't pick up bslib dark vars; these
+   force key surfaces to match the dark theme so the table isn't blindingly
+   white on a dark page.                                                     */
+[data-bs-theme="dark"] table.dataTable,
+[data-bs-theme="dark"] table.dataTable thead th,
+[data-bs-theme="dark"] table.dataTable tbody td {
+  background-color: var(--paper) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+[data-bs-theme="dark"] table.dataTable tbody tr.odd td { background-color: rgba(92,201,133,0.04) !important; }
+[data-bs-theme="dark"] table.dataTable tbody tr:hover td { background-color: rgba(92,201,133,0.12) !important; }
+[data-bs-theme="dark"] .dataTables_wrapper,
+[data-bs-theme="dark"] .dataTables_info,
+[data-bs-theme="dark"] .dataTables_length,
+[data-bs-theme="dark"] .dataTables_filter { color: var(--muted) !important; }
+[data-bs-theme="dark"] .dataTables_wrapper input,
+[data-bs-theme="dark"] .dataTables_wrapper select {
+  background: var(--paper); color: var(--ink); border-color: var(--line); }
+[data-bs-theme="dark"] .paginate_button { color: var(--muted) !important; }
+[data-bs-theme="dark"] .paginate_button:hover {
+  background: rgba(92,201,133,0.16) !important; color: var(--ink) !important; border-color: transparent !important; }
+[data-bs-theme="dark"] .paginate_button.current,
+[data-bs-theme="dark"] .paginate_button.current:hover {
+  background: var(--forest) !important; color: #fff !important; border-color: transparent !important; }

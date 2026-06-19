@@ -27,8 +27,9 @@ ui <- bslib::page_sidebar(
       "var s=p||localStorage.getItem('gbt_site');",
       "if(s){Shiny.setInputValue('restore_site',s,{priority:'event'});}}catch(e){}});",
       "Shiny.addCustomMessageHandler('gbt_remember',function(s){try{if(s){localStorage.setItem('gbt_site',s);}}catch(e){}});",
-      "function hideOv(){var o=document.getElementById('bootOverlay');if(o){o.classList.add('is-hidden');setTimeout(function(){if(o&&o.parentNode){o.parentNode.removeChild(o);}},600);}try{if(!localStorage.getItem('gbt_seen')){localStorage.setItem('gbt_seen','1');Shiny.setInputValue('first_visit',1,{priority:'event'});}}catch(e){}}",
-      "jQuery(document).one('shiny:idle',hideOv);setTimeout(hideOv,8000);",   # fallback if idle never fires
+      "function hideOv(){var o=document.getElementById('bootOverlay');if(o){o.classList.add('is-hidden');setTimeout(function(){if(o&&o.parentNode){o.parentNode.removeChild(o);}},600);}} ",
+      "function showWelcome(){try{if(!localStorage.getItem('gbt_seen')){localStorage.setItem('gbt_seen','1');Shiny.setInputValue('first_visit',1,{priority:'event'});}}catch(e){}}",
+      "jQuery(document).one('shiny:idle',function(){hideOv();showWelcome();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
       "}init();})();"))
   ),
   useShinyjs(),

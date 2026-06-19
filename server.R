@@ -41,6 +41,8 @@ function(input, output, session) {
   }
 
   rv <- reactiveValues(data = NULL, label = NULL, pal = NULL, ctx = NULL)
+  # Debounce the lag slider so dragging 0→12 doesn't fire 12 plotly re-renders.
+  envLag_d <- debounce(reactive(input$envLag), 250)
 
   # ---- memoized heavy computes -------------------------------------------
   # Each depends only on the loaded data/env, NOT on is_dark(), so the plots read
@@ -166,7 +168,6 @@ function(input, output, session) {
     updateSliderInput(session, "envLag", value = lag0)
     prog$set(value = 1, detail = "done")
     shinyjs::show("mainTabsWrap"); shinyjs::hide("splash")
-    nav_select("tabs", "overview")
     session$sendCustomMessage("gbt_remember", site)   # persist last site for next visit
   }
   # The Load button re-applies the current (possibly narrowed) date window.
@@ -207,8 +208,6 @@ function(input, output, session) {
   observeEvent(input$compareSite, {
     s <- input$compareSite
     if (is.null(s) || !nzchar(s)) return()
-    if (!isTRUE(input$tabs %in% c("diversity", "seasonality")))
-      nav_select("tabs", "diversity")
     showNotification(sprintf("Comparing %s vs %s — shown on the Diversity & Seasonality tabs.",
       input$site, s), type = "message", duration = 5)
   }, ignoreInit = TRUE)
@@ -622,7 +621,7 @@ function(input, output, session) {
       marker = list(size = 9, color = "#13632b"),
       hovertemplate = paste0("%{x}: %{y:.1f} ", ytitle, "<extra></extra>"))
     pred <- attr(t, "pred")
-    if (!is.null(pred) && length(pred) == nrow(t)) {
+    if (!is.null(pred) && length(pred) == nrow(t) && nrow(t) >= 5) {
       p <- p %>% add_trace(x = t$year, y = pred, mode = "lines", name = "trend",
         line = list(color = "#c9a300", width = 2, dash = "dash"),
         hoverinfo = "skip", inherit = FALSE)
@@ -738,20 +737,21 @@ function(input, output, session) {
     d <- rv$data; e <- rv$env; req(d, !is.null(e))
     layer <- input$envLayer
     if (is.null(layer) || layer == "none") return(note_plot("Pick a driver above<br>to see the response", "\U0001F326"))
-    pts <- env_response_points(d, e, layer, input$envLag %||% 0)
+    lag <- envLag_d() %||% 0
+    pts <- env_response_points(d, e, layer, lag)
     if (is.null(pts) || nrow(pts) < 3) return(note_plot("Not enough matched months<br>at this lag"))
     meta <- ENV_LAYERS[[layer]]; col <- if (is_dark()) "#5cc985" else DDL$forest
     p <- plot_ly(pts, x = ~value, y = ~cpue, type = "scatter", mode = "markers",
             marker = list(color = meta$color, size = 9, line = list(color = "#fff", width = 1)),
             hovertemplate = ~paste0("%{x} ", meta$unit, " · %{y:.1f} /100TN<br>", format(date, "%b %Y"), "<extra></extra>"))
-    if (stats::sd(pts$value) > 0) {
+    if (nrow(pts) >= 8 && abs(stats::cor(pts$value, pts$cpue, use = "complete.obs")) >= 0.2) {
       fit <- stats::lm(cpue ~ value, pts); xr <- range(pts$value)
       yy <- stats::predict(fit, newdata = data.frame(value = xr))
       p <- p %>% add_trace(x = xr, y = yy, type = "scatter", mode = "lines", inherit = FALSE,
         line = list(color = col, width = 2, dash = "dash"), hoverinfo = "skip", showlegend = FALSE)
     }
     p %>% plotly_theme(legend = FALSE) %>%
-      plotly::layout(xaxis = list(title = sprintf("%s (%s, lag %d mo)", meta$label, meta$unit, input$envLag %||% 0)),
+      plotly::layout(xaxis = list(title = sprintf("%s (%s, lag %d mo)", meta$label, meta$unit, lag)),
                      yaxis = list(title = "catch per 100 trap-nights"))
   })
 
@@ -803,9 +803,10 @@ function(input, output, session) {
     # optional environmental overlay (calendar-month climatology) on a right axis
     layer <- input$envLayer; has_ov <- !is.null(layer) && layer != "none" && !is.null(rv$env)
     if (has_ov) {
-      clim <- env_climatology(rv$env, layer, input$envLag %||% 0); meta <- ENV_LAYERS[[layer]]
+      lag <- envLag_d() %||% 0
+      clim <- env_climatology(rv$env, layer, lag); meta <- ENV_LAYERS[[layer]]
       if (!is.null(clim) && nrow(clim)) {
-        nm <- meta$label; if ((input$envLag %||% 0) != 0) nm <- sprintf("%s · lag %d mo", nm, as.integer(input$envLag))
+        nm <- meta$label; if (lag != 0L) nm <- sprintf("%s · lag %d mo", nm, as.integer(lag))
         hov <- paste0(meta$label, "<br>%{x}: %{y} ", meta$unit, "<extra></extra>")
         # inherit = FALSE: don't pick up the base activity trace's fill/markers
         # (a default-inherited fill = "tozeroy" was the bug that filled the temp line).
@@ -878,14 +879,14 @@ function(input, output, session) {
                    by.x = "siteID", by.y = "site")
       if (!nrow(rng)) return(base)
       return(base %>% addCircleMarkers(data = rng, lng = ~lng, lat = ~lat, layerId = ~siteID,
-        radius = ~pmax(6, sqrt(individualCount) * 2.2), color = "#13632b",
+        radius = ~pmax(12, sqrt(individualCount) * 2.2), color = "#13632b",
         fillOpacity = 0.75, stroke = TRUE, weight = 1.5,
         label = ~lapply(sprintf("<b>%s</b><br><i>%s</i>: %s individuals",
           siteID, sp, fmt_int(individualCount)), htmltools::HTML)))
     }
     pal <- c(neon = "#13632b", demo = "#c9a300")
     m <- base %>% addCircleMarkers(data = si, lng = ~lng, lat = ~lat, layerId = ~site,
-        radius = ~pmax(6, sqrt(richness) * 4), color = ~unname(pal[source]),
+        radius = ~pmax(12, sqrt(richness) * 4), color = ~unname(pal[source]),
         fillOpacity = 0.7, stroke = TRUE, weight = 1.5,
         label = ~lapply(sprintf("<b>%s</b> · %s<br>%d species · %s individuals<br>dominant: <i>%s</i>%s",
           site, name, richness, fmt_int(individuals), dominant,
