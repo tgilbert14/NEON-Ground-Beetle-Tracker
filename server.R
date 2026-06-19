@@ -42,6 +42,18 @@ function(input, output, session) {
 
   rv <- reactiveValues(data = NULL, label = NULL, pal = NULL, ctx = NULL)
 
+  # ---- memoized heavy computes -------------------------------------------
+  # Each depends only on the loaded data/env, NOT on is_dark(), so the plots read
+  # the cached result and the dark-mode toggle becomes a pure recolor: it no
+  # longer re-runs community_table (read by ~5 outputs), the 5x13 env dredge
+  # (formerly 3x per load), or the permutation-averaged accumulation curve.
+  ct_rx    <- reactive({ d <- rv$data; if (is.null(d)) NULL else community_table(d) })
+  env_rank <- reactive({ d <- rv$data; e <- rv$env
+    if (is.null(d) || is.null(e)) NULL else tryCatch(env_corr_all(d, e), error = function(x) NULL) })
+  env_pval <- reactive({ d <- rv$data; e <- rv$env
+    if (is.null(d) || is.null(e)) NULL else tryCatch(env_corr_pvalue(d, e), error = function(x) NULL) })
+  accum_rx <- reactive({ d <- rv$data; if (is.null(d)) NULL else accumulation_by_bout(d) })
+
   # ---- cascading state -> site picker ------------------------------------
   .states <- state_choices()
   # Open on the richest site so the first thing a user sees is real data — not an
@@ -259,7 +271,7 @@ function(input, output, session) {
 
   output$heroStats <- renderUI({
     d <- rv$data; if (is.null(d)) return(NULL)
-    ct <- community_table(d)
+    ct <- ct_rx(); if (is.null(ct)) return(NULL)
     sp <- ct[ct$species_level %in% TRUE, , drop = FALSE]   # richness = species only
     hn <- hill_numbers(sp$individuals)
     tn <- effort_trapnights(d)
@@ -285,10 +297,40 @@ function(input, output, session) {
     }
   )
 
+  # ---- tidy long-table CSV export (the analysis-ready download) ------------
+  # The loaded site's records as one row per plot x bout x species, plus a derived
+  # catch-per-100-trap-nights so the effort-normalised metric travels with the raw
+  # counts. Loads straight into R/pandas — the deliverable an ecologist actually wants.
+  output$reportCsv <- downloadHandler(
+    filename = function() sprintf("NEON-beetles-%s-%s.csv",
+      rv$siteCode %||% "site", format(Sys.Date(), "%Y%m%d")),
+    content = function(file) {
+      d <- rv$data; req(d)
+      tn <- suppressWarnings(as.numeric(d$trapnights))
+      out <- data.frame(
+        siteID                 = d$siteID %||% (rv$siteCode %||% NA_character_),
+        plotID                 = d$plotID,
+        collectDate            = as.character(d$date),
+        year                   = d$year,
+        month                  = d$mon,
+        taxonID                = d$taxonID,
+        scientificName         = d$scientificName,
+        taxonRank              = d$taxonRank,
+        species_level          = d$species_level,
+        individualCount        = d$individualCount,
+        trapnights             = tn,
+        cpn_per_100_trapnights = ifelse(!is.na(tn) & tn > 0, round(100 * d$individualCount / tn, 3), NA_real_),
+        source                 = attr(d, "source") %||% "neon",
+        stringsAsFactors = FALSE)
+      out <- out[order(out$collectDate, -out$individualCount), , drop = FALSE]
+      utils::write.csv(out, file, row.names = FALSE, na = "")
+    }
+  )
+
   # "answer up front" banner for the Overview — the community-composition story
   output$overviewVerdict <- renderUI({
     d <- rv$data; req(d)
-    ct <- community_table(d); req(!is.null(ct), nrow(ct))
+    ct <- ct_rx(); req(!is.null(ct), nrow(ct))
     sp <- ct[ct$species_level %in% TRUE, , drop = FALSE]
     if (!nrow(sp)) return(NULL)
     top <- sp[which.max(sp$individuals), ]
@@ -301,7 +343,7 @@ function(input, output, session) {
 
   output$commBar <- renderPlotly({
     d <- rv$data; req(d)
-    ct <- community_table(d); if (is.null(ct) || !nrow(ct)) return(note_plot("No community data"))
+    ct <- ct_rx(); if (is.null(ct) || !nrow(ct)) return(note_plot("No community data"))
     ct <- ct[ct$species_level %in% TRUE, , drop = FALSE]   # name species, not genera
     if (!nrow(ct)) return(note_plot("No species-level identifications yet"))
     ct <- ct[order(ct$individuals), ]   # plotly bars: bottom = first
@@ -319,12 +361,13 @@ function(input, output, session) {
                      yaxis = list(title = "", automargin = TRUE),  # fits names; shrinks on phones
                      margin = list(l = 10, r = 70)) %>%             # r: room for outside /100TN labels
       plotly::add_annotations(text = rv$ctx, x = 1, y = 1.04, xref = "paper", yref = "paper",
-        xanchor = "right", showarrow = FALSE, font = list(color = "#6b7a89", size = 11))
+        xanchor = "right", showarrow = FALSE,
+        font = list(color = if (is_dark()) "#9fb0a6" else "#6b7a89", size = 11))
   })
 
   output$meetBeetles <- renderUI({
     d <- rv$data; req(d)
-    ct <- community_table(d)
+    ct <- ct_rx(); req(!is.null(ct))
     ct <- utils::head(ct[ct$species_level %in% TRUE, , drop = FALSE], 6)
     if (!nrow(ct)) return(NULL)
     cards <- lapply(seq_len(nrow(ct)), function(i) {
@@ -357,7 +400,8 @@ function(input, output, session) {
       plotly::layout(xaxis = list(title = "% of sampling bouts present", range = c(0, 100)),
                      yaxis = list(title = "", automargin = TRUE), margin = list(l = 10, r = 55)) %>%
       plotly::add_annotations(text = rv$ctx, x = 1, y = 1.04, xref = "paper", yref = "paper",
-        xanchor = "right", showarrow = FALSE, font = list(color = "#6b7a89", size = 11))
+        xanchor = "right", showarrow = FALSE,
+        font = list(color = if (is_dark()) "#9fb0a6" else "#6b7a89", size = 11))
   })
 
   # ---- phenology heatmap: each species' own activity window -----------------
@@ -415,7 +459,7 @@ function(input, output, session) {
   # data-quality note: how much of the catch is named to species vs. higher taxa
   output$qaNote <- renderUI({
     d <- rv$data; req(d)
-    qa <- attr(community_table(d), "qa")
+    qa <- attr(ct_rx(), "qa")
     if (is.null(qa) || qa$higher_taxa == 0)
       return(div(class = "qa-note qa-clean", bs_icon("patch-check-fill"),
         HTML(sprintf(" All %d taxa here are identified to species — richness counts are clean.", qa$species %||% 0))))
@@ -433,6 +477,15 @@ function(input, output, session) {
     cmp <- compareData()
     if (!is.null(cmp)) {                       # two-site grouped comparison
       hb <- hill_numbers(sp_counts(cmp))
+      # Hill q0/q1/q2 scale with sample size and are NOT rarefied here, and the
+      # compare site loads over its FULL coverage while the main site honours the
+      # date window — so put each side's individuals + year span on the figure,
+      # making the asymmetry visible instead of reading as a fair diversity contest.
+      nA <- sum(sp_counts(d)); nB <- sum(sp_counts(cmp))
+      span <- function(x) { yr <- suppressWarnings(range(x$year, na.rm = TRUE))
+        if (!all(is.finite(yr))) "" else if (yr[1] == yr[2]) as.character(yr[1]) else paste0(yr[1], "\U2013", yr[2]) }
+      cap <- sprintf("%s: %s ind \U00B7 %s     %s: %s ind \U00B7 %s   \U2014   richness (q0) rises with sample size; sites are not rarefied to equal n",
+        input$site, fmt_int(nA), span(d), input$compareSite, fmt_int(nB), span(cmp))
       return(plot_ly() %>%
         add_trace(x = qlab, y = c(hn$q0, hn$q1, hn$q2), type = "bar", name = input$site,
                   marker = list(color = "#13632b"), text = round(c(hn$q0, hn$q1, hn$q2), 1),
@@ -444,7 +497,10 @@ function(input, output, session) {
                   hovertemplate = paste0("<b>", input$compareSite, "</b><br>%{x}: %{y:.2f}<extra></extra>")) %>%
         plotly_theme() %>%
         plotly::layout(barmode = "group", xaxis = list(title = ""),
-                       yaxis = list(title = "effective species")))
+                       yaxis = list(title = "effective species"), margin = list(t = 56),
+                       annotations = list(list(text = cap, x = 0, y = 1.16, xref = "paper", yref = "paper",
+                         xanchor = "left", showarrow = FALSE,
+                         font = list(size = 10.5, color = if (is_dark()) "#9fb0a6" else "#6b7a89")))))
     }
     df <- data.frame(q = qlab, v = c(hn$q0, hn$q1, hn$q2))
     plot_ly(df, x = ~q, y = ~v, type = "bar",
@@ -501,7 +557,7 @@ function(input, output, session) {
 
   output$accumPlot <- renderPlotly({
     d <- rv$data; req(d)
-    ac <- accumulation_by_bout(d)
+    ac <- accum_rx()
     if (is.null(ac)) return(note_plot("Not enough bouts for accumulation<br><span style='font-size:13px'>try widening the date window at left</span>"))
     plot_ly() %>%
       add_trace(x = ac$bouts, y = ac$richness + ac$sd, type = "scatter", mode = "lines",
@@ -533,7 +589,7 @@ function(input, output, session) {
     # but don't dress it up with a decimal the info-popover itself says to ignore.
     if (nrow(t) < 5) {
       appdir <- if (slope > 0) "an apparent rise" else if (slope < 0) "an apparent decline" else "little change"
-      pcttxt <- if (is.finite(pct)) sprintf(" (~%+.0f%%/yr)", pct) else ""
+      pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (~%+.0f%%/yr)", pct) else ""
       return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"),
         HTML(sprintf(" Over %d years, catch-per-effort shows <b>%s</b>%s — but %d years is too few to test reliably; read the direction, not the decimal.%s",
           nrow(t), appdir, pcttxt, nrow(t),
@@ -544,10 +600,10 @@ function(input, output, session) {
     word <- switch(dir, up = "rising", down = "declining", flat = "roughly flat")
     icon <- switch(dir, up = "arrow-up-right-circle-fill",
                    down = "arrow-down-right-circle-fill", flat = "dash-circle")
-    pcttxt <- if (is.finite(pct)) sprintf(" (~%+.0f%%/yr)", pct) else ""
+    pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (~%+.0f%%/yr)", pct) else ""
     sigtxt <- if (sig) sprintf("statistically clear (p = %.3f)", p)
-              else sprintf("not statistically distinguishable from no change (p = %.2f)",
-                           if (is.finite(p)) p else NA)
+              else if (is.finite(p)) sprintf("not statistically distinguishable from no change (p = %.2f)", p)
+              else "not statistically distinguishable from no change"
     div(class = paste("trend-verdict", paste0("trend-", dir)), bs_icon(icon),
       HTML(sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s — %s. %s",
         nrow(t), word, pcttxt, sigtxt,
@@ -593,7 +649,7 @@ function(input, output, session) {
 
   output$envDriverRank <- renderPlotly({
     d <- rv$data; e <- rv$env; req(d, !is.null(e))
-    rk <- env_corr_all(d, e)
+    rk <- env_rank()
     if (is.null(rk) || !nrow(rk)) return(note_plot("Not enough overlapping months<br>to rank drivers here", "\U0001F326"))
     rk <- rk[order(abs(rk$r)), ]
     cols <- vapply(seq_len(nrow(rk)), function(i) ec_corr_color(rk$layer[i], rk$r[i], is_dark()), character(1))
@@ -616,19 +672,44 @@ function(input, output, session) {
     updateSliderInput(session, "envLag", value = if (!is.null(sc) && !is.na(sc$lag)) as.integer(sc$lag) else 0L)
   }, ignoreInit = TRUE)
 
+  # The env overlay only renders on the POOLED activity curve (the per-species
+  # branch has no second axis), so when "Split by species" is ticked, grey out
+  # the driver picker and say why — instead of the line vanishing with the picker
+  # still active, which reads as a bug.
+  observeEvent(input$seasonBySpecies, {
+    if (isTRUE(input$seasonBySpecies)) shinyjs::disable("envLayer") else shinyjs::enable("envLayer")
+  })
+  output$envSplitNote <- renderUI({
+    if (!isTRUE(input$seasonBySpecies)) return(NULL)
+    div(class = "env-lag-hint", style = "margin-top:4px;",
+        bs_icon("info-circle"), " Overlay pauses while ", tags$b("Split by species"),
+        " is on — untick it to compare a driver on the pooled curve.")
+  })
+
   # styled "answer up front" — eyebrow · hero sentence + hero r-value · metadata
   # (same .ec design as the Small Mammal Tracker: strength drives the rail + verdict
   # word, SIGN drives the r-value colour + arrow + more/fewer, on separate channels).
   output$envCorrNote <- renderUI({
-    d <- rv$data; e <- rv$env; if (is.null(d) || is.null(e)) return(NULL)
-    rk <- env_corr_all(d, e); if (is.null(rk) || !nrow(rk)) return(NULL)
+    rk <- env_rank(); if (is.null(rk) || !nrow(rk)) return(NULL)
+    e <- rv$env; pv <- env_pval()
     top <- rk[1, ]
     strength <- abs(top$r); pos <- top$r >= 0; dir <- if (pos) "more" else "fewer"
-    rail <- if (strength >= 0.6) "rail-strong" else if (strength >= 0.35) "rail-mod" else "rail-weak"
-    slabel <- if (strength >= 0.6) "Strong" else if (strength >= 0.35) "Moderate"
-              else if (strength >= 0.2) "Weak" else "Negligible"
+    # Gate the loud verdict word on the permutation p: the strongest correlation
+    # out of the whole driver x lag dredge earns "Strong/Moderate" only when it
+    # beats chance alignment. p >= 0.05 -> demote to "Apparent" however big |r| is.
+    not_sig <- !is.null(pv) && is.finite(pv$p) && pv$p >= 0.05
+    if (not_sig) { slabel <- "Apparent"; rail <- "rail-weak" }
+    else {
+      rail <- if (strength >= 0.6) "rail-strong" else if (strength >= 0.35) "rail-mod" else "rail-weak"
+      slabel <- if (strength >= 0.6) "Strong" else if (strength >= 0.35) "Moderate"
+                else if (strength >= 0.2) "Weak" else "Negligible"
+    }
     glyph <- if (pos) "arrow-up-right" else "arrow-down-right"
     demo <- identical(attr(e, "source") %||% "neon", "demo")
+    n_search <- if (!is.null(pv)) pv$n_search else nrow(rk) * 13L
+    ptxt <- if (!is.null(pv) && is.finite(pv$p)) {
+      if (pv$p < 0.01) "p < 0.01" else sprintf("p = %.2f", pv$p)
+    } else NULL
     div(class = paste("ec", rail),
       style = sprintf("--ec-driver-hue:%s;", ENV_LAYERS[[top$layer]]$color %||% "#8a97a8"),
       div(class = "ec-eyebrow", bs_icon("graph-up-arrow"), tags$span("environmental tracking"),
@@ -645,6 +726,10 @@ function(input, output, session) {
           if (top$lag == 0) "same-month signal" else HTML(sprintf("<b>%d-mo</b> lead", top$lag))),
         tags$span(class = "ec-meta-dot"),
         tags$span(class = "ec-meta", bs_icon("calendar3"), HTML(sprintf("<b>%d</b> months matched", top$n))),
+        tags$span(class = "ec-meta-dot"),
+        tags$span(class = "ec-meta", bs_icon("search"),
+          HTML(sprintf("best of <b>%d</b> driver\U00D7lag%s", n_search,
+            if (!is.null(ptxt)) paste0(" \U00B7 ", ptxt) else ""))),
         tags$span(class = paste("ec-meta ec-dir", if (pos) "ec-sgn-pos" else "ec-sgn-neg"),
           HTML(sprintf("higher \U2192 <b>%s</b> beetles", dir)))))
   })
@@ -721,11 +806,19 @@ function(input, output, session) {
       clim <- env_climatology(rv$env, layer, input$envLag %||% 0); meta <- ENV_LAYERS[[layer]]
       if (!is.null(clim) && nrow(clim)) {
         nm <- meta$label; if ((input$envLag %||% 0) != 0) nm <- sprintf("%s · lag %d mo", nm, as.integer(input$envLag))
-        p <- p %>% add_trace(x = month.abb[clim$mon], y = clim$value, yaxis = "y2", type = "scatter",
-          mode = "lines", fill = "tozeroy", name = nm,
-          line = list(color = meta$color, width = 1.6, shape = "spline"),
-          fillcolor = paste0(meta$color, "1f"),
-          hovertemplate = paste0(meta$label, "<br>%{x}: %{y} ", meta$unit, "<extra></extra>"))
+        hov <- paste0(meta$label, "<br>%{x}: %{y} ", meta$unit, "<extra></extra>")
+        # inherit = FALSE: don't pick up the base activity trace's fill/markers
+        # (a default-inherited fill = "tozeroy" was the bug that filled the temp line).
+        if (isTRUE(meta$fillable)) {       # non-negative driver: fill the area to zero
+          p <- p %>% add_trace(x = month.abb[clim$mon], y = clim$value, yaxis = "y2", type = "scatter",
+            mode = "lines", fill = "tozeroy", name = nm, inherit = FALSE,
+            line = list(color = meta$color, width = 1.6, shape = "spline"),
+            fillcolor = paste0(meta$color, "1f"), hovertemplate = hov)
+        } else {                            # can go negative (temperature): plain line, no fill
+          p <- p %>% add_trace(x = month.abb[clim$mon], y = clim$value, yaxis = "y2", type = "scatter",
+            mode = "lines", name = nm, fill = "none", inherit = FALSE,
+            line = list(color = meta$color, width = 2.2, shape = "spline"), hovertemplate = hov)
+        }
       } else has_ov <- FALSE
     }
     p %>% plotly_theme(legend = TRUE) %>%
@@ -771,7 +864,11 @@ function(input, output, session) {
 
   output$map <- renderLeaflet({
     si <- SITE_INDEX
-    base <- leaflet() %>% addProviderTiles("CartoDB.Positron") %>% setView(-98, 39, zoom = 3)
+    # match the basemap to the theme — every plotly chart re-themes, so a blinding
+    # white map in dark mode is the one surface that fought the toggle. The gold
+    # "you are here" ring reads clearly on both tiles.
+    tiles <- if (is_dark()) "CartoDB.DarkMatter" else "CartoDB.Positron"
+    base <- leaflet() %>% addProviderTiles(tiles) %>% setView(-98, 39, zoom = 3)
     if (is.null(si)) return(base)
     si <- si[!is.na(si$lat), ]
     sp <- input$rangeSpecies %||% ""

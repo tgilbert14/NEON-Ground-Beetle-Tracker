@@ -85,17 +85,21 @@ available_sites <- function() {
 # because beetle and mammal sites are the same NEON terrestrial network. The
 # registry the UI + plots read; `lead` flags drivers expected to LEAD activity.
 ENV_DIR <- "data/env"
+# `fillable` = the driver is non-negative, so the overlay can fill the area to
+# zero and the y2 axis can be anchored at 0. Temperature can go BELOW zero
+# (HARV winters), where a to-zero fill and a forced-zero axis are meaningless and
+# visually invert the encoding — so temp draws as a plain line on a free axis.
 ENV_LAYERS <- list(
   precip  = list(col = "precip_mm",     label = "Precipitation",       unit = "mm/mo",
-                 dpid = "DP1.00044.001", agg = "sum",   color = "#2f7fb5", lead = TRUE,  dig = 0),
+                 dpid = "DP1.00044.001", agg = "sum",   color = "#2f7fb5", lead = TRUE,  dig = 0, fillable = TRUE),
   temp    = list(col = "temp_c",        label = "Air temperature",     unit = "°C",
-                 dpid = "DP1.00002.001", agg = "mean",  color = "#d9480f", lead = FALSE, dig = 1),
+                 dpid = "DP1.00002.001", agg = "mean",  color = "#d9480f", lead = FALSE, dig = 1, fillable = FALSE),
   flower  = list(col = "flowering_pct", label = "Plants flowering",    unit = "% in flower",
-                 dpid = "DP1.10055.001", agg = "share", color = "#d6336c", lead = TRUE,  dig = 0),
+                 dpid = "DP1.10055.001", agg = "share", color = "#d6336c", lead = TRUE,  dig = 0, fillable = TRUE),
   greenup = list(col = "greenup_pct",   label = "Green-up (leaf-out)", unit = "% leafing out",
-                 dpid = "DP1.10055.001", agg = "share", color = "#2f9e44", lead = TRUE,  dig = 0),
+                 dpid = "DP1.10055.001", agg = "share", color = "#2f9e44", lead = TRUE,  dig = 0, fillable = TRUE),
   fruit   = list(col = "fruiting_pct",  label = "Plants fruiting",     unit = "% in fruit",
-                 dpid = "DP1.10055.001", agg = "share", color = "#9c6644", lead = TRUE,  dig = 0)
+                 dpid = "DP1.10055.001", agg = "share", color = "#9c6644", lead = TRUE,  dig = 0, fillable = TRUE)
 )
 # Overlay-picker choices: only layers that actually have data for the loaded site.
 env_layer_choices <- function(env) {

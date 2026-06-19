@@ -54,13 +54,15 @@ ui <- bslib::page_sidebar(
 
     dateRangeInput("dateRange", label = tagList(bs_icon("calendar3"), " 3 · Date window"),
                    format = "yyyy-mm", startview = "year",
-                   start = "2016-01-01", end = "2023-12-31"),
+                   start = "2016-01-01", end = Sys.Date()),
 
     actionButton("loadBtn", tagList(bs_icon("bug-fill"), " Load this site"),
                  class = "btn-primary btn-lg w-100"),
     actionButton("surpriseBtn", tagList(bs_icon("shuffle"), " Surprise me"),
                  class = "btn-outline-success w-100 mt-2"),
     downloadButton("reportPdf", tagList(bs_icon("file-earmark-pdf"), " Site report (PDF)"),
+                   class = "btn-outline-secondary w-100 mt-2"),
+    downloadButton("reportCsv", tagList(bs_icon("filetype-csv"), " Data (CSV)"),
                    class = "btn-outline-secondary w-100 mt-2"),
     div(class = "demo-hint", bs_icon("info-circle"),
         if (isTRUE(LIVE_FETCH))
@@ -180,7 +182,8 @@ ui <- bslib::page_sidebar(
             div(class = "env-pop-row",
               div(class = "env-pop-sel",
                 selectInput("envLayer", label = tagList(bs_icon("cloud-drizzle-fill"), " Overlay a driver on the activity curve"),
-                            choices = c("None" = "none"), width = "100%")),
+                            choices = c("None" = "none"), width = "100%"),
+                uiOutput("envSplitNote")),
               div(class = "env-pop-lag",
                 sliderInput("envLag", tagList(bs_icon("hourglass-split"), " Lead time (months)"),
                             min = 0, max = 12, value = 0, step = 1, width = "100%"),

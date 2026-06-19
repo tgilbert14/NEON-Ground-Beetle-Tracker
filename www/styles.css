@@ -93,7 +93,8 @@ body { background: var(--bg); color: var(--ink); }
 .meet-card { display: flex; gap: 10px; background: var(--paper); border: 1px solid var(--line);
   border-radius: 10px; padding: 12px; }
 .meet-ico { font-size: 26px; flex: none; }
-.meet-name { font-weight: 700; font-style: italic; color: var(--navy); }
+.meet-body { min-width: 0; }   /* let long binomials wrap instead of overflowing the flex card */
+.meet-name { font-weight: 700; font-style: italic; color: var(--navy); overflow-wrap: anywhere; }
 .meet-stat { font-size: 11px; color: var(--muted); margin: 2px 0 4px; }
 .meet-blurb { font-size: 12.5px; color: #3a4654; line-height: 1.4; }
 
