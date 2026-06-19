@@ -62,8 +62,19 @@ for (s in sites) {
               s, nrow(d), dplyr::n_distinct(d$scientificName), file.size(out)/1e6))
 }
 
-cat(sprintf("\nDone. Bundle now has %d site files.\n",
-            length(list.files(out_dir, pattern = "\\.rds$"))))
+n_ok <- length(list.files(out_dir, pattern = "\\.rds$"))
+cat(sprintf("\nDone. Bundle now has %d site files.\n", n_ok))
+
+# Mass-failure guard: the auto-refresh workflow `rm -f data/sites/*.rds` BEFORE
+# this runs, then opens a data PR after. If a bad NEON-pull day left far too few
+# bundles, stop() now — before rebuilding the precompute cache/manifest and before
+# the PR — so a mass failure can't commit a shrunken dataset (which would delete
+# dozens of sites). Per-site failures are already skipped above; this trips only
+# on a mass failure.
+floor_n <- max(30L, as.integer(ceiling(0.75 * length(sites))))
+if (n_ok < floor_n)
+  stop(sprintf("Only %d/%d site bundles built (< %d) — aborting before precompute/manifest/PR so a mass NEON-pull failure can't commit a shrunken dataset.",
+               n_ok, length(sites), floor_n))
 
 # ---- rebuild cross-site cache + deploy manifest ---------------------------
 # A data refresh that stopped here would ship a STALE precomputed.rds (wrong
