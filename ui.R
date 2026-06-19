@@ -115,6 +115,12 @@ ui <- bslib::page_sidebar(
                 " caught, and the label shows ", tags$b("catch per 100 trap-nights"),
                 " so effort is accounted for."))),
           spin(plotlyOutput("commBar", height = "460px"))),
+        card(full_screen = TRUE,
+          card_head("pin-map-fill", "Most widespread species — frequency of occurrence",
+            info_pop("Frequency of occurrence (naive occupancy)",
+              p("The share of ", tags$b("sampling bouts"), " (a plot on a date) in which each species turned up at least once — how ", tags$b("widespread"), " it is, not how abundant. A beetle can be ", tags$em("abundant but patchy"), " (a long bar above, short here) or ", tags$em("sparse but everywhere"), "."),
+              p(tags$b("Two caveats."), " It's ", tags$b("naive"), " — not corrected for detection. And the denominator is bouts that caught ", tags$b("at least one ground beetle"), " (bouts with no carabids at all — rare in the active season — aren't in the data), so it slightly over-states how widespread a species is. Species-level IDs only."))),
+          spin(plotlyOutput("occupancyPlot", height = "420px"))),
         h4(class = "section-title", bs_icon("binoculars"), " Meet the beetles"),
         uiOutput("meetBeetles")
       ),
@@ -146,7 +152,12 @@ ui <- bslib::page_sidebar(
           card_head("graph-up-arrow", "Species accumulation across bouts",
             info_pop("Accumulation",
               p("As pitfall ", tags$b("bouts"), " accumulate, how many species have appeared? A flattening curve means the site's fauna is well sampled (averaged over random bout orders; Gotelli & Colwell 2001)."))),
-          spin(plotlyOutput("accumPlot", height = "360px")))
+          spin(plotlyOutput("accumPlot", height = "360px"))),
+        card(full_screen = TRUE,
+          card_head("bar-chart-steps", "Rank-abundance — the dominance curve",
+            info_pop("Rank-abundance (Whittaker)",
+              p("Species ranked from most to least abundant (log scale). The ", tags$b("shape"), " is the evenness story: a steep drop means a few species dominate; a shallow line means an even community — the same signal the Hill numbers above put into one number."))),
+          spin(plotlyOutput("rankAbundance", height = "360px")))
       ),
 
       nav_panel(
@@ -160,7 +171,12 @@ ui <- bslib::page_sidebar(
               p("Mean ", tags$b("catch per 100 trap-nights"), " by calendar month — the whole-community activity curve, pooling ", tags$b("every ground beetle (Carabidae) trapped"), " at this site, including records left at genus/family. Toggle to split it by the top species."))),
           div(class = "season-toggle",
             checkboxInput("seasonBySpecies", "Split by species", value = FALSE)),
-          spin(plotlyOutput("seasonPlot", height = "440px")))
+          spin(plotlyOutput("seasonPlot", height = "440px"))),
+        card(full_screen = TRUE,
+          card_head("grid-3x3", "Phenology heatmap — each species' active months",
+            info_pop("Phenology heatmap",
+              p("Top species (rows) × calendar month (columns); each cell is that month's ", tags$b("catch per 100 trap-nights"), ", darker = more active. A month sampled but with none of that species is a real ", tags$b("0"), "; a month never sampled is left ", tags$b("blank"), " (a gap, not a zero). The pooled activity curve above hides that species peak at different times."))),
+          spin(plotlyOutput("phenoHeat", height = "420px")))
       ),
 
       nav_panel(

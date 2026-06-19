@@ -227,6 +227,73 @@ seasonality <- function(d, by_species = FALSE, top_n = 6) {
   tibble::as_tibble(m[order(m$scientificName, m$mon), c("mon", "scientificName", "cpn")])
 }
 
+# ---- phenology heatmap (species x month) ----------------------------------
+# Top species by abundance, each row a species, each column a calendar month,
+# the cell = that month's catch per 100 trap-nights (so a heavily-sampled month
+# doesn't just look busier). A month with effort but no catch of the species is
+# a real 0; a month never sampled is NA (a gap, not a zero). Reveals that each
+# species has its OWN activity window, which a pooled curve hides.
+phenology_matrix <- function(d, top = 10) {
+  if (is.null(d) || !nrow(d)) return(NULL)
+  sp_d <- species_only(d); if (!nrow(sp_d)) return(NULL)
+  eff <- unique(d[, c("plotID", "collectDate", "trapnights")])
+  eff$mon <- as.integer(format(as.Date(eff$collectDate), "%m"))
+  mon_tn <- tapply(eff$trapnights, eff$mon, sum, na.rm = TRUE)   # named vector, month -> trap-nights
+  tops <- names(sort(tapply(sp_d$individualCount, sp_d$scientificName, sum),
+                     decreasing = TRUE))[seq_len(min(top, length(unique(sp_d$scientificName))))]
+  if (!length(tops)) return(NULL)
+  z <- matrix(NA_real_, nrow = length(tops), ncol = 12, dimnames = list(tops, month.abb))
+  sampled <- suppressWarnings(as.integer(names(mon_tn))[mon_tn > 0])
+  sampled <- sampled[!is.na(sampled)]
+  if (length(sampled)) z[, sampled] <- 0                        # sampled-but-absent = real 0
+  sub <- sp_d[sp_d$scientificName %in% tops, ]
+  cap <- stats::aggregate(individualCount ~ scientificName + mon, sub, sum)
+  for (i in seq_len(nrow(cap))) {
+    tn <- mon_tn[as.character(cap$mon[i])]
+    if (length(tn) && !is.na(tn) && tn > 0)
+      z[cap$scientificName[i], cap$mon[i]] <- round(100 * cap$individualCount[i] / tn, 2)
+  }
+  list(z = z, species = tops, months = month.abb)
+}
+
+# ---- frequency of occurrence (naive occupancy) ----------------------------
+# The share of CARABID-POSITIVE plot x bout samples in which each species was
+# caught at least once. The count-data analogue of "how widespread": a beetle can
+# be abundant but patchy, or sparse but everywhere. Two honest caveats baked into
+# the UI copy: (1) NAIVE — not detection-corrected; (2) the denominator is bouts
+# that caught >=1 ground beetle, because the bundle drops zero-catch bouts at
+# clean_beetle() (so a true deployment denominator isn't reconstructable here);
+# zero-carabid bouts are rare in the active season, so the bias is small but real.
+occupancy_table <- function(d, min_samples = 6) {
+  if (is.null(d) || !nrow(d)) return(NULL)
+  sp_d <- species_only(d); if (!nrow(sp_d)) return(NULL)
+  n_samp <- nrow(unique(d[, c("plotID", "collectDate"), drop = FALSE]))
+  if (n_samp < min_samples) return(NULL)
+  occ <- sp_d %>%
+    dplyr::distinct(.data$scientificName, .data$plotID, .data$collectDate) %>%
+    dplyr::group_by(.data$scientificName) %>%
+    dplyr::summarise(present = dplyr::n(), .groups = "drop") %>%
+    dplyr::mutate(occ = round(100 * .data$present / n_samp, 1)) %>%
+    dplyr::arrange(dplyr::desc(.data$occ))
+  attr(occ, "n_samp") <- n_samp
+  occ
+}
+
+# ---- rank-abundance (Whittaker) -------------------------------------------
+# Species ranked by relative abundance — the curve's SHAPE is the evenness
+# story the Hill numbers summarise: a steep drop = a few dominants, a shallow
+# line = an even community. Species-level only.
+rank_abundance <- function(d) {
+  ct <- community_table(d); if (is.null(ct)) return(NULL)
+  sp <- ct[ct$species_level %in% TRUE, , drop = FALSE]
+  if (!nrow(sp)) return(NULL)
+  tot <- sum(sp$individuals)
+  data.frame(rank = seq_len(nrow(sp)), scientificName = sp$scientificName,
+             individuals = sp$individuals,
+             rel = if (tot > 0) round(100 * sp$individuals / tot, 3) else NA_real_,
+             stringsAsFactors = FALSE)
+}
+
 # ---- inter-annual trend ---------------------------------------------------
 # Catch-per-100-trap-nights by year, with a fitted linear trend. This is the
 # "are the beetles disappearing?" view — NEON's standardized long records are
