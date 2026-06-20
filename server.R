@@ -630,8 +630,9 @@ function(input, output, session) {
       return(div(class = "qa-note qa-clean", bs_icon("patch-check-fill"),
         HTML(sprintf(" All %d taxa here are identified to species — richness counts are clean.", qa$species %||% 0))))
     div(class = "qa-note qa-flag", bs_icon("funnel-fill"),
-      HTML(sprintf(" Richness counts <b>%d species</b>. %d record-type%s identified only to genus/family (%s individuals, %.1f%% of the catch) are <b>excluded from richness, diversity and ordination</b> — they'd otherwise inflate the species count — but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
-        qa$species, qa$higher_taxa, if (qa$higher_taxa == 1) "" else "s",
+      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d record-type%s identified only to genus/family (%s individuals, %.1f%% of the catch) are <b>excluded from richness, diversity and ordination</b> — they'd otherwise inflate the species count — but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
+        qa$species, fmt_int(qa$ind_total - qa$ind_higher),
+        qa$higher_taxa, if (qa$higher_taxa == 1) "" else "s",
         fmt_int(qa$ind_higher), qa$pct_ind_higher)))
   })
 
