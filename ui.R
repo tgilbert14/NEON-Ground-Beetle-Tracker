@@ -117,7 +117,32 @@ ui <- bslib::page_sidebar(
     div(class = "splash-picker",
       div(class = "splash-map-hint", bs_icon("hand-index-thumb"),
         " Tap a site to explore it — dot size is species richness, colour is how many beetles were caught."),
-      mapPickerUI("picker", height = "520px", spinner = DDL$forest))),
+      mapPickerUI("picker", height = "520px", spinner = DDL$forest),
+      # Closed-by-default text fallback to the map: every site, one tap away. Each
+      # link drives the SAME input$siteExplore the popup's "Explore" button uses,
+      # so selection runs the app's normal cascade -> auto-load. Built from
+      # SITE_INDEX (real codes/names/state + total individuals).
+      local({
+        idx <- SITE_INDEX
+        if (is.null(idx) || nrow(idx) == 0) NULL else {
+          ord <- idx[order(idx$name), , drop = FALSE]
+          tags$details(class = "picker-list",
+            tags$summary(class = "picker-list-summary",
+              tags$span(class = "pls-label", bs_icon("list-ul"),
+                        tagList(" Browse all ", nrow(ord), " sites")),
+              tags$span(class = "pls-chevron", bs_icon("chevron-down"))),
+            div(class = "picker-list-grid",
+              lapply(seq_len(nrow(ord)), function(i)
+                tags$a(class = "picker-list-link", href = "#",
+                  onclick = sprintf("Shiny.setInputValue('siteExplore','%s',{priority:'event'});return false;",
+                                    ord$site[i]),
+                  tags$b(ord$site[i]), sprintf(" — %s ", ord$name[i]),
+                  tags$span(class = "pll-meta",
+                    sprintf("%s · %s caught",
+                            ord$state[i] %||% "—",
+                            format(ord$individuals[i], big.mark = ",")))))))
+        }
+      }))),
 
   # ---- tabs --------------------------------------------------------------
   div(id = "mainTabsWrap",

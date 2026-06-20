@@ -76,6 +76,41 @@ body {
   box-shadow: 0 4px 16px rgba(19,99,43,.10); }
 .map-picker-wrap .leaflet-container { background: var(--paper); }
 
+/* ---- "Browse all 46 sites" — closed-by-default text fallback to the map ---- */
+.picker-list { margin: 14px auto 0; max-width: 920px; text-align: left; }
+/* kill the native disclosure triangle so our chevron is the only marker */
+.picker-list > summary { list-style: none; }
+.picker-list > summary::-webkit-details-marker { display: none; }
+/* the summary, styled as a centered pill/button */
+.picker-list-summary {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: max-content; min-height: 40px; margin: 0 auto;
+  padding: 8px 18px; cursor: pointer; user-select: none;
+  font-weight: 700; font-size: 13.5px; color: var(--forest);
+  background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+  transition: color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.picker-list-summary:hover {
+  color: var(--forest2); border-color: var(--forest);
+  box-shadow: 0 6px 18px -10px var(--shadow); }
+.picker-list > summary:focus-visible { outline: none; }
+.picker-list > summary:focus-visible .picker-list-summary {
+  border-color: var(--forest); box-shadow: 0 0 0 3px var(--shadow); }
+.pls-label { display: inline-flex; align-items: center; gap: 7px; }
+.pls-chevron { display: inline-flex; transition: transform .2s ease; color: var(--forest); opacity: .85; }
+.picker-list[open] .pls-chevron { transform: rotate(180deg); }
+/* the expanded body: scrolls rather than pushing the page */
+.picker-list-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 18px;
+  margin-top: 12px; padding: 10px 12px;
+  max-height: 340px; overflow-y: auto;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+.picker-list-link { display: block; padding: 6px 9px; border-radius: 8px; color: var(--ink); font-size: 13px; text-decoration: none; }
+.picker-list-link:hover { background: var(--bg); color: var(--forest); }
+.picker-list-link b { color: var(--forest); }
+.pll-meta { color: var(--muted); font-size: 11.5px; }
+@media (max-width: 900px) { .picker-list-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .picker-list-grid { grid-template-columns: 1fr; } }
+
 /* ---- leaflet hover tooltip card ---- */
 .pm-pop { min-width: 190px; }
 .pm-pop-t { font-weight: 800; color: var(--ink); font-size: 13.5px; }
