@@ -2,10 +2,10 @@ name: Refresh NEON data bundle
 
 # Monthly rebuild of the per-site ground-beetle .rds bundles (data/sites/*.rds),
 # the cross-site precompute cache (data/precomputed.rds), and the deploy manifest,
-# then a PR. Runs late on the FIRST SATURDAY NIGHT of each month (~11pm Arizona
-# time) so any republish lands off-peak. NEON publishes on a lag, so a monthly
-# pull keeps the bundled data current. Posit Connect Cloud auto-republishes when
-# the PR merges to main.
+# then a direct push to main. Runs late on the FIRST SATURDAY NIGHT of each month
+# (~11pm Arizona time) so any republish lands off-peak. NEON publishes on a lag, so
+# a monthly pull keeps the bundled data current. Posit Connect Cloud auto-republishes
+# on every push to main.
 #
 # REQUIRES one repo secret (Settings → Secrets and variables → Actions):
 #   NEON_TOKEN   your NEON API token (optional but recommended; speeds the pull)
@@ -59,6 +59,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}   # push to main -> Connect Cloud auto-redeploys
 
       - uses: r-lib/actions/setup-r@v2
         with:
@@ -91,23 +93,19 @@ jobs:
         run: |
           Rscript scripts/precompute.R
 
-      # Land the refreshed bundle on main via a PR (re-uses one branch/PR each
-      # run). Connect Cloud auto-republishes the live app when this PR merges.
-      - name: Open/update data-refresh PR
-        uses: peter-evans/create-pull-request@v6
-        with:
-          add-paths: |
-            data
-            manifest.json
-          branch: auto/data-refresh
-          delete-branch: true
-          commit-message: "data: monthly NEON ground-beetle refresh"
-          title: "data: monthly NEON refresh"
-          body: |
-            Automated monthly refresh of NEON Ground Beetles (`DP1.10022.001`)
-            → `data/sites/*.rds` + `data/precomputed.rds` (+ `manifest.json` if the
-            file set changed).
-
-            Merging this PR to `main` triggers Posit Connect Cloud to auto-republish
-            the live app from the refreshed bundles.
-          labels: automated, data
+      # Commit + push refreshed data DIRECTLY to main. THIS is the deploy: the push
+      # makes Connect Cloud auto-republish (matching the SM / Veg / Plant siblings,
+      # and the suite standard of auto-push to the watched branch, not PR-merge).
+      # Guarded so it no-ops cleanly when nothing changed.
+      - name: Commit & push refreshed data to main
+        run: |
+          git config user.name  "neon-data-bot"
+          git config user.email "neon-data-bot@users.noreply.github.com"
+          git add -A data manifest.json
+          if git diff --cached --quiet; then
+            echo "No data changes - nothing to commit or deploy."
+          else
+            git commit -m "data: monthly NEON ground-beetle refresh [bot]"
+            git push origin HEAD:main
+            echo "Pushed refreshed data to main - Connect Cloud will redeploy."
+          fi
