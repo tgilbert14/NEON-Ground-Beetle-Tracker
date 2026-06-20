@@ -183,31 +183,107 @@ function(input, output, session) {
     load_site(input$site, snap = TRUE)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
+  # ---- the site-choice popup + "About this site" card ----------------------
+  # Tapping a dot on the picker map no longer auto-loads. It opens a small popup
+  # anchored on the dot offering a CLEAR choice: "Explore this site" (loads the
+  # record) or "About this site" (an instant info card). Mirrors the flagship
+  # Small Mammal app's picker. The Explore button sets input$siteExplore; the
+  # observer below runs the SAME load path the dropdown cascade uses.
+  site_popup_html <- function(row) {
+    code  <- row$site[1]
+    nm    <- row$name[1] %||% code
+    where <- paste(stats::na.omit(c(as.character(row$state[1]),
+      { m <- neon_sites[neon_sites$site == code, ]; if (nrow(m)) paste("NEON", m$domain[1]) else NA })),
+      collapse = " · ")
+    dom <- if (!is.na(row$dominant[1]))
+      sprintf("<div class='pm-pop-sp'>Dominant: <i>%s</i></div>", row$dominant[1]) else ""
+    demo <- if (identical(row$source[1], "demo"))
+      "<div class='sp-years'><b>demo data</b></div>" else ""
+    htmltools::HTML(sprintf(
+      "<div class='pm-pop site-pop'>
+         <div class='pm-pop-t'>\U0001FAB2 %s <span class='sp-code'>(%s)</span></div>
+         <div class='pm-pop-s'>%s</div>
+         <div class='pm-pop-n'><b>%s</b> species &middot; <b>%s</b> individuals</div>
+         %s%s
+         <div class='sp-actions'>
+           <button type='button' class='sp-btn sp-go' onclick=\"Shiny.setInputValue('siteExplore','%s',{priority:'event'});\">Explore this site &rarr;</button>
+           <button type='button' class='sp-btn sp-info' onclick=\"Shiny.setInputValue('siteInfo','%s',{priority:'event'});\">About this site</button>
+         </div>
+       </div>",
+      nm, code, where, row$richness[1] %||% "?", fmt_int(row$individuals[1] %||% 0),
+      dom, demo, code, code))
+  }
+
+  site_info_modal <- function(code) {
+    row <- if (!is.null(SITE_INDEX)) SITE_INDEX[SITE_INDEX$site == code, ] else NULL
+    m   <- neon_sites[neon_sites$site == code, ]
+    if (is.null(row) || !nrow(row))
+      return(modalDialog(title = "Site info", easyClose = TRUE, footer = modalButton("Close"),
+                         p("No details are available for this site.")))
+    dash <- function(x) if (length(x) == 0 || is.na(x) || !nzchar(as.character(x))) "—" else as.character(x)
+    coords <- if (nrow(m) && !is.na(m$lat[1]) && !is.na(m$lng[1]))
+      sprintf("%.3f, %.3f", m$lat[1], m$lng[1]) else "—"
+    stat <- function(v, lab) div(class = "si-stat",
+      div(class = "si-stat-n", if (is.na(v)) "—" else format(v, big.mark = ",")),
+      div(class = "si-stat-l", lab))
+    modalDialog(
+      title = HTML(sprintf("\U0001FAB2 %s <span class='si-code'>(%s)</span>", row$name[1] %||% code, code)),
+      easyClose = TRUE, size = "m",
+      footer = tagList(
+        modalButton("Close"),
+        tags$button(type = "button", class = "btn btn-primary",
+          onclick = sprintf("Shiny.setInputValue('siteExplore','%s',{priority:'event'});", code),
+          HTML("Explore this site&rsquo;s data &rarr;"))),
+      div(class = "site-info",
+        div(class = "si-sec",
+          div(class = "si-h", "Where"),
+          div(class = "si-row", dash(row$state[1]),
+              if (nrow(m)) HTML(sprintf(" · NEON %s", dash(m$domain[1]))) else NULL),
+          if (nrow(m) && !is.na(m$bio[1])) div(class = "si-row si-bio", m$bio[1]),
+          div(class = "si-coords", "\U0001F4CD ", coords)),
+        div(class = "si-sec",
+          div(class = "si-h", "What’s been collected"),
+          div(class = "si-stats",
+            stat(row$richness[1], "species"),
+            stat(row$individuals[1], "individuals")),
+          div(class = "si-row si-star", "Dominant: ", tags$i(dash(row$dominant[1])))),
+        if (identical(row$source[1], "demo"))
+          div(class = "si-sec", div(class = "si-row si-bio", "Showing demo data for this site."))))
+  }
+
   # ---- splash national PICKER map (the flagship front door) ----------------
   # size = species richness, colour = total individuals (forest sequential ramp).
-  # Tapping a marker drives the state+site dropdowns; the input$site observer above
-  # does the single load (no race), matching the Biogeography-tab map's pattern.
+  # Tapping a marker opens the Explore | About choice popup; the load comes from
+  # the popup's Explore button (input$siteExplore), which runs the SAME cascade as
+  # the dropdowns — no race, dropdowns and charts can't disagree.
   local({
     st <- picker_site_table
     if (!is.null(st) && nrow(st)) {
       mx <- suppressWarnings(max(st$individuals, na.rm = TRUE)); if (!is.finite(mx) || mx <= 0) mx <- 1
       pal <- leaflet::colorNumeric(c("#d6f3e4", "#36d98a", "#1f8a5a"), domain = c(0, mx), na.color = "#c9d3bb")
-      picked <- mapPickerServer("picker", site_table = st, radius_metric = "richness",
+      mapPickerServer("picker", site_table = st, radius_metric = "richness",
         color_fn = function(s) pal(ifelse(is.finite(s$individuals), s$individuals, 0)),
         label_fn = function(r) sprintf(
           "<b>%s</b> · %s, %s<br><b>%s</b> species · <b>%s</b> individuals<br>dominant: <i>%s</i>%s",
           r$site, r$name %||% r$site, r$state %||% "", r$richness %||% "?",
           fmt_int(r$individuals %||% 0), r$dominant %||% "?",
-          if (identical(r$source, "demo")) "<br><b>demo data</b>" else ""))
-      # load in the MAIN server context (the module session would namespace inputs)
-      observeEvent(picked(), {
-        s <- picked(); if (is.null(s) || !nzchar(s)) return()
-        m <- neon_sites[neon_sites$site == s, ]; if (!nrow(m)) return()
-        if (identical(input$stateSel, m$state)) updateSelectInput(session, "site", selected = s)
-        else { rv$pendingSite <- s; updateSelectInput(session, "stateSel", selected = m$state) }
-      }, ignoreInit = TRUE)
+          if (identical(r$source, "demo")) "<br><b>demo data</b>" else ""),
+        popup_fn = site_popup_html)
     }
   })
+
+  # "Explore this site" (popup button OR About-modal footer) -> load it. Same body
+  # the old picked()/marker_click observer used: drive the pickers, the cascade /
+  # input$site observer does the single load.
+  observeEvent(input$siteExplore, {
+    removeModal()
+    s <- input$siteExplore; if (is.null(s) || !nzchar(s)) return()
+    m <- neon_sites[neon_sites$site == s, ]; if (!nrow(m)) return()
+    if (identical(input$stateSel, m$state)) updateSelectInput(session, "site", selected = s)
+    else { rv$pendingSite <- s; updateSelectInput(session, "stateSel", selected = m$state) }
+  })
+  # "About this site" -> instant info card (no bundle load)
+  observeEvent(input$siteInfo, showModal(site_info_modal(input$siteInfo)))
 
   # Restore the last-used site (localStorage) or a ?site=SRER URL param on connect.
   observeEvent(input$restore_site, {
@@ -976,9 +1052,16 @@ function(input, output, session) {
           siteID, sp, fmt_int(individualCount)), htmltools::HTML)))
     }
     pal <- c(neon = "#36d98a", demo = "#e0b43a")
+    # CLICK opens the same Explore | About choice popup as the splash picker — no
+    # silent auto-load (the load comes from the popup's Explore -> input$siteExplore).
+    bio_pops <- vapply(seq_len(nrow(si)),
+      function(i) as.character(site_popup_html(si[i, , drop = FALSE])), character(1))
     m <- base %>% addCircleMarkers(data = si, lng = ~lng, lat = ~lat, layerId = ~site,
         radius = ~pmax(12, sqrt(richness) * 4), color = ~unname(pal[source]),
         fillOpacity = 0.7, stroke = TRUE, weight = 1.5,
+        popup = bio_pops, popupOptions = popupOptions(maxWidth = 300, minWidth = 230,
+          autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = TRUE,
+          closeButton = TRUE, closeOnClick = FALSE, className = "pm-pop-card"),
         label = ~lapply(sprintf("<b>%s</b> · %s<br>%d species · %s individuals<br>dominant: <i>%s</i>%s",
           site, name, richness, fmt_int(individuals), dominant,
           ifelse(source == "demo", "<br><b>demo data</b>", "")), htmltools::HTML))
@@ -1025,19 +1108,10 @@ function(input, output, session) {
       xaxis = list(title = if (!is.na(ve[1])) sprintf("PCoA 1 (%d%%)", ve[1]) else "PCoA 1"),
       yaxis = list(title = if (!is.na(ve[2])) sprintf("PCoA 2 (%d%%)", ve[2]) else "PCoA 2"))
   })
-  observeEvent(input$map_marker_click, {
-    s <- input$map_marker_click$id; req(s)
-    m <- neon_sites[neon_sites$site == s, ]
-    if (!nrow(m)) return()
-    # drive the pickers; the cascade / site-change observer does the single load,
-    # so the dropdowns and the loaded charts can't disagree (no race).
-    if (identical(input$stateSel, m$state))
-      updateSelectInput(session, "site", selected = s)
-    else {
-      rv$pendingSite <- s
-      updateSelectInput(session, "stateSel", selected = m$state)
-    }
-  })
+  # (removed) the Biogeography-tab map's click->auto-load observer. The map's
+  # markers now carry the Explore | About choice popup (built with site_popup_html
+  # above), so a tap opens the popup; the load comes from the popup's Explore
+  # button via input$siteExplore — matching the splash picker and the flagship.
 
   output$siteTable <- DT::renderDT({
     si <- SITE_INDEX; if (is.null(si)) return(NULL)
