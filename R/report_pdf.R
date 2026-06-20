@@ -14,10 +14,13 @@ suppressPackageStartupMessages(library(grid))
 
 PDF_DEV <- if (isTRUE(capabilities("cairo"))) grDevices::cairo_pdf else grDevices::pdf
 
+# PG is DECOUPLED from DDL on purpose: the PDF prints on WHITE paper, so it must
+# stay the LIGHT house palette. DDL is now the desert-NIGHT system (light text on
+# dark navy) — reading those hexes here would print invisible white-on-white.
 PG <- list(w = 8.5, h = 11, margin = 0.75, lineH = 0.165,
-           navy = DDL$navy, forest = DDL$forest, green = DDL$green, gold = DDL$gold2,
-           cardinal = DDL$cardinal, sky = DDL$sky, ink = DDL$ink, muted = DDL$muted,
-           line = DDL$line, tint = "#eef5ef", zebra = "#f4f8f4")
+           navy = "#0C234B", forest = "#13632b", green = "#1a7f37", gold = "#c9a300",
+           cardinal = "#AB0520", sky = "#2f7fb5", ink = "#1c2733", muted = "#6b7a89",
+           line = "#dbe2ec", tint = "#eef5ef", zebra = "#f4f8f4")
 PG$cw <- PG$w - 2 * PG$margin
 PG$ch <- PG$h - 2 * PG$margin
 

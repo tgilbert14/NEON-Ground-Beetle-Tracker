@@ -1,16 +1,30 @@
 /* ===========================================================================
    NEON Ground Beetle Tracker — styles.css
-   Desert Data Labs house style, tuned green for a forest-floor / carabid feel.
+   Desert Data Labs DESERT-NIGHT house style. The app DEFAULTS to LIGHT
+   ("desert-day"), but the prominent info boxes (hero command band, stat
+   value-boxes) wear the dark desert-night scheme in BOTH modes — the
+   "light page, dark hero" look (see the premium block at the bottom).
+   Var names kept for low churn; --forest is the primary (teal), --cardinal
+   the accent (coral). Mirrors the NEON Small Mammal Tracker.
    =========================================================================== */
-:root {
-  --navy: #0C234B; --forest: #13632b; --green: #1a7f37; --cardinal: #AB0520;
-  --gold: #c9a300; --sky: #2f7fb5; --ink: #1c2733; --muted: #54616e;
-  --bg: #eef3ee; --paper: #fff; --line: #dbe7dc;
+:root {                                   /* light "desert-day" (DEFAULT) */
+  --navy: #16243a; --forest: #149086; --forest2: #0f6f66; --green: #3f9a52;
+  --cardinal: #e0685a; --gold: #d6a31c; --gold-ink: #9a7314; --sky: #2f8fc4;
+  --ink: #16243a; --muted: #5a6a82;
+  --bg: #eef3fb; --paper: #ffffff; --line: #d6e0ee;
+  --shadow: rgba(20, 144, 134, 0.10);
 }
-body { background: var(--bg); color: var(--ink); }
+body {
+  background:
+    radial-gradient(1100px 520px at 8% -8%, rgba(20,144,134,0.05), transparent 60%),
+    radial-gradient(900px 460px at 102% 2%, rgba(224,104,90,0.04), transparent 55%),
+    linear-gradient(180deg, #eef3fb 0%, #e7eef8 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+}
 
 /* ---- sidebar / control deck ---- */
-.control-deck { background: #f6faf6; border-right: 1px solid var(--line); }
+.control-deck { background: var(--bg); border-right: 1px solid var(--line); }
 .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
 .brand-mark { font-size: 30px; line-height: 1; }
 .brand-title { font-weight: 800; font-size: 17px; color: var(--forest); }
@@ -18,10 +32,10 @@ body { background: var(--bg); color: var(--ink); }
 .demo-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
 .deck-hr { border-color: var(--line); margin: 16px 0; }
 .deck-foot { font-size: 11px; color: var(--muted); line-height: 1.7; }
-.deck-foot code { color: var(--forest); background: #e7f1e9; padding: 1px 5px; border-radius: 5px; }
+.deck-foot code { color: var(--forest); background: var(--bg); padding: 1px 5px; border-radius: 5px; }
 .deck-foot a { color: var(--muted); text-decoration: none; }
 .deck-foot a:hover { color: var(--forest); }
-.site-bio { display: flex; gap: 8px; align-items: flex-start; background: #eef5ef; border: 1px solid var(--line);
+.site-bio { display: flex; gap: 8px; align-items: flex-start; background: var(--bg); border: 1px solid var(--line);
   border-left: 3px solid var(--forest); border-radius: 8px; padding: 8px 10px; margin: -4px 0 12px;
   font-size: 12px; color: #3a4654; line-height: 1.45; }
 .site-bio .bi { color: var(--forest); margin-top: 2px; flex: none; }
@@ -66,7 +80,7 @@ body { background: var(--bg); color: var(--ink); }
 .section-title { color: var(--forest); margin: 22px 0 12px; }
 .with-info .ch-title { font-weight: 700; }
 .info-dot { color: var(--muted); cursor: pointer; margin-left: 6px; }
-.tab-intro { background: #eef5ef; border: 1px solid var(--line); border-radius: 8px;
+.tab-intro { background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
   padding: 8px 12px; font-size: 13px; color: #3a4654; margin-bottom: 14px; }
 .tab-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; padding: 6px 2px 10px; }
 .tab-head-text h4 { color: var(--forest); margin: 0; }
@@ -78,7 +92,7 @@ body { background: var(--bg); color: var(--ink); }
   padding: 11px 14px; margin: 0 0 14px; font-size: 13px; line-height: 1.5; border: 1px solid; }
 .qa-note .bi { margin-top: 2px; flex: none; font-size: 16px; }
 .qa-clean { background: #eef6f0; border-color: #cfe6d6; color: #21503a; }
-.qa-clean .bi { color: var(--forest, #13632b); }
+.qa-clean .bi { color: var(--forest); }
 .qa-flag { background: #f7f3e6; border-color: #ece0bd; color: #5f5320; }
 .qa-flag .bi { color: #b07d00; }
 .qa-cite { color: var(--muted); font-style: italic; }
@@ -88,11 +102,11 @@ body { background: var(--bg); color: var(--ink); }
   padding: 11px 14px; margin: 0 0 14px; font-size: 14px; line-height: 1.5; border: 1px solid; }
 .trend-verdict .bi { margin-top: 2px; flex: none; font-size: 18px; }
 .trend-up   { background: #eef6f0; border-color: #cfe6d6; color: #21503a; }
-.trend-up .bi   { color: var(--forest, #13632b); }
+.trend-up .bi   { color: var(--forest); }
 .trend-down { background: #fbeef0; border-color: #f0cdd4; color: #7a1020; }
 .trend-down .bi { color: #b3122b; }
 .trend-flat { background: #f7f3e6; border-color: #ece0bd; color: #6a5a1f; }
-.trend-flat .bi { color: #c9a300; }
+.trend-flat .bi { color: var(--gold); }
 .season-toggle { margin-bottom: 4px; }
 .hill-note { font-size: 13px; color: #3a4654; margin-top: 8px; }
 
@@ -170,58 +184,67 @@ body { background: var(--bg); color: var(--ink); }
    redefine the house-style CSS vars (so every var()-based rule adapts) and
    override the rules that hardcode light hexes (banners, badges, notes).
    =========================================================================== */
-[data-bs-theme="dark"] {
-  --bg: #0f1a16; --paper: #18241f; --ink: #e7efe9; --muted: #93a69c; --line: #2b3a33;
-  --forest: #5cc985;   /* brand green, brightened for text + accents on dark */
-  --green: #6fd493; --navy: #a9c2e6; --gold: #e8c552; --sky: #7fb2dd;
+[data-bs-theme="dark"] {                  /* desert-NIGHT — teal/coral/gold on dark sky */
+  --navy: #a9c2e6; --forest: #2dd4bf; --forest2: #5eead4; --green: #5fb56a;
+  --cardinal: #fb8a7e; --gold: #ffd24a; --gold-ink: #ffd24a; --sky: #43b8e8;
+  --ink: #eaf2ff; --muted: #9fb0cf;
+  --bg: #070d1f; --paper: #0e1d40; --line: rgba(255,255,255,0.12);
+  --shadow: rgba(0,0,0,0.5);
 }
-[data-bs-theme="dark"] body { background: var(--bg); color: var(--ink); }
-[data-bs-theme="dark"] .control-deck { background: #12201a; border-right-color: var(--line); }
-[data-bs-theme="dark"] .deck-foot code { background: rgba(92,201,133,0.16); color: var(--forest); }
-[data-bs-theme="dark"] .site-bio { background: rgba(92,201,133,0.08); color: #c7d6cc; }
-[data-bs-theme="dark"] .tab-intro { background: rgba(92,201,133,0.08); color: #c7d6cc; }
+[data-bs-theme="dark"] body {
+  background:
+    radial-gradient(1100px 520px at 8% -8%, rgba(45,212,191,0.12), transparent 60%),
+    radial-gradient(900px 460px at 102% 2%, rgba(251,138,126,0.10), transparent 55%),
+    radial-gradient(900px 600px at 50% 120%, rgba(255,210,74,0.06), transparent 60%),
+    linear-gradient(180deg, #070d1f 0%, #05080f 100%);
+  color: var(--ink);
+}
+[data-bs-theme="dark"] .control-deck { background: #0b1733; border-right-color: var(--line); }
+[data-bs-theme="dark"] .deck-foot code { background: rgba(45,212,191,0.16); color: var(--forest); }
+[data-bs-theme="dark"] .site-bio { background: rgba(45,212,191,0.08); color: #c7d6e8; }
+[data-bs-theme="dark"] .tab-intro { background: rgba(45,212,191,0.08); color: #c7d6e8; }
 [data-bs-theme="dark"] .hill-note,
 [data-bs-theme="dark"] .meet-blurb,
-[data-bs-theme="dark"] .tab-head-text p { color: #b8c7bd; }
+[data-bs-theme="dark"] .tab-head-text p { color: #b8c7dd; }
 [data-bs-theme="dark"] .title-tag { background: var(--gold); color: #2a2200; }
 /* colored verdict / QA / source / about banners — dark tints, light text */
 [data-bs-theme="dark"] .trend-up, [data-bs-theme="dark"] .qa-clean, [data-bs-theme="dark"] .env-real {
-  background: rgba(92,201,133,0.13); border-color: rgba(92,201,133,0.30); color: #a9e3bf; }
+  background: rgba(95,181,106,0.14); border-color: rgba(95,181,106,0.32); color: #a9e3bf; }
 [data-bs-theme="dark"] .trend-up .bi, [data-bs-theme="dark"] .qa-clean .bi, [data-bs-theme="dark"] .env-real .bi { color: var(--green); }
 [data-bs-theme="dark"] .trend-down {
-  background: rgba(220,80,100,0.14); border-color: rgba(220,80,100,0.34); color: #ff9aa6; }
+  background: rgba(251,138,126,0.14); border-color: rgba(251,138,126,0.34); color: #ff9aa6; }
 [data-bs-theme="dark"] .trend-down .bi { color: #ff7a8a; }
 [data-bs-theme="dark"] .trend-flat, [data-bs-theme="dark"] .qa-flag,
 [data-bs-theme="dark"] .env-demo, [data-bs-theme="dark"] .about-note {
-  background: rgba(232,197,82,0.13); border-color: rgba(232,197,82,0.32); color: #e8c552; }
+  background: rgba(255,210,74,0.13); border-color: rgba(255,210,74,0.32); color: #ffd24a; }
 [data-bs-theme="dark"] .trend-flat .bi, [data-bs-theme="dark"] .qa-flag .bi,
 [data-bs-theme="dark"] .env-demo .bi, [data-bs-theme="dark"] .about-note .bi { color: var(--gold); }
 [data-bs-theme="dark"] .trend-info {
-  background: rgba(127,178,221,0.13); border-color: rgba(127,178,221,0.32); color: #aed0ee; }
+  background: rgba(67,184,232,0.13); border-color: rgba(67,184,232,0.32); color: #aed0ee; }
 [data-bs-theme="dark"] .trend-info .bi { color: var(--sky); }
-[data-bs-theme="dark"] .welcome p, [data-bs-theme="dark"] .welcome-list { color: #c7d6cc; }
+[data-bs-theme="dark"] .welcome p, [data-bs-theme="dark"] .welcome-list { color: #c7d6e8; }
 /* keep the boot overlay on the dark bg so first paint matches the theme */
 [data-bs-theme="dark"] .boot-overlay { background: var(--bg); }
 
 /* ---- environmental-overlay picker bar (Seasonality tab) ---- */
 .env-pop-bar { border: 1px solid var(--line); border-left: 4px solid var(--forest); border-radius: 12px;
-  padding: 12px 16px; margin: 0 0 14px; background: linear-gradient(180deg, #f4f8f4 0%, var(--paper) 100%); }
+  padding: 12px 16px; margin: 0 0 14px; background: linear-gradient(180deg, var(--bg) 0%, var(--paper) 100%); }
 .env-pop-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .env-pop-sel { flex: 2 1 320px; min-width: 220px; }
 .env-pop-lag { flex: 1 1 220px; min-width: 190px; }
 .env-pop-bar .form-group, .env-pop-bar .shiny-input-container { margin-bottom: 0; }
 .env-lag-hint { font-size: 10.5px; color: var(--muted); line-height: 1.35; margin: -6px 0 4px; }
 @media (max-width: 560px) { .env-pop-row { gap: 6px; } }
-[data-bs-theme="dark"] .env-pop-bar { background: linear-gradient(180deg, #16231d 0%, var(--paper) 100%); }
+[data-bs-theme="dark"] .env-pop-bar { background: linear-gradient(180deg, #15294f 0%, var(--paper) 100%); }
 
 /* ---- env-tracking "answer" banner (.ec) — same design as the mammal app ---- */
 @keyframes ecReveal { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 .ec { position: relative; margin: 0 0 14px; padding: 12px 16px 11px 18px;
   border: 1px solid var(--line); border-left: 4px solid var(--ec-rail, var(--muted));
-  border-radius: 9px; background: linear-gradient(180deg, #f4f8f4 0%, var(--paper) 100%);
+  border-radius: 9px; background: linear-gradient(180deg, var(--bg) 0%, var(--paper) 100%);
   box-shadow: 0 1px 2px rgba(19, 99, 43, .05); animation: ecReveal .3s ease; }
-.ec.rail-strong { --ec-rail: #1a7f37; }
-.ec.rail-mod    { --ec-rail: #c9a300; }
+.ec.rail-strong { --ec-rail: #3f9a52; }
+.ec.rail-mod    { --ec-rail: #d6a31c; }
 .ec.rail-weak   { --ec-rail: var(--muted); }
 .ec-eyebrow { display: flex; align-items: center; gap: 6px; margin-bottom: 7px;
   font-size: 10px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
@@ -239,7 +262,7 @@ body { background: var(--bg); color: var(--ink); }
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
 .ec-rvalue .bi { font-size: 18px; }
-.ec-rvalue.ec-sgn-pos { color: #1a7f37; }
+.ec-rvalue.ec-sgn-pos { color: #3f9a52; }
 .ec-rvalue.ec-sgn-neg { color: var(--cardinal); }
 .ec-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 9px;
   margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
@@ -248,13 +271,13 @@ body { background: var(--bg); color: var(--ink); }
 .ec-meta b { color: var(--ink); font-weight: 800; }
 .ec-meta-dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: .4; }
 .ec-dir { margin-left: auto; }
-.ec-dir.ec-sgn-pos b { color: #1a7f37; }
+.ec-dir.ec-sgn-pos b { color: #3f9a52; }
 .ec-dir.ec-sgn-neg b { color: var(--cardinal); }
-[data-bs-theme="dark"] .ec { background: linear-gradient(180deg, #16231d 0%, var(--paper) 100%);
+[data-bs-theme="dark"] .ec { background: linear-gradient(180deg, #15294f 0%, var(--paper) 100%);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
-[data-bs-theme="dark"] .ec.rail-strong { --ec-rail: #5cc985; }
+[data-bs-theme="dark"] .ec.rail-strong { --ec-rail: #5fb56a; }
 [data-bs-theme="dark"] .ec.rail-mod    { --ec-rail: #e8c552; }
-[data-bs-theme="dark"] .ec-rvalue.ec-sgn-pos, [data-bs-theme="dark"] .ec-dir.ec-sgn-pos b { color: #5cc985; }
+[data-bs-theme="dark"] .ec-rvalue.ec-sgn-pos, [data-bs-theme="dark"] .ec-dir.ec-sgn-pos b { color: #5fb56a; }
 [data-bs-theme="dark"] .ec-rvalue.ec-sgn-neg, [data-bs-theme="dark"] .ec-dir.ec-sgn-neg b { color: #ff7a8a; }
 [data-bs-theme="dark"] .ec-demo { color: #e8c552; background: rgba(232, 197, 82, .12); border-color: rgba(232, 197, 82, .32); }
 @media (max-width: 560px) {
@@ -273,8 +296,8 @@ body { background: var(--bg); color: var(--ink); }
   color: var(--ink) !important;
   border-color: var(--line) !important;
 }
-[data-bs-theme="dark"] table.dataTable tbody tr.odd td { background-color: rgba(92,201,133,0.04) !important; }
-[data-bs-theme="dark"] table.dataTable tbody tr:hover td { background-color: rgba(92,201,133,0.12) !important; }
+[data-bs-theme="dark"] table.dataTable tbody tr.odd td { background-color: rgba(45,212,191,0.04) !important; }
+[data-bs-theme="dark"] table.dataTable tbody tr:hover td { background-color: rgba(45,212,191,0.12) !important; }
 [data-bs-theme="dark"] .dataTables_wrapper,
 [data-bs-theme="dark"] .dataTables_info,
 [data-bs-theme="dark"] .dataTables_length,
@@ -284,7 +307,74 @@ body { background: var(--bg); color: var(--ink); }
   background: var(--paper); color: var(--ink); border-color: var(--line); }
 [data-bs-theme="dark"] .paginate_button { color: var(--muted) !important; }
 [data-bs-theme="dark"] .paginate_button:hover {
-  background: rgba(92,201,133,0.16) !important; color: var(--ink) !important; border-color: transparent !important; }
+  background: rgba(45,212,191,0.16) !important; color: var(--ink) !important; border-color: transparent !important; }
 [data-bs-theme="dark"] .paginate_button.current,
 [data-bs-theme="dark"] .paginate_button.current:hover {
   background: var(--forest) !important; color: #fff !important; border-color: transparent !important; }
+
+/* ====================================================================== *
+ *  PREMIUM DESERT-NIGHT layer — command-band hero, starfield, sheen, and  *
+ *  DARK "info-box" stat surfaces on the LIGHT page (the cascade look).    *
+ *  Every animation is prefers-reduced-motion gated at the bottom.        *
+ * ====================================================================== */
+@keyframes gbtStars { to { background-position: 0 220px, 0 220px, 0 220px, 0 220px; } }
+@keyframes gbtSheen { 0% { left:-65%; opacity:0; } 12% { opacity:.85; } 100% { left:135%; opacity:0; } }
+@keyframes gbtFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* the hero becomes a dark navy/teal COMMAND BAND with a drifting starfield + nebula,
+   in BOTH light and dark modes (the "light page, dark hero" look) */
+.app-hero {
+  position: relative; overflow: hidden;
+  padding: 24px 26px 22px; margin: 6px 0 6px; border-radius: 16px;
+  background: radial-gradient(125% 150% at 16% -12%, #15425f 0%, #0b1733 46%, #070d1f 100%) !important;
+  box-shadow: 0 18px 46px rgba(3,8,20,.45), inset 0 0 0 1px rgba(45,212,191,.18);
+}
+.app-hero > * { position: relative; z-index: 1; }
+.app-hero::before {           /* drifting starfield */
+  content:""; position:absolute; inset:0; z-index:0; pointer-events:none; opacity:.55;
+  background-repeat: repeat; background-size: 210px 220px,210px 220px,210px 220px,210px 220px;
+  background-image:
+    radial-gradient(1.4px 1.4px at 30px 40px, rgba(255,255,255,.6), transparent),
+    radial-gradient(1.2px 1.2px at 150px 90px, rgba(150,220,255,.5), transparent),
+    radial-gradient(1.5px 1.5px at 90px 175px, rgba(255,210,74,.4), transparent),
+    radial-gradient(1.1px 1.1px at 175px 28px, rgba(94,234,212,.5), transparent);
+  animation: gbtStars 120s linear infinite;
+}
+.app-hero::after {            /* teal/coral/gold nebula */
+  content:""; position:absolute; inset:0; z-index:0; pointer-events:none; opacity:.6;
+  background:
+    radial-gradient(48px 48px at 10% 26%, rgba(45,212,191,.18), transparent 70%),
+    radial-gradient(66px 66px at 86% 16%, rgba(251,138,126,.14), transparent 70%),
+    radial-gradient(54px 54px at 64% 94%, rgba(255,210,74,.12), transparent 70%);
+}
+.app-hero .app-title { color: #ffd24a !important; }
+.app-hero .app-subtitle { color: #cfe0f5 !important; }
+.app-hero .title-tag { background: rgba(255,210,74,.16); color: #ffd24a;
+  border: 1px solid rgba(255,210,74,.5); }
+
+/* ---- DARK navy-glass STAT value-boxes on the LIGHT page (both modes) ---- */
+.hero-stat {
+  position: relative; overflow: hidden; isolation: isolate;
+  background: linear-gradient(180deg, #15294f 0%, #0e1d40 100%) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-top: 3px solid var(--forest) !important;
+  box-shadow: 0 12px 28px -12px rgba(3,8,20,.6) !important;
+  transition: transform .2s cubic-bezier(.22,1,.36,1), box-shadow .28s ease, border-color .2s ease;
+}
+.hero-stat .hs-v { color: #ffffff !important; }
+.hero-stat .hs-l { color: #9fb0cf !important; }
+.hero-stat::before {
+  content:""; position:absolute; top:0; left:-65%; width:55%; height:100%; z-index:4;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.5), transparent);
+  transform: skewX(-18deg); pointer-events:none; opacity:0;
+}
+.hero-stat:hover::before { animation: gbtSheen .85s ease; }
+.hero-stat:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 36px rgba(0,0,0,.5), 0 0 0 1px rgba(45,212,191,.35) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-hero::before, .hero-stat::before { animation: none !important; }
+  .hero-stat:hover { transform: none; }
+}

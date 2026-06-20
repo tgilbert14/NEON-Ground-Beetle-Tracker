@@ -257,18 +257,26 @@ fetch_neon_beetles <- function(site, start_date, end_date) {
   assemble_beetles(raw)   # see scripts/refresh_data.R for the shared assembler
 }
 
-# ---- theme (Desert Data Labs house style; greens tuned for beetles) -------
+# ---- theme (Desert Data Labs DESERT-NIGHT house style) --------------------
+# Key NAMES kept (server.R references DDL$forest/$gold2/etc.), VALUES remapped to
+# the desert-night creative system (teal/coral/gold on a dark sky) so the charts
+# re-theme from one edit. `forest` (the beetle primary) -> teal. The app DEFAULTS
+# to LIGHT (ui.R input_dark_mode mode="light"); styles.css carries the full
+# desert-day base + the [data-bs-theme="dark"] desert-night system. The PDF
+# report keeps the LIGHT house palette (see R/report_pdf.R — it prints on paper).
 DDL <- list(
-  navy = "#0C234B", navy2 = "#16386e", cardinal = "#AB0520", gold = "#FFD200",
-  gold2 = "#c9a300", sky = "#2f7fb5", green = "#1a7f37", forest = "#13632b",
-  ink = "#1c2733", muted = "#6b7a89", bg = "#eef3ee", paper = "#ffffff",
-  line = "#dbe7dc"
+  navy = "#0e1d40", navy2 = "#1b2e5c", cardinal = "#fb8a7e", gold = "#ffd24a",
+  gold2 = "#e0b43a", sky = "#43b8e8", green = "#5fb56a", forest = "#2dd4bf",
+  ink = "#eaf2ff", muted = "#9fb0cf", bg = "#070d1f", paper = "#0e1d40",
+  line = "rgba(255,255,255,0.12)"
 )
 
+# Light "desert-day" base (DEFAULT). styles.css [data-bs-theme="dark"] carries the
+# full desert-night system; the toggle defaults to light, so this is what shows.
 app_theme <- bs_theme(
-  version = 5, bg = "#ffffff", fg = DDL$ink,
-  primary = DDL$forest, secondary = DDL$cardinal,
-  success = DDL$green, info = DDL$sky, warning = DDL$gold, danger = DDL$cardinal,
+  version = 5, bg = "#ffffff", fg = "#16243a",
+  primary = "#149086", secondary = "#e0685a",
+  success = "#3f9a52", info = "#2f8fc4", warning = "#d6a31c", danger = "#e0685a",
   base_font = font_google("Rubik"), heading_font = font_google("Rubik"),
   "border-radius" = "10px"
 )

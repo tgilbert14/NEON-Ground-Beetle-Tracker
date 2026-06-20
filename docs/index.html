@@ -8,7 +8,7 @@
   <meta name="description"
     content="Explore real NEON ground-beetle (Carabidae) pitfall-trap data across 46 field sites — tap a site on the national map, then dive into community composition, Hill-number diversity, seasonality, inter-annual trends, and a Bray–Curtis biogeography ordination. Honest statistics, instant loads." />
 
-  <meta name="theme-color" content="#13632b" />
+  <meta name="theme-color" content="#070d1f" />
 
   <!-- Open Graph / social card. Absolute URLs = the GitHub Pages domain for this repo. -->
   <meta property="og:type" content="website" />
@@ -31,29 +31,48 @@
     rel="stylesheet" />
   <style>
     :root {
-      --forest: #13632b;
-      --forest2: #1f7a3a;
-      --cardinal: #AB0520;
-      --gold: #FFD200;
-      --gold-ink: #9a7a00;
-      --sky: #2f7fb5;
-      --green: #1a7f37;
-      --ink: #1c2733;
-      --slate: #5a6675;
-      --bg: #eef3ee;
-      --card: #ffffff;
+      --forest: #2dd4bf;
+      --forest2: #5eead4;
+      --cardinal: #fb8a7e;
+      --gold: #ffd24a;
+      --gold-ink: #ffd24a;
+      --sky: #43b8e8;
+      --green: #5fb56a;
+      --ink: #eaf2ff;
+      --slate: #9fb0cf;
+      --bg: #070d1f;
+      --card: #0e1d40;
+      --line: rgba(255,255,255,.10);
     }
 
     * { box-sizing: border-box }
 
     body {
       margin: 0;
+      position: relative;
       font-family: Rubik, system-ui, sans-serif;
       color: var(--ink);
-      background: var(--bg);
+      background:
+        radial-gradient(1100px 520px at 8% -8%, rgba(45,212,191,0.12), transparent 60%),
+        radial-gradient(900px 460px at 102% 2%, rgba(251,138,126,0.10), transparent 55%),
+        linear-gradient(180deg, #070d1f 0%, #05080f 100%);
+      background-attachment: fixed;
       -webkit-font-smoothing: antialiased;
       line-height: 1.55
     }
+    /* drifting starfield over the whole page */
+    body::before {
+      content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
+      background-repeat: repeat; background-size: 210px 220px,210px 220px,210px 220px,210px 220px;
+      background-image:
+        radial-gradient(1.4px 1.4px at 30px 40px, rgba(255,255,255,.6), transparent),
+        radial-gradient(1.2px 1.2px at 150px 90px, rgba(150,220,255,.5), transparent),
+        radial-gradient(1.5px 1.5px at 90px 175px, rgba(255,210,74,.4), transparent),
+        radial-gradient(1.1px 1.1px at 175px 28px, rgba(94,234,212,.5), transparent);
+      animation: coverStars 140s linear infinite;
+    }
+    @keyframes coverStars { to { background-position: 0 220px, 0 220px, 0 220px, 0 220px; } }
+    body > * { position: relative; z-index: 1 }
 
     h1, h2, h3 { font-family: Rubik, sans-serif; line-height: 1.15; margin: 0; font-weight: 800 }
     a { color: var(--sky) }
@@ -64,19 +83,20 @@
       position: relative;
       overflow: hidden;
       color: #fff;
-      background: radial-gradient(120% 140% at 18% 0%, var(--forest2) 0%, var(--forest) 48%, #0c2a16 100%)
+      background: radial-gradient(125% 150% at 16% -12%, #15425f 0%, #0b1733 46%, #070d1f 100%);
+      box-shadow: inset 0 -1px 0 rgba(45,212,191,.18)
     }
 
     .hero::after {
       content: "";
       position: absolute;
       inset: 0;
-      opacity: .55;
+      opacity: .6;
       pointer-events: none;
       background:
-        radial-gradient(46px 46px at 12% 30%, rgba(255, 210, 0, .10), transparent 70%),
-        radial-gradient(60px 60px at 84% 22%, rgba(255, 255, 255, .07), transparent 70%),
-        radial-gradient(54px 54px at 66% 80%, rgba(255, 255, 255, .06), transparent 70%)
+        radial-gradient(46px 46px at 12% 30%, rgba(45, 212, 191, .16), transparent 70%),
+        radial-gradient(60px 60px at 84% 22%, rgba(251, 138, 126, .12), transparent 70%),
+        radial-gradient(54px 54px at 66% 80%, rgba(255, 210, 74, .10), transparent 70%)
     }
 
     .hero .wrap { position: relative; padding: 70px 22px 64px }
@@ -98,11 +118,15 @@
     .hero h1 {
       font-size: clamp(2.1rem, 5vw, 3.3rem);
       margin: 18px 0 10px;
-      letter-spacing: -.02em
+      letter-spacing: -.02em;
+      background: linear-gradient(100deg, #ffffff 0%, var(--forest2) 48%, var(--cardinal) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent
     }
     .hero h1 .tag {
       font-size: .42em; font-weight: 700; vertical-align: middle; margin-left: 12px;
-      text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.62);
+      text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.7);
+      -webkit-text-fill-color: rgba(255,255,255,.7);
       border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 3px 10px
     }
 
@@ -127,8 +151,15 @@
       transition: transform .12s ease, box-shadow .12s ease
     }
 
-    .btn-primary { background: var(--gold); color: #3a2f00; box-shadow: 0 8px 24px rgba(0, 0, 0, .22) }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0, 0, 0, .3) }
+    .btn-primary {
+      color: #06231f;
+      background: linear-gradient(100deg, #2dd4bf, #5eead4, #2dd4bf);
+      background-size: 200% 100%;
+      box-shadow: 0 8px 24px rgba(45, 212, 191, .28);
+      animation: ctaFlow 6s ease infinite
+    }
+    @keyframes ctaFlow { 0%,100% { background-position: 0% 50% } 50% { background-position: 100% 50% } }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(45, 212, 191, .42) }
     .btn-ghost { color: #fff; border: 1.5px solid rgba(255, 255, 255, .6) }
     .btn-ghost:hover { background: rgba(255, 255, 255, .12) }
 
@@ -139,8 +170,10 @@
       display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
       margin: -34px auto 0; position: relative; z-index: 2
     }
-    .stat { background: var(--card); border-radius: 14px; padding: 18px 16px; box-shadow: 0 6px 22px rgba(12, 45, 22, .12) }
-    .stat .n { font-weight: 800; font-size: 1.7rem; color: var(--forest) }
+    .stat { background: linear-gradient(180deg, #15294f 0%, #0e1d40 100%); border: 1px solid var(--line);
+      border-top: 3px solid var(--forest); border-radius: 14px; padding: 18px 16px;
+      box-shadow: 0 12px 28px -12px rgba(3, 8, 20, .6) }
+    .stat .n { font-weight: 800; font-size: 1.7rem; color: var(--forest2) }
     .stat .l { font-size: .82rem; color: var(--slate); font-weight: 500 }
 
     /* Features */
@@ -149,28 +182,33 @@
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 22px }
 
     .feat {
-      background: var(--card); border: 1px solid #dbe7dc; border-top: 3px solid #cfe6d6;
+      background: rgba(255, 255, 255, .05); border: 1px solid var(--line); border-top: 3px solid rgba(45, 212, 191, .4);
       border-radius: 12px; padding: 20px
     }
-    .feat-star { border-top: 3px solid var(--gold); background: linear-gradient(180deg, rgba(255, 210, 0, .06), #fff 42%) }
-    .feat h3 { font-size: 1.08rem; margin-bottom: 6px; color: var(--forest) }
-    .feat p { margin: 0; color: #3b4f43; font-size: .95rem }
+    .feat-star { border-top: 3px solid var(--gold); background: linear-gradient(180deg, rgba(255, 210, 74, .08), rgba(255, 255, 255, .04) 42%) }
+    .feat h3 { font-size: 1.08rem; margin-bottom: 6px; color: var(--forest2) }
+    .feat p { margin: 0; color: #c2d2ea; font-size: .95rem }
 
     .honest {
-      margin: 40px 0; background: rgba(19, 99, 43, .06); border-left: 4px solid var(--gold);
+      margin: 40px 0; background: rgba(45, 212, 191, .07); border-left: 4px solid var(--gold);
       border-radius: 10px; padding: 20px 22px
     }
-    .honest h2 { font-size: 1.25rem; margin-bottom: 10px; color: var(--forest) }
-    .honest ul { margin: 0; padding-left: 18px; color: #36493c }
+    .honest h2 { font-size: 1.25rem; margin-bottom: 10px; color: var(--forest2) }
+    .honest ul { margin: 0; padding-left: 18px; color: #d3deef }
     .honest li { margin: 6px 0 }
 
-    footer { border-top: 1px solid #dbe7dc; padding: 26px 0 50px; color: var(--slate); font-size: .9rem }
+    footer { border-top: 1px solid var(--line); padding: 26px 0 50px; color: var(--slate); font-size: .9rem }
     footer a { font-weight: 600; text-decoration: none }
     .cta-foot { display: inline-block; margin-bottom: 10px; font-weight: 700; color: var(--cardinal) }
 
     @media(max-width:760px) {
       .stats { grid-template-columns: repeat(2, 1fr) }
       .grid { grid-template-columns: 1fr }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body::before { animation: none }
+      .btn-primary { animation: none }
     }
   </style>
 </head>
@@ -276,18 +314,19 @@
   </section>
 
   <style>
-    .series { background: #0C234B; color: #fff; padding: 56px 0; }
+    .series { background: linear-gradient(180deg, #0b1733 0%, #0e1d40 100%); color: #fff; padding: 56px 0;
+      border-top: 1px solid rgba(45,212,191,.18); }
     .series h2 { color: #fff; margin: 0; font-size: 1.6rem; }
-    .series-sub { color: #bcccdf; margin: 8px 0 26px; max-width: 640px; }
+    .series-sub { color: #9fb0cf; margin: 8px 0 26px; max-width: 640px; }
     .series-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
     .series-card { display: flex; flex-direction: column; gap: 5px; padding: 22px; border-radius: 16px;
       background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: #fff;
       text-decoration: none; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
-    .series-card:hover { transform: translateY(-3px); border-color: #FFD200; background: rgba(255,255,255,.10); }
+    .series-card:hover { transform: translateY(-3px); border-color: #2dd4bf; background: rgba(255,255,255,.10); }
     .series-emoji { font-size: 1.9rem; line-height: 1; }
     .series-name { font-weight: 800; font-size: 1.12rem; }
-    .series-tag { color: #bcccdf; font-size: .95rem; }
-    .series-go { color: #FFD200; font-weight: 700; margin-top: 6px; }
+    .series-tag { color: #9fb0cf; font-size: .95rem; }
+    .series-go { color: #ffd24a; font-weight: 700; margin-top: 6px; }
     @media (max-width: 640px) { .series-grid { grid-template-columns: 1fr; } }
   </style>
   <section class="series">
