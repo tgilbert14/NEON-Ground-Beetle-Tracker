@@ -25,6 +25,7 @@ suppressPackageStartupMessages({
 # ---- helpers + metadata ---------------------------------------------------
 source("R/site_metadata.R", local = FALSE)
 source("R/helpers.R", local = FALSE)
+source("R/map_picker.R", local = FALSE)   # reusable national site-picker map (flagship front door)
 
 # ---- NEON data product ----------------------------------------------------
 NEON_DPID <- "DP1.10022.001"   # Ground beetles sampled from pitfall traps
@@ -226,6 +227,11 @@ SITE_INDEX    <- NATIONAL_INDEX$site_index
 ORDINATION    <- NATIONAL_INDEX$ordination
 INDICATORS    <- NATIONAL_INDEX$indicators
 SPECIES_SITES <- NATIONAL_INDEX$species_sites
+
+# national site-picker table for the splash map (dot size = species richness,
+# colour = total individuals). Drops coord-less sites so the map can't blank.
+picker_site_table <- if (!is.null(SITE_INDEX))
+  SITE_INDEX[is.finite(SITE_INDEX$lat) & is.finite(SITE_INDEX$lng), , drop = FALSE] else NULL
 
 species_choices <- function() {
   if (is.null(SPECIES_SITES)) return(NULL)

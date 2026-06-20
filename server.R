@@ -167,7 +167,7 @@ function(input, output, session) {
     updateSelectInput(session, "envLayer", choices = ch, selected = if (sel0 %in% ch) sel0 else "none")
     updateSliderInput(session, "envLag", value = lag0)
     prog$set(value = 1, detail = "done")
-    shinyjs::show("mainTabsWrap"); shinyjs::hide("splash")
+    shinyjs::show("mainTabsWrap"); shinyjs::hide("splash"); shinyjs::hide("splashHome")
     session$sendCustomMessage("gbt_remember", site)   # persist last site for next visit
   }
   # The Load button re-applies the current (possibly narrowed) date window.
@@ -175,8 +175,39 @@ function(input, output, session) {
   # Picking a site (directly, via the state cascade, or via a map tap that drives
   # the dropdowns) auto-loads it — one mental model, no "why is nothing happening".
   # ignoreInit keeps the intro splash visible on first launch.
-  observeEvent(input$site, load_site(input$site, snap = TRUE),
-               ignoreInit = TRUE, ignoreNULL = TRUE)
+  # Skip the ONE boot-time auto-load so a new visitor lands on the national picker
+  # map (the flagship front door, on par with the Small Mammal Tracker); every later
+  # pick — dropdown change, map tap, or the remembered-site restore — loads normally.
+  observeEvent(input$site, {
+    if (!isTRUE(rv$siteReady)) { rv$siteReady <- TRUE; return(invisible()) }
+    load_site(input$site, snap = TRUE)
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # ---- splash national PICKER map (the flagship front door) ----------------
+  # size = species richness, colour = total individuals (forest sequential ramp).
+  # Tapping a marker drives the state+site dropdowns; the input$site observer above
+  # does the single load (no race), matching the Biogeography-tab map's pattern.
+  local({
+    st <- picker_site_table
+    if (!is.null(st) && nrow(st)) {
+      mx <- suppressWarnings(max(st$individuals, na.rm = TRUE)); if (!is.finite(mx) || mx <= 0) mx <- 1
+      pal <- leaflet::colorNumeric(c("#dbe7d6", "#5aa86a", "#13632b"), domain = c(0, mx), na.color = "#c9d3bb")
+      picked <- mapPickerServer("picker", site_table = st, radius_metric = "richness",
+        color_fn = function(s) pal(ifelse(is.finite(s$individuals), s$individuals, 0)),
+        label_fn = function(r) sprintf(
+          "<b>%s</b> · %s, %s<br><b>%s</b> species · <b>%s</b> individuals<br>dominant: <i>%s</i>%s",
+          r$site, r$name %||% r$site, r$state %||% "", r$richness %||% "?",
+          fmt_int(r$individuals %||% 0), r$dominant %||% "?",
+          if (identical(r$source, "demo")) "<br><b>demo data</b>" else ""))
+      # load in the MAIN server context (the module session would namespace inputs)
+      observeEvent(picked(), {
+        s <- picked(); if (is.null(s) || !nzchar(s)) return()
+        m <- neon_sites[neon_sites$site == s, ]; if (!nrow(m)) return()
+        if (identical(input$stateSel, m$state)) updateSelectInput(session, "site", selected = s)
+        else { rv$pendingSite <- s; updateSelectInput(session, "stateSel", selected = m$state) }
+      }, ignoreInit = TRUE)
+    }
+  })
 
   # Restore the last-used site (localStorage) or a ?site=SRER URL param on connect.
   observeEvent(input$restore_site, {

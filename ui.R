@@ -104,7 +104,13 @@ ui <- bslib::page_sidebar(
       "Ground beetles (Carabidae) are a textbook bioindicator. Explore who lives where, how diverse each site is, and when beetles are active — across the National Ecological Observatory Network.")
   ),
   uiOutput("heroStats"),
-  uiOutput("splash"),
+  # ---- splash: the national PICKER map is the front door (flagship pattern) ----
+  div(id = "splashHome",
+    uiOutput("splash"),
+    div(class = "splash-picker",
+      div(class = "splash-map-hint", bs_icon("hand-index-thumb"),
+        " Tap a site to explore it — dot size is species richness, colour is how many beetles were caught."),
+      mapPickerUI("picker", height = "520px", spinner = DDL$forest))),
 
   # ---- tabs --------------------------------------------------------------
   div(id = "mainTabsWrap",

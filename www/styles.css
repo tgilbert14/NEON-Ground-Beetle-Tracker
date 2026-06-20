@@ -53,6 +53,14 @@ body { background: var(--bg); color: var(--ink); }
 .splash-icon { font-size: 54px; }
 .splash h3 { color: var(--forest); margin-top: 8px; }
 .splash-sub { font-size: 13px; }
+/* national picker map on the splash (the flagship front door) */
+.splash-picker { margin: 6px 0 18px; }
+.splash-map-hint { display: flex; gap: 8px; align-items: center; justify-content: center;
+  font-size: 13.5px; color: var(--muted); margin: 0 0 10px; }
+.splash-map-hint > .bi { color: var(--forest); }
+.map-picker-wrap { width: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 4px 16px rgba(19,99,43,.10); }
+.map-picker-wrap .leaflet-container { background: var(--paper); }
 
 /* ---- cards / tabs ---- */
 .section-title { color: var(--forest); margin: 22px 0 12px; }
