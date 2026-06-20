@@ -3,399 +3,405 @@
 
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NEON Ground Beetle Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>NEON Ground Beetle Tracker — the Explorer Suite by Desert Data Labs</title>
   <meta name="description"
-    content="Explore real NEON ground-beetle (Carabidae) pitfall-trap data across 46 field sites — tap a site on the national map, then dive into community composition, Hill-number diversity, seasonality, inter-annual trends, and a Bray–Curtis biogeography ordination. Honest statistics, instant loads." />
-
+    content="Pitfall-trapped ground beetles (Carabidae) as a window on the soil-surface community: which carabids are active at each NEON site, how busy they are, and how diverse the community runs. Real NEON data across 46 field sites. Honest statistics, instant loads." />
   <meta name="theme-color" content="#07100b" />
 
-  <!-- Open Graph / social card. Absolute URLs = the GitHub Pages domain for this repo. -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/" />
-  <meta property="og:title" content="NEON Ground Beetle Tracker" />
+  <meta property="og:title" content="NEON Ground Beetle Tracker — Desert Data Labs" />
   <meta property="og:description"
-    content="Real NEON ground-beetle data across 46 field sites — tap a site on the national map, explore who lives where, diversity, seasonality, trends, and biogeography. Honest stats, instant loads." />
+    content="Real NEON ground-beetle data across 46 field sites — who's active where, how busy, and how diverse. Part of the NEON Explorer Suite. Honest stats, instant loads." />
   <meta property="og:image"
     content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="NEON Ground Beetle Tracker" />
+  <meta name="twitter:title" content="NEON Ground Beetle Tracker — Desert Data Labs" />
   <meta name="twitter:description"
-    content="Real NEON ground-beetle data across 46 field sites. Honest stats, instant loads." />
+    content="Real NEON ground-beetle data across 46 field sites. Part of the NEON Explorer Suite. Honest stats, instant loads." />
   <meta name="twitter:image"
     content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/og-image.png" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- promote to JS layout before paint so there is no flash of the fallback list -->
+  <script>document.documentElement.className += ' js';</script>
+
   <style>
     :root {
-      --forest: #36d98a;
-      --forest2: #6ef0b0;
-      --cardinal: #d98a3c;
-      --gold: #ffd24a;
-      --gold-ink: #ffd24a;
-      --sky: #2f93a0;
-      --green: #6ef0b0;
-      --ink: #e9f6ee;
-      --slate: #9fc0ad;
-      --bg: #07100b;
-      --card: #12241a;
-      --line: rgba(255,255,255,.10);
+      --bg-0:#07100b; --bg-1:#0c1810; --bg-2:#12241a;
+      --teal:#36d98a; --teal-rgb:54,217,138; --bright:#6ef0b0;
+      --coral:#d98a3c; --coral-rgb:217,138,60;
+      --gold:#ffd24a; --gold-rgb:255,210,74;
+      --ink:#e9f6ee; --dim:#9fc0ad; --line:rgba(255,255,255,.12); --card:rgba(255,255,255,.045);
+      /* beetle flow layer hues (carabid iridescence, light -> deep) */
+      --clim:#6ef0b0; --phen:#36d98a; --prod:#2fae7a; --cons:#d98a3c;
     }
-
     * { box-sizing: border-box }
-
+    html,body { margin:0 }
     body {
-      margin: 0;
-      position: relative;
-      font-family: Rubik, system-ui, sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(1100px 520px at 8% -8%, rgba(54,217,138,0.12), transparent 60%),
-        radial-gradient(900px 460px at 102% 2%, rgba(217,138,60,0.10), transparent 55%),
-        linear-gradient(180deg, #07100b 0%, #050a07 100%);
-      background-attachment: fixed;
-      -webkit-font-smoothing: antialiased;
-      line-height: 1.55
+      font-family: Rubik, system-ui, sans-serif; color: var(--ink); background: var(--bg-0);
+      -webkit-font-smoothing: antialiased; line-height: 1.55; overflow-x:hidden;
     }
-    /* drifting starfield over the whole page */
-    body::before {
-      content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
-      background-repeat: repeat; background-size: 210px 220px,210px 220px,210px 220px,210px 220px;
+    h1,h2,h3 { font-family: Rubik, sans-serif; line-height: 1.12; margin:0; font-weight:800 }
+    a { color: var(--bright); text-decoration:none }
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 0 22px; position:relative; z-index:2 }
+
+    /* ---------- desert-night / circuit sky ---------- */
+    .sky { position: fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;
+      background:
+        radial-gradient(120% 90% at 50% -8%, var(--bg-2), transparent 58%),
+        radial-gradient(140% 120% at 50% 120%, #133a26 0%, var(--bg-1) 45%, var(--bg-0) 100%); }
+    .sky::before { content:""; position:absolute; inset:-50%; opacity:.45;
+      background-repeat:repeat; background-size:240px 240px;
       background-image:
-        radial-gradient(1.4px 1.4px at 30px 40px, rgba(255,255,255,.6), transparent),
-        radial-gradient(1.2px 1.2px at 150px 90px, rgba(150,255,210,.5), transparent),
-        radial-gradient(1.5px 1.5px at 90px 175px, rgba(217,138,60,.4), transparent),
-        radial-gradient(1.1px 1.1px at 175px 28px, rgba(110,240,176,.5), transparent);
-      animation: coverStars 140s linear infinite;
+        radial-gradient(1.4px 1.4px at 30px 40px, rgba(255,255,255,.5), transparent),
+        radial-gradient(1.2px 1.2px at 150px 90px, rgba(150,255,210,.45), transparent),
+        radial-gradient(1.5px 1.5px at 90px 170px, rgba(217,138,60,.4), transparent);
+      animation: drift 140s linear infinite; }
+    @keyframes drift { to { transform: translateY(240px) } }
+
+    /* ---------- hero ---------- */
+    .hero { position:relative; z-index:2; padding: 46px 0 6px }
+    .brand { display:inline-flex; align-items:center; gap:10px; }
+    .brand svg { width:26px; height:26px; overflow:visible }
+    .brand .stroke { stroke:var(--teal); stroke-width:7; fill:none; stroke-linecap:round }
+    .brand .pip { fill:var(--bright) }
+    .brand b { font-weight:700; font-size:.82rem; letter-spacing:.16em; text-transform:uppercase; color:var(--dim) }
+    .eyebrow { margin-top:18px; font-family: ui-monospace,Menlo,Consolas,monospace; font-size:.72rem;
+      letter-spacing:.26em; text-transform:uppercase; color:var(--teal); }
+    .hero h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); margin:.5rem 0 .6rem; letter-spacing:-.02em;
+      background:linear-gradient(100deg,#fff 10%, var(--bright) 45%, var(--coral) 95%);
+      -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .lead { font-size: clamp(1.05rem,2.2vw,1.24rem); max-width:60ch; margin:0 0 24px; color:var(--ink) }
+    .lead b { color:var(--bright); font-weight:600 }
+
+    /* ---------- standout launch button (the one thing to click) ---------- */
+    .cta-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center }
+    .launch {
+      position:relative; display:inline-flex; align-items:center; gap:11px;
+      font-weight:800; font-size:1.06rem; padding:15px 28px; border-radius:14px;
+      color:#06231a; border:1px solid rgba(255,255,255,.5); overflow:hidden; isolation:isolate;
+      background:linear-gradient(100deg, var(--bright), var(--teal) 45%, #9bffcf 80%, var(--bright));
+      background-size:220% 100%;
+      box-shadow:0 10px 34px rgba(var(--teal-rgb),.5), 0 0 0 6px rgba(var(--teal-rgb),.08);
+      transition: transform .16s ease, box-shadow .25s ease;
+      animation: ctaFlow 7s linear infinite;
     }
-    @keyframes coverStars { to { background-position: 0 220px, 0 220px, 0 220px, 0 220px; } }
-    body > * { position: relative; z-index: 1 }
+    @keyframes ctaFlow { to { background-position:220% 0 } }
+    .launch::after { content:""; position:absolute; inset:0; z-index:-1; mix-blend-mode:soft-light;
+      background:linear-gradient(120deg, transparent 30%, rgba(255,255,255,.75) 50%, transparent 70%);
+      transform:translateX(-120%); transition:transform .6s ease; }
+    .launch:hover { transform: translateY(-2px) scale(1.015);
+      box-shadow:0 16px 46px rgba(var(--teal-rgb),.65), 0 0 0 6px rgba(var(--teal-rgb),.12) }
+    .launch:hover::after { transform:translateX(120%) }
+    .launch .arrow { font-size:1.1em; transition:transform .2s ease }
+    .launch:hover .arrow { transform:translateX(4px) }
+    .ghost { display:inline-flex; align-items:center; gap:8px; padding:14px 22px; border-radius:14px;
+      color:#fff; border:1.5px solid var(--line); font-weight:600; transition:background .2s, border-color .2s }
+    .ghost:hover { background:rgba(255,255,255,.07); border-color:rgba(var(--teal-rgb),.5) }
+    .warm { font-size:.82rem; color:var(--dim); margin-top:14px; min-height:1.2em }
 
-    h1, h2, h3 { font-family: Rubik, sans-serif; line-height: 1.15; margin: 0; font-weight: 800 }
-    a { color: var(--sky) }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 0 22px }
+    /* ---------- the constellation (suite hub + signature motion) ---------- */
+    .constel-sec { position:relative; z-index:2; padding: 26px 0 8px }
+    .constel { position:relative; width:100%; max-width:680px; margin:0 auto;
+      aspect-ratio:1/1; max-height:74vh; }
+    .ctraces { position:absolute; inset:0; width:100%; height:100%; overflow:visible; z-index:1; pointer-events:none }
+    .ctraces line { stroke:rgba(var(--teal-rgb),.5); stroke-width:1.4; stroke-linecap:round;
+      stroke-dasharray:5 9; opacity:0; transition:opacity .5s ease; }
+    .constel.lit .ctraces line { opacity:.6; animation: cascadeFlow 1.5s linear infinite; }
+    @keyframes cascadeFlow { to { stroke-dashoffset:-28 } }    /* energy flows outward from the core */
 
-    /* Hero */
-    .hero {
-      position: relative;
-      overflow: hidden;
-      color: #fff;
-      background: radial-gradient(125% 150% at 16% -12%, #133a26 0%, #0c1810 46%, #07100b 100%);
-      box-shadow: inset 0 -1px 0 rgba(54,217,138,.20)
+    /* core = the launch */
+    .ccore {
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      z-index:4; width:var(--core,150px); height:var(--core,150px); --core:clamp(120px,21vmin,168px);
+      display:grid; place-items:center; border-radius:50%; text-align:center; color:#06231a; cursor:pointer;
+      background:radial-gradient(circle at 42% 36%, #eafff4 0%, var(--bright) 30%, var(--teal) 64%, #0a7a52 100%);
+      border:2px solid rgba(255,255,255,.65);
+      box-shadow:0 0 0 7px rgba(var(--teal-rgb),.10), 0 0 46px 6px rgba(var(--teal-rgb),.5), inset 0 0 30px rgba(255,255,255,.4);
+      animation: corePulse 3.6s ease-in-out infinite;
     }
-
-    .hero::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      opacity: .6;
-      pointer-events: none;
-      background:
-        radial-gradient(46px 46px at 12% 30%, rgba(54, 217, 138, .18), transparent 70%),
-        radial-gradient(60px 60px at 84% 22%, rgba(217, 138, 60, .12), transparent 70%),
-        radial-gradient(54px 54px at 66% 80%, rgba(255, 210, 74, .10), transparent 70%)
+    @keyframes corePulse {
+      0%,100% { box-shadow:0 0 0 7px rgba(var(--teal-rgb),.10), 0 0 46px 6px rgba(var(--teal-rgb),.5), inset 0 0 30px rgba(255,255,255,.4) }
+      50% { box-shadow:0 0 0 12px rgba(var(--teal-rgb),.04), 0 0 66px 12px rgba(var(--teal-rgb),.62), inset 0 0 34px rgba(255,255,255,.5) }
     }
+    .ccore:hover,.ccore:focus-visible { outline:none; transform:translate(-50%,-50%) scale(1.05) }
+    .ccore .clabel { font-weight:800; font-size:clamp(.86rem,2vw,1.02rem); line-height:1.1; padding:0 .5rem }
+    .ccore .csub { display:block; font-weight:700; font-size:.64em; letter-spacing:.14em; text-transform:uppercase;
+      color:#0a5a3c; margin-top:.25rem }
 
-    .hero .wrap { position: relative; padding: 70px 22px 64px }
+    /* explorer nodes */
+    .cnode { position:absolute; left:0; top:0; z-index:3;
+      transform:translate(calc(var(--x,0px) - 50%), calc(var(--y,0px) - 50%)); }
+    html.js .cnode { opacity:0 }
+    .constel.lit .cnode { opacity:1 }
+    .cnode-orb { display:grid; place-items:center; width:var(--ns,72px); height:var(--ns,72px); border-radius:50%;
+      color:var(--ink); text-align:center; padding:6px;
+      background:radial-gradient(circle at 38% 32%, rgba(255,255,255,.5), rgba(var(--h,54 217 138),.0) 60%), rgba(12,24,16,.85);
+      border:1.5px solid rgba(var(--hc,var(--teal-rgb)),.6);
+      box-shadow:0 0 16px rgba(var(--hc,var(--teal-rgb)),.35), inset 0 0 12px rgba(255,255,255,.12);
+      transition: transform .22s cubic-bezier(.22,1,.36,1), box-shadow .22s ease, border-color .2s ease; }
+    .constel.lit .cnode-orb { animation: bob 6s ease-in-out infinite; animation-delay: calc(var(--i,0) * -.5s) }
+    @keyframes bob { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-6px) } }
+    .cnode:hover, .cnode:focus-visible { outline:none; z-index:9 }
+    .cnode:hover .cnode-orb, .cnode:focus-visible .cnode-orb {
+      transform:scale(1.16); border-color:#fff;
+      box-shadow:0 0 28px rgba(var(--hc,var(--teal-rgb)),.7), inset 0 0 16px rgba(255,255,255,.22) }
+    .cnode-dot { width:9px; height:9px; border-radius:50%; background:rgb(var(--hc,var(--teal-rgb)));
+      box-shadow:0 0 10px rgb(var(--hc,var(--teal-rgb))) }
+    .cnode-lab { font-size:.68rem; font-weight:700; line-height:1.05; margin-top:4px }
 
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: .76rem;
-      font-weight: 700;
-      letter-spacing: .05em;
-      text-transform: uppercase;
-      color: var(--gold);
-      background: rgba(255, 255, 255, .10);
-      padding: 6px 13px;
-      border-radius: 999px
-    }
+    /* ---------- the reading band (how the tracker reads) ---------- */
+    .cascade-band { position:relative; z-index:2; margin: 30px 0 6px; padding:26px 0 }
+    .kick { font-family: ui-monospace,Menlo,Consolas,monospace; font-size:.72rem; letter-spacing:.22em;
+      text-transform:uppercase; color:var(--dim) }
+    .cascade-band h2 { font-size:clamp(1.4rem,3.4vw,1.9rem); margin:.4rem 0 4px;
+      background:linear-gradient(100deg,#fff, var(--bright)); -webkit-background-clip:text; background-clip:text; color:transparent }
+    .cascade-band > .wrap > p { color:var(--dim); margin:0 0 20px; max-width:64ch }
+    .flow { display:grid; gap:0 }
+    .frung { position:relative; display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:14px;
+      background:var(--card); border:1px solid var(--line); border-left:4px solid var(--lc); overflow:hidden }
+    .frung + .frung { margin-top:10px }
+    .frung::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.0;
+      background:linear-gradient(100deg, transparent, rgba(var(--lrgb),.16), transparent); }
+    .frung.pip-on::before { animation: pip 2.4s ease-in-out; }     /* energy pulse sweeps each rung in turn */
+    @keyframes pip { 0%{opacity:0; transform:translateX(-30%)} 40%{opacity:1} 100%{opacity:0; transform:translateX(30%)} }
+    .frung .fmark { width:34px; height:34px; flex:0 0 auto; border-radius:9px; position:relative;
+      background:rgba(var(--lrgb),.16); border:1px solid rgba(var(--lrgb),.5) }
+    .frung .fmark::after { content:""; position:absolute; inset:0; margin:auto; width:12px; height:12px; border-radius:50%;
+      background:var(--lc); box-shadow:0 0 12px var(--lc) }
+    .frung .ftxt b { font-weight:800; font-size:1rem } .frung .ftxt span { color:var(--dim); font-size:.86rem }
+    .frung.r1 { --lc:var(--clim); --lrgb:110,240,176 }
+    .frung.r2 { --lc:var(--phen); --lrgb:54,217,138; margin-left:14px }
+    .frung.r3 { --lc:var(--prod); --lrgb:47,174,122; margin-left:28px }
+    .frung.r4 { --lc:var(--cons); --lrgb:217,138,60; margin-left:42px }
+    .farrow { color:rgba(255,255,255,.32); text-align:center; margin:2px 0 2px 17px; font-size:1.05rem }
 
-    .hero h1 {
-      font-size: clamp(2.1rem, 5vw, 3.3rem);
-      margin: 18px 0 10px;
-      letter-spacing: -.02em;
-      background: linear-gradient(100deg, #ffffff 0%, var(--forest2) 48%, var(--cardinal) 100%);
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent; color: transparent
-    }
-    .hero h1 .tag {
-      font-size: .42em; font-weight: 700; vertical-align: middle; margin-left: 12px;
-      text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.7);
-      -webkit-text-fill-color: rgba(255,255,255,.7);
-      border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 3px 10px
-    }
+    /* ---------- stats + about ---------- */
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:26px 0 0; position:relative; z-index:2 }
+    .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 14px; text-align:center }
+    .stat .n { font-weight:800; font-size:1.5rem; color:var(--bright) } .stat .l { font-size:.78rem; color:var(--dim) }
+    details.more { margin:30px 0 0; border:1px solid var(--line); border-radius:14px; background:var(--card); overflow:hidden }
+    details.more > summary { cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between;
+      gap:1rem; padding:1rem 1.3rem; font-weight:700; color:var(--bright) }
+    details.more > summary::-webkit-details-marker { display:none }
+    details.more > summary::after { content:"+"; color:var(--coral); font-weight:800; font-size:1.2rem }
+    details.more[open] > summary::after { content:"\2212" }
+    details.more[open] { border-color:rgba(var(--teal-rgb),.4) }
+    details.more .mbody { padding:0 1.3rem 1.2rem; color:var(--dim) }
+    details.more .mbody b { color:var(--ink) }
 
-    .hero p.lead {
-      font-size: clamp(1.05rem, 2.2vw, 1.26rem);
-      max-width: 62ch;
-      margin: 0 0 28px;
-      color: rgba(255, 255, 255, .92)
-    }
+    footer { position:relative; z-index:2; border-top:1px solid var(--line); margin-top:34px; padding:26px 0 54px;
+      color:var(--dim); font-size:.9rem }
+    .cta-foot { display:inline-block; margin-bottom:10px; font-weight:700; color:var(--coral) }
 
-    .cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center }
+    @media (max-width:560px){ .stats { grid-template-columns:repeat(2,1fr) } .frung { margin-left:0 !important } }
 
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 1.04rem;
-      padding: 14px 26px;
-      border-radius: 12px;
-      text-decoration: none;
-      transition: transform .12s ease, box-shadow .12s ease
-    }
+    /* ---------- no-JS fallback: a plain reachable grid of the suite ---------- */
+    html:not(.js) .ctraces, html:not(.js) .ccore .csub { display:none }
+    html:not(.js) .constel { aspect-ratio:auto; max-width:100%; display:grid;
+      grid-template-columns:repeat(2,1fr); gap:12px; padding:8px 0 }
+    html:not(.js) .ccore { position:static; transform:none; width:auto; height:auto; border-radius:14px;
+      grid-column:1/-1; padding:18px; animation:none }
+    html:not(.js) .cnode { position:static; transform:none; opacity:1 }
+    html:not(.js) .cnode-orb { width:auto; height:auto; flex-direction:row; gap:10px; border-radius:14px;
+      padding:14px 16px; justify-content:flex-start; animation:none }
+    html:not(.js) .cnode-lab { font-size:.95rem; margin-top:0 }
 
-    .btn-primary {
-      color: #06231a;
-      background: linear-gradient(100deg, #36d98a, #6ef0b0, #36d98a);
-      background-size: 200% 100%;
-      box-shadow: 0 8px 24px rgba(54, 217, 138, .28);
-      animation: ctaFlow 6s ease infinite
-    }
-    @keyframes ctaFlow { 0%,100% { background-position: 0% 50% } 50% { background-position: 100% 50% } }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(54, 217, 138, .42) }
-    .btn-ghost { color: #fff; border: 1.5px solid rgba(255, 255, 255, .6) }
-    .btn-ghost:hover { background: rgba(255, 255, 255, .12) }
-
-    .warm { font-size: .82rem; color: rgba(255, 255, 255, .82); margin-top: 14px; min-height: 1.2em }
-
-    /* Stats strip */
-    .stats {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
-      margin: -34px auto 0; position: relative; z-index: 2
-    }
-    .stat { background: linear-gradient(180deg, #12241a 0%, #07100b 100%); border: 1px solid var(--line);
-      border-top: 3px solid var(--forest); border-radius: 14px; padding: 18px 16px;
-      box-shadow: 0 12px 28px -12px rgba(3, 8, 20, .6) }
-    .stat .n { font-weight: 800; font-size: 1.7rem; color: var(--forest2) }
-    .stat .l { font-size: .82rem; color: var(--slate); font-weight: 500 }
-
-    /* Features */
-    section.body { padding: 54px 0 10px }
-    .sub { color: var(--slate); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .78rem }
-    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 22px }
-
-    .feat {
-      background: rgba(255, 255, 255, .05); border: 1px solid var(--line); border-top: 3px solid rgba(54, 217, 138, .4);
-      border-radius: 12px; padding: 20px
-    }
-    .feat-star { border-top: 3px solid var(--gold); background: linear-gradient(180deg, rgba(255, 210, 74, .08), rgba(255, 255, 255, .04) 42%) }
-    .feat h3 { font-size: 1.08rem; margin-bottom: 6px; color: var(--forest2) }
-    .feat p { margin: 0; color: #c2d2ea; font-size: .95rem }
-
-    .honest {
-      margin: 40px 0; background: rgba(54, 217, 138, .07); border-left: 4px solid var(--gold);
-      border-radius: 10px; padding: 20px 22px
-    }
-    .honest h2 { font-size: 1.25rem; margin-bottom: 10px; color: var(--forest2) }
-    .honest ul { margin: 0; padding-left: 18px; color: #d3deef }
-    .honest li { margin: 6px 0 }
-
-    footer { border-top: 1px solid var(--line); padding: 26px 0 50px; color: var(--slate); font-size: .9rem }
-    footer a { font-weight: 600; text-decoration: none }
-    .cta-foot { display: inline-block; margin-bottom: 10px; font-weight: 700; color: var(--cardinal) }
-
-    @media(max-width:760px) {
-      .stats { grid-template-columns: repeat(2, 1fr) }
-      .grid { grid-template-columns: 1fr }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      body::before { animation: none }
-      .btn-primary { animation: none }
+    @media (prefers-reduced-motion: reduce){
+      .sky::before, .launch, .ccore, .constel.lit .cnode-orb, .constel.lit .ctraces line, .frung.pip-on::before { animation:none !important }
+      .launch::after { display:none }
     }
   </style>
 </head>
 
 <body>
+  <div class="sky" aria-hidden="true"></div>
 
   <header class="hero">
     <div class="wrap">
-      <span class="badge"><span aria-hidden="true">🪲</span> NEON · Ground Beetles (Carabidae) · DP1.10022.001</span>
-      <h1>NEON Ground Beetle Tracker <span class="tag">unofficial</span></h1>
-      <p class="lead">Ground beetles are a textbook <b>bioindicator</b> — they respond fast to habitat,
-        disturbance, and climate. Tap a site on the national map, then explore who lives where, how
-        diverse each site is, when beetles are active, and whether they're holding steady — on real
-        data, with statistics that show their work.</p>
+      <span class="brand">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <path class="stroke" d="M50 14 L64 30 L50 46 L36 30 Z" />
+          <line class="stroke" x1="50" y1="46" x2="50" y2="86" />
+          <line class="stroke" x1="34" y1="86" x2="66" y2="86" />
+          <circle class="pip" cx="50" cy="62" r="7.5" />
+        </svg>
+        <b>Desert Data Labs</b>
+      </span>
+
+      <div class="eyebrow">The NEON Explorer Suite · Consumers</div>
+      <h1>NEON Ground Beetle Tracker</h1>
+      <p class="lead">Pitfall-trapped <b>ground beetles</b> as a window on the soil-surface community: which
+        <b>carabids</b> are active at each NEON site, how busy they are, and how diverse the community runs.
+        Ground beetles are a textbook bioindicator — they respond fast to habitat, disturbance, and climate —
+        so their activity and diversity tell a rich story about each field site, on real data, with the
+        statistics shown at every step.</p>
+
       <div class="cta-row">
-        <a id="launch" class="btn btn-primary" href="#">Launch the app&nbsp;→</a>
-        <a class="btn btn-ghost" href="https://github.com/tgilbert14/NEON-Ground-Beetle-Tracker"
-          target="_blank" rel="noopener">View on GitHub</a>
+        <a id="launch" class="launch" href="https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/">
+          Launch the Ground Beetle Tracker <span class="arrow" aria-hidden="true">&rarr;</span>
+        </a>
+        <a class="ghost" href="https://github.com/tgilbert14/NEON-Ground-Beetle-Tracker" target="_blank" rel="noopener">View on GitHub</a>
       </div>
       <div class="warm" id="warm"></div>
     </div>
   </header>
 
-  <div class="wrap">
-    <div class="stats">
-      <div class="stat">
-        <div class="n">46</div>
-        <div class="l">field sites</div>
-      </div>
-      <div class="stat">
-        <div class="n">~233k</div>
-        <div class="l">beetles trapped</div>
-      </div>
-      <div class="stat">
-        <div class="n">731</div>
-        <div class="l">species</div>
-      </div>
-      <div class="stat">
-        <div class="n">instant</div>
-        <div class="l">no live API waits</div>
-      </div>
-    </div>
-  </div>
-
-  <section class="body">
+  <!-- the suite, as a living constellation. The core launches the Beetle Tracker; each node opens an explorer. -->
+  <section class="constel-sec" aria-label="The NEON Explorer Suite">
     <div class="wrap">
-      <span class="sub">What you can do</span>
-      <div class="grid">
-        <div class="feat feat-star">
-          <h3>Pick a site on the map</h3>
-          <p>The Biogeography tab is a national map of every NEON site — dot size is carabid richness.
-            Tap a dot to load it, or pick a state &amp; site at left and it loads automatically.</p>
-        </div>
-        <div class="feat feat-star">
-          <h3>Map a species' range</h3>
-          <p>Choose any species and the map redraws to show where it turns up across the country,
-            each dot sized by local abundance — a live range map for the carabid fauna.</p>
-        </div>
-        <div class="feat">
-          <h3>Community &amp; diversity</h3>
-          <p>Most-abundant species by catch-per-effort, a Hill-number diversity profile (q0/q1/q2),
-            Hurlbert rarefaction at equal sample size, and species accumulation across bouts.</p>
-        </div>
-        <div class="feat">
-          <h3>Seasonality &amp; trends</h3>
-          <p>Activity-density by month, overall or per species — plus inter-annual catch-per-effort
-            with a fitted trend and a plain-English verdict: the insect-decline view.</p>
-        </div>
-        <div class="feat">
-          <h3>Biogeography</h3>
-          <p>A Bray–Curtis <b>PCoA ordination</b> placing similar communities together, and a
-            Dufrêne–Legendre <b>indicator-species</b> table naming each site's signature beetles.</p>
-        </div>
-        <div class="feat feat-star">
-          <h3>Compare two sites</h3>
-          <p>Put a desert next to a forest — overlay any second site on the diversity and seasonality
-            charts to contrast richness profiles and activity curves head-to-head.</p>
-        </div>
-      </div>
+      <div class="constel is-noscript" data-constel style="--n:7;">
+        <svg class="ctraces" viewBox="-340 -340 680 680" aria-hidden="true"><g data-traces></g></svg>
 
-      <div class="honest">
-        <h2>Statistics</h2>
-        <p>Every view is built on transparent, well-sourced methods:</p>
-        <ul>
-          <li><b>Abundance</b> is effort-normalised to catch per 100 trap-nights, which also absorbs
-            NEON's protocol changes (4→3 traps/plot in 2018; 10→6 plots/site in 2023) so sites
-            compare fairly.</li>
-          <li><b>Richness</b> counts species-level records only — genus/family morphospecies
-            (<i>Bembidion</i> sp., Carabidae) are excluded, keyed on NEON's expert-taxonomist rank;
-            total abundance still counts every beetle trapped, and the Diversity tab reports how many
-            records are set aside.</li>
-          <li><b>Diversity</b> uses Hill numbers; rarefaction (Hurlbert 1971) compares richness at
-            equal sample size; accumulation is averaged over random bout orders (Gotelli &amp;
-            Colwell 2001).</li>
-          <li><b>Trends</b> suppress the p-value under ~5 years of record — short series report the
-            direction, not a false-precision decimal.</li>
-          <li><b>Indicator species</b> use the Dufrêne–Legendre IndVal (specificity × fidelity), so a
-            beetle is flagged as a site's signature only when it is both concentrated and reliably
-            found there.</li>
-        </ul>
+        <a class="ccore" data-core href="https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/" aria-label="Launch the NEON Ground Beetle Tracker app">
+           <span class="clabel">Ground Beetles<span class="csub">launch &rarr;</span></span>
+        </a>
+
+        <a class="cnode" style="--i:0; --hc:45,212,191" href="https://tgilbert14.github.io/NEON-Driver-Cascade/" aria-label="NEON Driver Cascade"><span class="cnode-orb"><span class="cnode-dot" aria-hidden="true"></span><span class="cnode-lab">Driver Cascade</span></span></a>
+        <a class="cnode" style="--i:1; --hc:56,168,232" href="https://tgilbert14.github.io/NEON-Small-Mammal-Tracker-App/" aria-label="NEON Small Mammal Tracker"><span class="cnode-orb"><span class="cnode-dot" aria-hidden="true"></span><span class="cnode-lab">Small Mammals</span></span></a>
+        <a class="cnode" style="--i:2; --hc:245,177,63" href="https://tgilbert14.github.io/NEON-Breeding-Birds/" aria-label="NEON Breeding Birds"><span class="cnode-orb"><span class="cnode-dot" aria-hidden="true"></span><span class="cnode-lab">Breeding Birds</span></span></a>
+        <a class="cnode" style="--i:3; --hc:95,209,106" href="https://tgilbert14.github.io/NEON-Plant-Diversity/" aria-label="NEON Plant Diversity"><span class="cnode-orb"><span class="cnode-dot" aria-hidden="true"></span><span class="cnode-lab">Plant Diversity</span></span></a>
+        <a class="cnode" style="--i:4; --hc:106,191,90" href="https://tgilbert14.github.io/NEON-Plant-Phenology-Explorer/" aria-label="NEON Plant Phenology"><span class="cnode-orb"><span class="cnode-dot" aria-hidden="true"></span><span class="cnode-lab">Plant Phenology</span></span></a>
+        <a class="cnode" style="--i:5; --hc:78,184,106" href="https://tgilbert14.github.io/NEON-Vegetation-Structure-Explorer/" aria-label="NEON Vegetation Structure"><span class="cnode-orb"><span class="cnode-dot" aria-hidden="true"></span><span class="cnode-lab">Veg Structure</span></span></a>
+        <a class="cnode" style="--i:6; --hc:52,198,216" href="https://tgilbert14.github.io/NEON-WaterChemistry-Analyte-Viewer-App/" aria-label="NEON Water Chemistry"><span class="cnode-orb"><span class="cnode-dot" aria-hidden="true"></span><span class="cnode-lab">Water Chemistry</span></span></a>
       </div>
     </div>
   </section>
 
-  <style>
-    .series { background: linear-gradient(180deg, #0c1810 0%, #12241a 100%); color: #fff; padding: 56px 0;
-      border-top: 1px solid rgba(54,217,138,.18); }
-    .series h2 { color: #fff; margin: 0; font-size: 1.6rem; }
-    .series-sub { color: #9fc0ad; margin: 8px 0 26px; max-width: 640px; }
-    .series-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
-    .series-card { display: flex; flex-direction: column; gap: 5px; padding: 22px; border-radius: 16px;
-      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: #fff;
-      text-decoration: none; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
-    .series-card:hover { transform: translateY(-3px); border-color: #36d98a; background: rgba(255,255,255,.10); }
-    .series-emoji { font-size: 1.9rem; line-height: 1; }
-    .series-name { font-weight: 800; font-size: 1.12rem; }
-    .series-tag { color: #9fc0ad; font-size: .95rem; }
-    .series-go { color: #ffd24a; font-weight: 700; margin-top: 6px; }
-    @media (max-width: 640px) { .series-grid { grid-template-columns: 1fr; } }
-  </style>
-  <section class="series">
+  <!-- how the tracker reads: pitfall trap -> identify -> activity-density -> diversity -->
+  <section class="cascade-band">
     <div class="wrap">
-      <h2>Check out some of our other NEON series apps</h2>
-      <p class="series-sub">Pick another data type to explore.</p>
-      <div class="series-grid">
-        <a class="series-card" href="https://tgilbert14.github.io/NEON-Plant-Diversity/" target="_blank" rel="noopener">
-          <span class="series-emoji">🌿</span>
-          <span class="series-name">NEON Plant Diversity Explorer</span>
-          <span class="series-tag">Plant presence &amp; % cover across all 46 NEON terrestrial sites.</span>
-          <span class="series-go">Open&nbsp;→</span>
-        </a>
-        <a class="series-card" href="https://tgilbert14.github.io/NEON-Small-Mammal-Tracker-App/" target="_blank" rel="noopener">
-          <span class="series-emoji">🐾</span>
-          <span class="series-name">NEON Small Mammal Tracker</span>
-          <span class="series-tag">Small-mammal box-trapping across 46 NEON sites.</span>
-          <span class="series-go">Open&nbsp;→</span>
-        </a>
-        <a class="series-card" href="https://tgilbert14.github.io/NEON-WaterChemistry-Analyte-Viewer-App/" target="_blank" rel="noopener">
-          <span class="series-emoji">💧</span>
-          <span class="series-name">NEON Water Chemistry Analyte Viewer</span>
-          <span class="series-tag">Surface-water chemistry across 34 aquatic sites.</span>
-          <span class="series-go">Open&nbsp;→</span>
-        </a>
+      <span class="kick">How the tracker reads</span>
+      <h2>From one trap to the whole community.</h2>
+      <p>Every carabid number starts in a pitfall cup and climbs the same ladder. The tracker walks it in order,
+        on shared NEON sites, with the statistics shown at every step.</p>
+      <div class="flow" data-flow>
+        <div class="frung r1"><span class="fmark"></span><span class="ftxt"><b>Pitfall trap</b> &middot; <span>cups set in the ground, emptied on a bout</span></span></div>
+        <div class="farrow" aria-hidden="true">&darr;</div>
+        <div class="frung r2"><span class="fmark"></span><span class="ftxt"><b>Identify</b> &middot; <span>each beetle keyed to carabid species</span></span></div>
+        <div class="farrow" aria-hidden="true">&darr;</div>
+        <div class="frung r3"><span class="fmark"></span><span class="ftxt"><b>Activity-density</b> &middot; <span>catch per 100 trap-nights — how busy</span></span></div>
+        <div class="farrow" aria-hidden="true">&darr;</div>
+        <div class="frung r4"><span class="fmark"></span><span class="ftxt"><b>Diversity</b> &middot; <span>the community, compared across sites</span></span></div>
       </div>
+
+      <div class="stats">
+        <div class="stat"><div class="n">46</div><div class="l">NEON sites</div></div>
+        <div class="stat"><div class="n">~233k</div><div class="l">beetles trapped</div></div>
+        <div class="stat"><div class="n">731</div><div class="l">species</div></div>
+        <div class="stat"><div class="n">instant</div><div class="l">no API waits</div></div>
+      </div>
+
+      <details class="more">
+        <summary>How it stays honest</summary>
+        <div class="mbody">
+          Abundance is effort-normalised to <b>catch per 100 trap-nights</b>, which also absorbs NEON's protocol
+          changes (4&rarr;3 traps/plot in 2018; 10&rarr;6 plots/site in 2023) so sites compare fairly. Every
+          richness-type metric counts <b>species-level records only</b> — genus/family morphospecies are set
+          aside (keyed on NEON's expert-taxonomist rank) so they don't inflate diversity, while total abundance
+          still counts every beetle trapped. Diversity uses Hill numbers; rarefaction (Hurlbert 1971) compares
+          richness at equal sample size; biogeography uses a Bray&ndash;Curtis PCoA ordination and the
+          Dufr&ecirc;ne&ndash;Legendre IndVal for signature species; trends suppress the p-value under ~5 years
+          of record. Everything loads from pre-bundled snapshots, so there are no live-API waits.
+          <b>An educational data-exploration tool, not affiliated with NEON, Battelle, or the NSF.</b>
+        </div>
+      </details>
     </div>
   </section>
 
   <footer>
     <div class="wrap">
-      <a class="cta-foot" href="mailto:desertdatalabs@gmail.com?subject=NEON%20Ground%20Beetle%20Tracker"><span aria-hidden="true">👋</span> Want a custom data app like this for your project?</a><br>
-      Built on the NEON <a href="https://data.neonscience.org/data-products/DP1.10022.001" target="_blank"
-        rel="noopener">Ground Beetles sampled from pitfall traps</a> product by <b>Desert Data Labs</b> · Tucson, AZ.
-      Data: National Ecological Observatory Network (operated by Battelle, funded by NSF). An
-      educational data-exploration tool, not affiliated with NEON, Battelle, or the NSF.
+      <a class="cta-foot" href="mailto:desertdatalabs@gmail.com?subject=NEON%20Ground%20Beetle%20Tracker">Want a custom data app like these for your project?</a><br>
+      Built on the NEON <a href="https://data.neonscience.org/data-products/DP1.10022.001" target="_blank" rel="noopener">Ground Beetles sampled from pitfall traps</a> product by <b>Desert Data Labs</b> &middot; Tucson, AZ.
+      Data: National Ecological Observatory Network (operated by Battelle, funded by NSF). Educational tools, not affiliated with NEON, Battelle, or the NSF.
     </div>
   </footer>
 
   <script>
-    // ── The deployed app URL (Posit Connect Cloud). Update here + re-publish Pages
-    //    if the deployment ever moves. ──
-    const APP_URL = "https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/";
-
+    // ---- the beetle tracker app (Connect Cloud share URL); pre-warm on load ----
+    var APP_URL = "https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/";
     (function () {
-      const placeholder = APP_URL.indexOf("REPLACE-WITH") !== -1;
-      const launch = document.getElementById("launch");
-      const warm = document.getElementById("warm");
-
-      if (placeholder) {
-        launch.addEventListener("click", function (e) {
-          e.preventDefault();
-          warm.textContent = "⚠ Set APP_URL in docs/index.html to your deployed app URL, then re-publish.";
-        });
-        return;
-      }
-      launch.href = APP_URL;
-
-      // Pre-warm the (possibly sleeping) app while the visitor reads, to soften cold start.
-      // Aborts after 8s so a hung request never leaves "Warming up…" stuck on screen.
+      var launch = document.getElementById("launch");
+      var warm = document.getElementById("warm");
+      if (launch) launch.href = APP_URL;
       try {
-        warm.textContent = "Warming up the app…";
+        if (warm) warm.textContent = "Warming up the app…";
         var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
         var killer = ctrl ? setTimeout(function () { ctrl.abort(); }, 8000) : null;
         fetch(APP_URL, { mode: "no-cors", cache: "no-store", signal: ctrl ? ctrl.signal : undefined })
-          .then(function () { warm.textContent = "Ready when you are."; })
-          .catch(function () { warm.textContent = ""; })
+          .then(function () { if (warm) warm.textContent = "Ready when you are."; })
+          .catch(function () { if (warm) warm.textContent = ""; })
           .finally(function () { if (killer) clearTimeout(killer); });
-      } catch (e) { /* ignore */ }
+      } catch (e) {}
+    })();
+
+    // ---- the constellation: lay the 7 explorers on a ring, draw energy traces ----
+    (function () {
+      var root = document.querySelector("[data-constel]");
+      if (!root) return;
+      var nodes = Array.prototype.slice.call(root.querySelectorAll(".cnode"));
+      var tracesG = root.querySelector("[data-traces]");
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      root.classList.remove("is-noscript");
+
+      var n = nodes.length, TR = 300; // trace viewBox radius
+      // build a trace from center to each node
+      if (tracesG) {
+        var frag = document.createDocumentFragment();
+        for (var i = 0; i < n; i++) {
+          var th = (i * (360 / n) - 90) * Math.PI / 180;
+          var ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          ln.setAttribute("x1", "0"); ln.setAttribute("y1", "0");
+          ln.setAttribute("x2", (Math.cos(th) * TR).toFixed(1));
+          ln.setAttribute("y2", (Math.sin(th) * TR).toFixed(1));
+          frag.appendChild(ln);
+        }
+        tracesG.appendChild(frag);
+      }
+
+      function place(landed) {
+        var r = root.getBoundingClientRect();
+        var cx = r.width / 2, cy = r.height / 2;
+        var unit = Math.min(r.width, r.height);
+        var rad = unit * 0.40, ns = Math.max(58, unit * 0.135);
+        nodes.forEach(function (nd, i) {
+          nd.style.setProperty("--ns", ns.toFixed(0) + "px");
+          var th = (i * (360 / n) - 90) * Math.PI / 180;
+          var f = landed ? 1 : 0.18;            // start near the core, fly out on land
+          nd.style.setProperty("--x", (cx + Math.cos(th) * rad * f).toFixed(1) + "px");
+          nd.style.setProperty("--y", (cy + Math.sin(th) * rad * f).toFixed(1) + "px");
+        });
+      }
+
+      place(false);
+      // light it up (fly the nodes out + start the energy flow) after a beat
+      function lite() { place(true); root.classList.add("lit"); }
+      if (reduce) { lite(); }
+      else { requestAnimationFrame(function () { requestAnimationFrame(lite); }); setTimeout(lite, 400); }
+
+      var rt;
+      window.addEventListener("resize", function () {
+        clearTimeout(rt); rt = setTimeout(function () { place(root.classList.contains("lit")); }, 120);
+      }, { passive: true });
+    })();
+
+    // ---- the reading flow: pulse each rung in turn (energy cascading down) ----
+    (function () {
+      var rungs = Array.prototype.slice.call(document.querySelectorAll("[data-flow] .frung"));
+      if (!rungs.length || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      var i = 0;
+      setInterval(function () {
+        rungs.forEach(function (r) { r.classList.remove("pip-on"); });
+        var el = rungs[i % rungs.length];
+        // force reflow so the animation restarts each cycle
+        void el.offsetWidth; el.classList.add("pip-on");
+        i++;
+      }, 900);
     })();
   </script>
 </body>
