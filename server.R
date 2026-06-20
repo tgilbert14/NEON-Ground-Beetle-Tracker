@@ -27,7 +27,7 @@ function(input, output, session) {
       legend = list(bgcolor = "rgba(0,0,0,0)", orientation = "h", x = 0.5, xanchor = "center",
                     y = -0.16, font = list(color = legc)),
       hoverlabel = list(bgcolor = if (dark) "rgba(14,29,64,0.96)" else "rgba(20,144,134,0.96)",
-                        bordercolor = if (dark) "#2dd4bf" else "#ffd24a",
+                        bordercolor = if (dark) "#36d98a" else "#ffd24a",
                         font = list(color = "#fff", family = "Rubik", size = 13))) %>%
       plotly::config(displayModeBar = FALSE, responsive = TRUE)
   }
@@ -191,7 +191,7 @@ function(input, output, session) {
     st <- picker_site_table
     if (!is.null(st) && nrow(st)) {
       mx <- suppressWarnings(max(st$individuals, na.rm = TRUE)); if (!is.finite(mx) || mx <= 0) mx <- 1
-      pal <- leaflet::colorNumeric(c("#cdeee8", "#2dd4bf", "#0f6f66"), domain = c(0, mx), na.color = "#c9d3bb")
+      pal <- leaflet::colorNumeric(c("#d6f3e4", "#36d98a", "#1f8a5a"), domain = c(0, mx), na.color = "#c9d3bb")
       picked <- mapPickerServer("picker", site_table = st, radius_metric = "richness",
         color_fn = function(s) pal(ifelse(is.finite(s$individuals), s$individuals, 0)),
         label_fn = function(r) sprintf(
@@ -525,7 +525,7 @@ function(input, output, session) {
     ra <- rank_abundance(d)
     ra <- if (is.null(ra)) NULL else ra[is.finite(ra$rel) & ra$rel > 0, , drop = FALSE]   # log axis drops 0/NA silently
     if (is.null(ra) || nrow(ra) < 2) return(note_plot("Too few species<br>for a rank-abundance curve"))
-    col <- if (is_dark()) "#2dd4bf" else DDL$forest
+    col <- if (is_dark()) "#36d98a" else DDL$forest
     plot_ly(ra, x = ~rank, y = ~rel, type = "scatter", mode = "lines+markers",
             line = list(color = col, width = 2), marker = list(color = col, size = 6),
             hovertemplate = ~paste0("#", rank, "  <b>", scientificName, "</b><br>",
@@ -574,11 +574,11 @@ function(input, output, session) {
         input$site, fmt_int(nA), span(d), input$compareSite, fmt_int(nB), span(cmp))
       return(plot_ly() %>%
         add_trace(x = qlab, y = c(hn$q0, hn$q1, hn$q2), type = "bar", name = input$site,
-                  marker = list(color = "#2dd4bf"), text = round(c(hn$q0, hn$q1, hn$q2), 1),
+                  marker = list(color = "#36d98a"), text = round(c(hn$q0, hn$q1, hn$q2), 1),
                   textposition = "outside",
                   hovertemplate = paste0("<b>", input$site, "</b><br>%{x}: %{y:.2f}<extra></extra>")) %>%
         add_trace(x = qlab, y = c(hb$q0, hb$q1, hb$q2), type = "bar", name = input$compareSite,
-                  marker = list(color = "#fb8a7e"), text = round(c(hb$q0, hb$q1, hb$q2), 1),
+                  marker = list(color = "#d98a3c"), text = round(c(hb$q0, hb$q1, hb$q2), 1),
                   textposition = "outside",
                   hovertemplate = paste0("<b>", input$compareSite, "</b><br>%{x}: %{y:.2f}<extra></extra>")) %>%
         plotly_theme() %>%
@@ -590,7 +590,7 @@ function(input, output, session) {
     }
     df <- data.frame(q = qlab, v = c(hn$q0, hn$q1, hn$q2))
     plot_ly(df, x = ~q, y = ~v, type = "bar",
-            marker = list(color = c("#2dd4bf", "#5fb56a", "#7fe6d8")),
+            marker = list(color = c("#36d98a", "#6ef0b0", "#a8f0cf")),
             text = ~round(v, 1), textposition = "outside",
             hovertemplate = ~paste0("%{x}: %{y:.2f} effective species<extra></extra>")) %>%
       plotly_theme(legend = FALSE) %>%
@@ -634,7 +634,7 @@ function(input, output, session) {
                 fillcolor = "rgba(19,99,43,0.14)", line = list(width = 0),
                 name = "±1 SD", hoverinfo = "skip") %>%
       add_trace(x = rc$n, y = rc$richness, type = "scatter", mode = "lines",
-                line = list(color = "#2dd4bf", width = 3), name = "expected species",
+                line = list(color = "#36d98a", width = 3), name = "expected species",
                 hovertemplate = "%{x} individuals<br>%{y:.1f} species<extra></extra>") %>%
       plotly_theme(legend = FALSE) %>%
       plotly::layout(xaxis = list(title = "individuals sampled"),
@@ -704,8 +704,8 @@ function(input, output, session) {
     kind <- attr(t, "metric_kind") %||% "cpn"
     ytitle <- if (kind == "cpn") "catch per 100 trap-nights" else "individuals caught"
     p <- plot_ly(x = ~t$year, y = ~t$metric, type = "scatter", mode = "lines+markers",
-      name = "observed", line = list(color = "#2dd4bf", width = 3),
-      marker = list(size = 9, color = "#2dd4bf"),
+      name = "observed", line = list(color = "#36d98a", width = 3),
+      marker = list(size = 9, color = "#36d98a"),
       hovertemplate = paste0("%{x}: %{y:.1f} ", ytitle, "<extra></extra>"))
     pred <- attr(t, "pred")
     if (!is.null(pred) && length(pred) == nrow(t) && nrow(t) >= 5) {
@@ -827,7 +827,7 @@ function(input, output, session) {
     lag <- envLag_d() %||% 0
     pts <- env_response_points(d, e, layer, lag)
     if (is.null(pts) || nrow(pts) < 3) return(note_plot("Not enough matched months<br>at this lag"))
-    meta <- ENV_LAYERS[[layer]]; col <- if (is_dark()) "#2dd4bf" else DDL$forest
+    meta <- ENV_LAYERS[[layer]]; col <- if (is_dark()) "#36d98a" else DDL$forest
     p <- plot_ly(pts, x = ~value, y = ~cpue, type = "scatter", mode = "markers",
             marker = list(color = meta$color, size = 9, line = list(color = "#fff", width = 1)),
             hovertemplate = ~paste0("%{x} ", meta$unit, " · %{y:.1f} /100TN<br>", format(date, "%b %Y"), "<extra></extra>"))
@@ -858,12 +858,12 @@ function(input, output, session) {
       if (!is.null(sA) && nrow(sA))
         p <- p %>% add_trace(x = month.abb[sA$mon], y = sA$cpn, type = "scatter",
           mode = "lines+markers", name = input$site,
-          line = list(color = "#2dd4bf", width = 3), marker = list(size = 7, color = "#2dd4bf"),
+          line = list(color = "#36d98a", width = 3), marker = list(size = 7, color = "#36d98a"),
           hovertemplate = paste0("<b>", input$site, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
       if (!is.null(sB) && nrow(sB))
         p <- p %>% add_trace(x = month.abb[sB$mon], y = sB$cpn, type = "scatter",
           mode = "lines+markers", name = input$compareSite,
-          line = list(color = "#fb8a7e", width = 3, dash = "dot"), marker = list(size = 7, color = "#fb8a7e"),
+          line = list(color = "#d98a3c", width = 3, dash = "dot"), marker = list(size = 7, color = "#d98a3c"),
           hovertemplate = paste0("<b>", input$compareSite, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
       return(plotly_theme(p) %>% plotly::layout(
         xaxis = list(title = "", categoryorder = "array", categoryarray = month.abb),
@@ -877,8 +877,8 @@ function(input, output, session) {
         ss <- s[s$scientificName == sp, ]
         p <- p %>% add_trace(x = month.abb[ss$mon], y = ss$cpn, type = "scatter",
           mode = "lines+markers", name = sp,
-          line = list(color = pal[[sp]] %||% "#2dd4bf", width = 2),
-          marker = list(size = 6, color = pal[[sp]] %||% "#2dd4bf"),
+          line = list(color = pal[[sp]] %||% "#36d98a", width = 2),
+          marker = list(size = 6, color = pal[[sp]] %||% "#36d98a"),
           hovertemplate = paste0("<b>", sp, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
       }
       return(plotly_theme(p) %>% plotly::layout(
@@ -889,7 +889,7 @@ function(input, output, session) {
     if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
     p <- plot_ly(x = month.abb[s$mon], y = s$cpn, type = "scatter", mode = "lines+markers",
             name = "all ground beetles", fill = "tozeroy", fillcolor = "rgba(19,99,43,0.16)",
-            line = list(color = "#2dd4bf", width = 3), marker = list(size = 7, color = "#2dd4bf"),
+            line = list(color = "#36d98a", width = 3), marker = list(size = 7, color = "#36d98a"),
             hovertemplate = "%{x}: %{y:.1f} per 100 trap-nights<extra></extra>")
     # optional environmental overlay (calendar-month climatology) on a right axis
     layer <- input$envLayer; has_ov <- !is.null(layer) && layer != "none" && !is.null(rv$env)
@@ -970,12 +970,12 @@ function(input, output, session) {
                    by.x = "siteID", by.y = "site")
       if (!nrow(rng)) return(base)
       return(base %>% addCircleMarkers(data = rng, lng = ~lng, lat = ~lat, layerId = ~siteID,
-        radius = ~pmax(12, sqrt(individualCount) * 2.2), color = "#2dd4bf",
+        radius = ~pmax(12, sqrt(individualCount) * 2.2), color = "#36d98a",
         fillOpacity = 0.75, stroke = TRUE, weight = 1.5,
         label = ~lapply(sprintf("<b>%s</b><br><i>%s</i>: %s individuals",
           siteID, sp, fmt_int(individualCount)), htmltools::HTML)))
     }
-    pal <- c(neon = "#2dd4bf", demo = "#e0b43a")
+    pal <- c(neon = "#36d98a", demo = "#e0b43a")
     m <- base %>% addCircleMarkers(data = si, lng = ~lng, lat = ~lat, layerId = ~site,
         radius = ~pmax(12, sqrt(richness) * 4), color = ~unname(pal[source]),
         fillOpacity = 0.7, stroke = TRUE, weight = 1.5,

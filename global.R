@@ -265,9 +265,9 @@ fetch_neon_beetles <- function(site, start_date, end_date) {
 # desert-day base + the [data-bs-theme="dark"] desert-night system. The PDF
 # report keeps the LIGHT house palette (see R/report_pdf.R — it prints on paper).
 DDL <- list(
-  navy = "#0e1d40", navy2 = "#1b2e5c", cardinal = "#fb8a7e", gold = "#ffd24a",
-  gold2 = "#e0b43a", sky = "#43b8e8", green = "#5fb56a", forest = "#2dd4bf",
-  ink = "#eaf2ff", muted = "#9fb0cf", bg = "#070d1f", paper = "#0e1d40",
+  navy = "#12241a", navy2 = "#1b3a28", cardinal = "#d98a3c", gold = "#ffd24a",
+  gold2 = "#e0b43a", sky = "#2f93a0", green = "#6ef0b0", forest = "#36d98a",
+  ink = "#e9f6ee", muted = "#9fc0ad", bg = "#07100b", paper = "#12241a",
   line = "rgba(255,255,255,0.12)"
 )
 
@@ -275,8 +275,8 @@ DDL <- list(
 # full desert-night system; the toggle defaults to light, so this is what shows.
 app_theme <- bs_theme(
   version = 5, bg = "#ffffff", fg = "#16243a",
-  primary = "#149086", secondary = "#e0685a",
-  success = "#3f9a52", info = "#2f8fc4", warning = "#d6a31c", danger = "#e0685a",
+  primary = "#1f8a5a", secondary = "#c47a2c",
+  success = "#3f9a52", info = "#2f93a0", warning = "#c79a1c", danger = "#c47a2c",
   base_font = font_google("Rubik"), heading_font = font_google("Rubik"),
   "border-radius" = "10px"
 )
