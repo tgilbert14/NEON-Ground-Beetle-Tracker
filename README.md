@@ -28,7 +28,7 @@ sharing its Desert Data Labs house style and **bundle-first** data pattern.
   </tr>
   <tr>
     <td width="50%"><img src="assets/bet_seasonality.png" alt="Seasonal activity-density split by species" width="100%"><br><sub><b>Seasonality</b> — activity-density by month, split by species to reveal each one's peak.</sub></td>
-    <td width="50%"><img src="assets/bet_trends.png" alt="Inter-annual catch-per-effort with fitted trend" width="100%"><br><sub><b>Trends</b> — inter-annual catch-per-effort with a fitted trend: the insect-decline view.</sub></td>
+    <td width="50%"><img src="assets/bet_trends.png" alt="Inter-annual catch-per-effort with fitted trend" width="100%"><br><sub><b>Trends</b> — inter-annual catch-per-effort with a fitted trend: the insect-trend view.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="assets/bet_siteCompare.png" alt="Bray-Curtis community ordination of all sites" width="100%"><br><sub><b>Biogeography</b> — a Bray–Curtis PCoA placing every site×year community; sites cluster by biome.</sub></td>
@@ -43,7 +43,7 @@ sharing its Desert Data Labs house style and **bundle-first** data pattern.
 | **Overview** | Carabid community composition — species ranked by abundance and catch-per-100-trap-nights, plus "meet the beetles" natural-history cards. |
 | **Diversity** | Hill numbers (q0/q1/q2 effective species), Hurlbert rarefaction (richness at equal sample size), and species accumulation across bouts. |
 | **Seasonality** | Activity-density by month (catch per 100 trap-nights), overall or split by the top species. |
-| **Trends** | Inter-annual catch-per-effort with a fitted OLS trend line and a plain-English verdict (rising / declining / flat, with %/yr and p-value) — the insect-decline view. |
+| **Trends** | Inter-annual catch-per-effort with a fitted OLS trend line and a plain-English verdict (rising / declining / flat, with %/yr and p-value) — the insect-trend view. |
 | **Biogeography** | A national map sized by carabid richness — or by a chosen species' local abundance (a range map); a **PCoA community ordination** (Bray–Curtis) showing which site×year communities resemble each other; an **indicator-species table** (Dufrêne–Legendre IndVal) naming each site's signature beetles; and a sortable comparison table. |
 | **About** | Data product, methods, and the live data-source note. |
 

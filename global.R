@@ -108,7 +108,9 @@ env_layer_choices <- function(env) {
   if (is.null(env) || !nrow(env)) return(base)
   have <- vapply(names(ENV_LAYERS), function(k) {
     col <- ENV_LAYERS[[k]]$col
-    col %in% names(env) && any(!is.na(env[[col]]))
+    # same coverage floor the driver dredge uses, so the overlay picker never offers
+    # a near-empty driver (e.g. fruiting_pct, ~15 months) the ranking has dropped.
+    col %in% names(env) && env_has_min_coverage(env[[col]])
   }, logical(1))
   if (!any(have)) return(base)
   labs <- vapply(ENV_LAYERS[have], function(m) sprintf("%s (%s)", m$label, m$unit), character(1))
@@ -288,6 +290,18 @@ spin <- function(x) shinycssloaders::withSpinner(x, color = DDL$forest,
 info_pop <- function(title, ..., placement = "auto")
   bslib::popover(tags$span(class = "info-dot", bsicons::bs_icon("info-circle")),
                  ..., title = title, placement = placement)
+
+# A small clickable "introduced" badge for non-native European carabids. Reuses
+# the bslib popover so the ecological caveat ("dominant ≠ intact native fauna")
+# lives behind a click, keeping the default verdict/card clean (see is_introduced).
+introduced_marker <- function(scientificName, placement = "auto")
+  bslib::popover(
+    tags$span(class = "intro-badge", title = "introduced — click for why this matters",
+              bsicons::bs_icon("globe-americas"), " introduced"),
+    tags$p(tags$b(tags$em(scientificName)), " is an ", tags$b("introduced European carabid"),
+           ", not native here."),
+    tags$p("So a high rank or “dominant” label is the opposite of intact native fauna — it usually marks a disturbed or human-modified site, not a rich one."),
+    title = "Introduced (non-native) species", placement = placement)
 
 # state pickers reused from the mammal app's metadata
 state_choices <- function() {

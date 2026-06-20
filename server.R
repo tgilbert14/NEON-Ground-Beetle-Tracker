@@ -500,7 +500,10 @@ function(input, output, session) {
     cls <- if (share >= 50) "trend-flat" else "trend-up"   # one species dominating = amber, not "good"
     div(class = paste("trend-verdict", cls), bs_icon("bar-chart-line-fill"),
       HTML(sprintf(" <b>%d</b> carabid species identified here. Most abundant: <b><i>%s</i></b> — <b>%d%%</b> of named individuals (%s per 100 trap-nights).",
-        nrow(sp), top$scientificName, share, top$cpn)))
+        nrow(sp), top$scientificName, share, top$cpn)),
+      # When the #1 species is an introduced European carabid, a clickable marker so
+      # "most abundant" isn't read as intact native fauna (the caveat is behind the dot).
+      if (is_introduced(top$scientificName)) introduced_marker(top$scientificName) else NULL)
   })
 
   output$commBar <- renderPlotly({
@@ -537,7 +540,8 @@ function(input, output, session) {
       div(class = "meet-card",
         div(class = "meet-ico", "\U0001FAB2"),
         div(class = "meet-body",
-          div(class = "meet-name", sp),
+          div(class = "meet-name", sp,
+            if (is_introduced(sp)) introduced_marker(sp) else NULL),
           div(class = "meet-stat", sprintf("%s individuals · %s per 100 trap-nights",
               fmt_int(ct$individuals[i]), ct$cpn[i])),
           div(class = "meet-blurb", beetle_blurb(sp))))

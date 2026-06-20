@@ -367,6 +367,38 @@ beetle_blurb <- function(scientificName) {
   unname(lut[g]) %||% "A NEON-sampled ground beetle (Carabidae) — a sensitive bioindicator of habitat and climate."
 }
 
+# Introduced (non-native, established European) carabids -----------------------
+# Several NEON sites are numerically DOMINATED by an introduced European species
+# (Pterostichus melanarius #1 at STEI/UNDE/WOOD; Carabus nemoralis at TREE), so a
+# "most abundant / dominant" verdict reads backwards — a dominant European beetle
+# is the opposite of intact native fauna. Keyed on the exact binomial (not genus:
+# most Pterostichus/Carabus are native) so only the established invaders flag.
+# Refs: Bousquet 2012 (Carabidae of America N of Mexico); Lindroth 1961-69.
+INTRODUCED_CARABIDS <- c(
+  "Pterostichus melanarius",   # common black ground beetle — widespread European invader
+  "Carabus nemoralis",         # European bronze carabid, established across the N US
+  "Carabus granulatus",
+  "Carabus auratus",
+  "Nebria brevicollis",
+  "Clivina fossor",
+  "Calathus fuscipes",
+  "Harpalus affinis",
+  "Harpalus rufipes",          # = Pseudoophonus rufipes, the strawberry seed beetle
+  "Pseudoophonus rufipes",
+  "Amara aenea",
+  "Trechus quadristriatus",
+  "Anisodactylus binotatus"
+)
+# TRUE for an introduced/non-native European carabid (exact-binomial match, so a
+# subgenus tag or trailing author string is tolerated; vectorised).
+is_introduced <- function(scientificName) {
+  nm <- trimws(as.character(scientificName %||% ""))
+  nm <- gsub("\\s*\\([^)]*\\)\\s*", " ", nm)               # drop subgenus "(Hypherpes)"
+  nm <- trimws(gsub("\\s+", " ", nm))
+  binom <- sub("^([A-Z][a-z]+ [a-z][a-z-]+).*$", "\\1", nm)  # first two words = Genus species
+  binom %in% INTRODUCED_CARABIDS
+}
+
 # Number formatting used across cards/tables.
 fmt_int <- function(x) formatC(x, format = "d", big.mark = ",")
 
@@ -685,7 +717,9 @@ env_corr_all <- function(d, env, max_lag = 12) {
   if (is.null(d) || is.null(env)) return(NULL)
   rows <- lapply(names(ENV_LAYERS), function(k) {
     meta <- ENV_LAYERS[[k]]
-    if (!(meta$col %in% names(env)) || !any(!is.na(env[[meta$col]]))) return(NULL)
+    # require real coverage, not just one non-NA month, so a near-empty driver
+    # (e.g. fruiting_pct, ~15 months) can't top the ranking on noise.
+    if (!(meta$col %in% names(env)) || !env_has_min_coverage(env[[meta$col]])) return(NULL)
     sc <- env_corr_scan(d, env, k, max_lag)
     if (is.null(sc)) return(NULL)
     data.frame(layer = k, label = meta$label, color = meta$color,
@@ -729,7 +763,10 @@ env_corr_pvalue <- function(d, env, max_lag = 12, nperm = 99, min_n = 8) {
   ev <- env; ev$date <- as.Date(ev$date); ev <- ev[order(ev$date), , drop = FALSE]
   evm  <- midx(ev$date)
   cols <- intersect(vapply(ENV_LAYERS, function(z) z$col, character(1)), names(ev))
-  cols <- cols[vapply(cols, function(cc) any(!is.na(ev[[cc]])), logical(1))]
+  # same coverage floor as env_corr_all(): a near-empty driver (e.g. fruiting_pct)
+  # must not enter the dredge OR its null, so the observed best |r| and the null
+  # are computed over the SAME driver set.
+  cols <- cols[vapply(cols, function(cc) env_has_min_coverage(ev[[cc]]), logical(1))]
   if (!length(cols)) return(NULL)
 
   # Lay beetle + every driver on ONE dense monthly axis (NA for gaps), so a lag
@@ -781,6 +818,15 @@ env_corr_pvalue <- function(d, env, max_lag = 12, nperm = 99, min_n = 8) {
        n_search  = length(drivers) * (max_lag + 1L),
        n_drivers = length(drivers))
 }
+
+# Minimum non-NA months a driver must have to ENTER the dredge. A column that is
+# present but near-empty (e.g. fruiting_pct: ~15 non-NA months at SRER, inherited
+# verbatim from the mammal app) is not "empty" — the any(!is.na()) test passes — so
+# it can still win the best-of-dredge on 15 points of noise. Requiring >= 2 years
+# of monthly coverage drops that thin column from BOTH the ranking and its
+# permutation null, so neither ranks a driver on a sliver of data.
+ENV_MIN_MONTHS <- 24L
+env_has_min_coverage <- function(v) sum(!is.na(v)) >= ENV_MIN_MONTHS
 
 # ec_corr_color() — single source of truth for the hue of a (driver, r) pair:
 # identity->hue family, direction->pole (only where sign is ALSO geometric),

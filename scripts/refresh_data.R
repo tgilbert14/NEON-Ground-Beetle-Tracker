@@ -51,13 +51,26 @@ for (s in sites) {
     cat(sprintf("    assemble error %s: %s\n", s, conditionMessage(e))); NULL })
   if (is.null(d) || !nrow(d)) { cat(sprintf("    no carabid data for %s\n", s)); next }
 
-  # materialize any ALTREP/arrow-backed columns to plain base vectors before save
+  # Materialize EVERY column to a plain base vector before save. assemble_beetles()
+  # returns arrow/ALTREP-backed columns: a cold readRDS() + bulk access (nrow/names)
+  # on those deferred-string columns segfaults a vanilla Rscript (exit 139), and
+  # `col[seq_along(col)]` does NOT force a deferred string — it stays an ALTREP
+  # promise. Coerce by TYPE: as.character() collapses every string column to a real
+  # CHARSXP vector, as.Date() gives collectDate a true Date class (assemble_beetles
+  # never sets one, so an inherits(col,"Date") test would never fire), and as.numeric()
+  # realizes the count/effort columns. saveRDS(version = 2) keeps the bundle readable
+  # by the broadest set of R installs.
+  date_cols <- "collectDate"
+  num_cols  <- intersect(c("individualCount", "trapnights"), names(d))
   for (nm in names(d)) {
     col <- d[[nm]]
-    d[[nm]] <- if (inherits(col, "Date")) structure(as.numeric(col[seq_along(col)]), class = "Date")
-               else col[seq_along(col)]
+    d[[nm]] <-
+      if (nm %in% date_cols) as.Date(substr(as.character(col), 1, 10))
+      else if (nm %in% num_cols) as.numeric(as.character(col))
+      else if (is.character(col) || is.factor(col)) as.character(col)
+      else col[seq_along(col)]
   }
-  saveRDS(tibble::as_tibble(d), out, compress = "xz")
+  saveRDS(tibble::as_tibble(d), out, version = 2, compress = "xz")
   cat(sprintf("    saved %s: %d rows, %d species, %.2f MB\n",
               s, nrow(d), dplyr::n_distinct(d$scientificName), file.size(out)/1e6))
 }
