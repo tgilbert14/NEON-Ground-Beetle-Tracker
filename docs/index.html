@@ -4,20 +4,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>NEON Ground Beetle Tracker — the Explorer Suite by Desert Data Labs</title>
+  <title>NEON Ground Beetle Tracker · the Explorer Suite by Desert Data Labs</title>
   <meta name="description"
-    content="Explore the ground beetles caught in cup traps at NEON research sites across the United States. See how many kinds live at a site, which ones are most common, and how the community changes by season and region. Free, real data, no account needed." />
+    content="Pitfall-trapped ground beetles (Carabidae) as a window on the soil-surface community: which carabids are active at each NEON site, how busy they are, and how diverse the community runs. Real NEON data across 46 field sites. Honest statistics, instant loads." />
   <meta name="theme-color" content="#07100b" />
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/" />
-  <meta property="og:title" content="NEON Ground Beetle Tracker — Desert Data Labs" />
+  <meta property="og:title" content="NEON Ground Beetle Tracker · Desert Data Labs" />
   <meta property="og:description"
-    content="Real NEON ground-beetle data across 46 field sites — who's active where, how busy, and how diverse. Part of the NEON Explorer Suite. Honest stats, instant loads." />
+    content="Real NEON ground-beetle data across 46 field sites: who's active where, how busy, and how diverse. Part of the NEON Explorer Suite. Honest stats, instant loads." />
   <meta property="og:image"
     content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="NEON Ground Beetle Tracker — Desert Data Labs" />
+  <meta name="twitter:title" content="NEON Ground Beetle Tracker · Desert Data Labs" />
   <meta name="twitter:description"
     content="Real NEON ground-beetle data across 46 field sites. Part of the NEON Explorer Suite. Honest stats, instant loads." />
   <meta name="twitter:image"
@@ -312,11 +312,13 @@
 
       <div class="eyebrow">The NEON Explorer Suite · Consumers</div>
       <h1>NEON Ground Beetle Tracker</h1>
-      <p class="lead">Pitfall-trapped <b>ground beetles</b> as a window on the soil-surface community: which
-        <b>carabids</b> are active at each NEON site, how busy they are, and how diverse the community runs.
-        Ground beetles are a textbook bioindicator — they respond fast to habitat, disturbance, and climate —
-        so their activity and diversity tell a rich story about each field site, on real data, with the
-        statistics shown at every step.</p>
+      <p class="lead">Explore the <b>ground beetles</b> caught in cup traps set in the soil at research sites
+        across the country. NEON, the National Ecological Observatory Network, is a set of sites funded by the
+        National Science Foundation that measure plants, animals, and climate the same way everywhere, year
+        after year. Ground beetles are easy to catch and quick to react to their surroundings, so they are a
+        handy gauge of a site's health. See how many kinds of beetle live at a site, which ones are most
+        common, and how the mix shifts by season and region. It is <b>free</b>, needs no account, and you just
+        pick a site and start.</p>
 
       <div class="cta-row">
         <a id="launch" class="launch" href="https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/">
@@ -352,39 +354,40 @@
   <!-- how the tracker reads: pitfall trap -> identify -> activity-density -> diversity -->
   <section class="cascade-band">
     <div class="wrap">
-      <span class="kick">How the tracker reads</span>
-      <h2>From one trap to the whole community.</h2>
-      <p>Every carabid number starts in a pitfall cup and climbs the same ladder. The tracker walks it in order,
-        on shared NEON sites, with the statistics shown at every step.</p>
+      <span class="kick">What this shows you</span>
+      <h2>From one trap to a whole community.</h2>
+      <p>Every number starts with a beetle in a cup trap. The app follows the same four steps in order, the same
+        way at every NEON site, and shows the math behind each one.</p>
       <div class="flow" data-flow>
-        <div class="frung r1"><span class="fmark"></span><span class="ftxt"><b>Pitfall trap</b> &middot; <span>cups set in the ground, emptied on a bout</span></span></div>
+        <div class="frung r1"><span class="fmark"></span><span class="ftxt"><b>Cup trap</b> &middot; <span>a cup sunk in the ground catches beetles that walk by</span></span></div>
         <div class="farrow" aria-hidden="true">&darr;</div>
-        <div class="frung r2"><span class="fmark"></span><span class="ftxt"><b>Identify</b> &middot; <span>each beetle keyed to carabid species</span></span></div>
+        <div class="frung r2"><span class="fmark"></span><span class="ftxt"><b>Identify</b> &middot; <span>each beetle named down to its species</span></span></div>
         <div class="farrow" aria-hidden="true">&darr;</div>
-        <div class="frung r3"><span class="fmark"></span><span class="ftxt"><b>Activity-density</b> &middot; <span>catch per 100 trap-nights — how busy</span></span></div>
+        <div class="frung r3"><span class="fmark"></span><span class="ftxt"><b>How busy</b> &middot; <span>catch per 100 trap-nights, so sites compare fairly</span></span></div>
         <div class="farrow" aria-hidden="true">&darr;</div>
-        <div class="frung r4"><span class="fmark"></span><span class="ftxt"><b>Diversity</b> &middot; <span>the community, compared across sites</span></span></div>
+        <div class="frung r4"><span class="fmark"></span><span class="ftxt"><b>How varied</b> &middot; <span>how many kinds live there, compared across sites</span></span></div>
       </div>
 
       <div class="stats">
         <div class="stat"><div class="n">46</div><div class="l">NEON sites</div></div>
         <div class="stat"><div class="n">~233k</div><div class="l">beetles trapped</div></div>
         <div class="stat"><div class="n">731</div><div class="l">species</div></div>
-        <div class="stat"><div class="n">instant</div><div class="l">no API waits</div></div>
+        <div class="stat"><div class="n">instant</div><div class="l">no loading waits</div></div>
       </div>
 
       <details class="more">
         <summary>How it stays honest</summary>
         <div class="mbody">
-          Abundance is effort-normalised to <b>catch per 100 trap-nights</b>, which also absorbs NEON's protocol
-          changes (4&rarr;3 traps/plot in 2018; 10&rarr;6 plots/site in 2023) so sites compare fairly. Every
-          richness-type metric counts <b>species-level records only</b> — genus/family morphospecies are set
-          aside (keyed on NEON's expert-taxonomist rank) so they don't inflate diversity, while total abundance
-          still counts every beetle trapped. Diversity uses Hill numbers; rarefaction (Hurlbert 1971) compares
-          richness at equal sample size; biogeography uses a Bray&ndash;Curtis PCoA ordination and the
-          Dufr&ecirc;ne&ndash;Legendre IndVal for signature species; trends suppress the p-value under ~5 years
-          of record. Everything loads from pre-bundled snapshots, so there are no live-API waits.
-          <b>An educational data-exploration tool, not affiliated with NEON, Battelle, or the NSF.</b>
+          Some sites are trapped harder than others, so a raw count would mislead. We report <b>catch per 100
+          trap-nights</b> instead, which puts every site on the same footing and also smooths over changes NEON
+          made to its own setup (fewer traps per plot in 2018, fewer plots per site in 2023). When we count
+          <b>how many kinds</b> live at a site, we use only beetles named all the way down to their species.
+          Beetles that could only be sorted to a broader group are set aside so they don't make a site look more
+          varied than it is, though the total beetle count still includes every one caught. The diversity and
+          map math use standard ecology methods (Hill numbers, rarefaction, a community ordination, and an
+          indicator-species test), and trend lines stay quiet until a site has about five years of record.
+          Everything loads from data we bundle ahead of time, so there is no waiting on a live server.
+          <b>This is an educational tool for exploring data. It is not affiliated with NEON, Battelle, or the NSF.</b>
         </div>
       </details>
     </div>
