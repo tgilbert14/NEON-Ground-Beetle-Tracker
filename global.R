@@ -326,6 +326,22 @@ site_bio <- function(site) {
   if (nrow(m)) m$bio else NULL
 }
 
+# The app mascot — a flat (no-gradient, no-id so it's safely reusable) cute beetle
+# in the carabid green/copper accent. Used as the loading spinner, the splash
+# guide, and the celebration hop. Parts are classed so the CSS can wiggle the
+# antennae (mascot-ear-l/-r) and blink the eyes (mascot-eyes).
+MASCOT_CRITTER <- htmltools::HTML(paste0(
+  '<svg class="mascot" viewBox="0 0 120 120" aria-hidden="true">',
+  '<g class="mascot-ear-l"><path d="M50,40 Q40,22 32,16" fill="none" stroke="#d98a3c" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="16" r="4" fill="#e8a24a"/></g>',
+  '<g class="mascot-ear-r"><path d="M70,40 Q80,22 88,16" fill="none" stroke="#d98a3c" stroke-width="3" stroke-linecap="round"/><circle cx="88" cy="16" r="4" fill="#e8a24a"/></g>',
+  '<g stroke="#c47a2c" stroke-width="3" stroke-linecap="round"><path d="M30,62 L16,62"/><path d="M30,78 L18,88"/><path d="M90,62 L104,62"/><path d="M90,78 L102,88"/></g>',
+  '<ellipse cx="60" cy="64" rx="31" ry="34" fill="#36d98a"/>',
+  '<path d="M60,32 L60,96" stroke="#176b46" stroke-width="2" opacity=".5"/>',
+  '<ellipse cx="60" cy="34" rx="14" ry="10" fill="#176b46"/>',
+  '<g class="mascot-eyes"><circle cx="50" cy="58" r="6.5" fill="#0c2a1c"/><circle cx="70" cy="58" r="6.5" fill="#0c2a1c"/>',
+  '<circle cx="48" cy="55.5" r="2.4" fill="#ffffff"/><circle cx="68" cy="55.5" r="2.4" fill="#ffffff"/></g>',
+  '</svg>'))
+
 # Server-side PDF site report (sourced last — needs DDL + helpers + ENV_LAYERS).
 source("R/report_pdf.R", local = FALSE)
 

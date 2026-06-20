@@ -29,7 +29,11 @@ ui <- bslib::page_sidebar(
       "Shiny.addCustomMessageHandler('gbt_remember',function(s){try{if(s){localStorage.setItem('gbt_site',s);}}catch(e){}});",
       "function hideOv(){var o=document.getElementById('bootOverlay');if(o){o.classList.add('is-hidden');setTimeout(function(){if(o&&o.parentNode){o.parentNode.removeChild(o);}},600);}} ",
       "function showWelcome(){try{if(!localStorage.getItem('gbt_seen')){localStorage.setItem('gbt_seen','1');Shiny.setInputValue('first_visit',1,{priority:'event'});}}catch(e){}}",
-      "jQuery(document).one('shiny:idle',function(){hideOv();showWelcome();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
+      # first-visit: the splash mascot waves hello once (mirrors the flagship's localStorage gate)
+      "function waveMascot(){try{if(localStorage.getItem('smtMascotSeen')==='1')return;var g=document.querySelector('.splash-guide');if(g){g.classList.add('wave');localStorage.setItem('smtMascotSeen','1');setTimeout(function(){g.classList.remove('wave');},3300);}}catch(e){}}",
+      # celebration: a beetle hops up + fades on a legendary find (no confetti in this app — exposed for parity/future use)
+      "window.mascotCheer=function(big){try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;var src=document.querySelector('#bootOverlay .mascot')||document.querySelector('.sg-mascot .mascot');if(!src)return;var wrap=document.createElement('div');wrap.className='mascot-cheer';wrap.appendChild(src.cloneNode(true));document.body.appendChild(wrap);setTimeout(function(){if(wrap.parentNode){wrap.parentNode.removeChild(wrap);}},1700);}catch(e){}};",
+      "jQuery(document).one('shiny:idle',function(){hideOv();showWelcome();waveMascot();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
       "}init();})();"))
   ),
   useShinyjs(),
@@ -92,7 +96,7 @@ ui <- bslib::page_sidebar(
 
   # ---- boot / cold-start overlay (removed by JS once Shiny goes idle) -----
   div(id = "bootOverlay", class = "boot-overlay",
-    div(class = "boot-bug", "\U0001FAB2"),
+    div(class = "load-spin mascot-spin", MASCOT_CRITTER),
     div(class = "boot-msg", "Waking up the Ground Beetle Tracker…"),
     div(class = "boot-sub", "Loading 46 NEON sites")),
 
@@ -106,6 +110,9 @@ ui <- bslib::page_sidebar(
   uiOutput("heroStats"),
   # ---- splash: the national PICKER map is the front door (flagship pattern) ----
   div(id = "splashHome",
+    div(class = "splash-guide",
+      div(class = "sg-bubble", "Pick a site to start!"),
+      div(class = "sg-mascot", MASCOT_CRITTER)),
     uiOutput("splash"),
     div(class = "splash-picker",
       div(class = "splash-map-hint", bs_icon("hand-index-thumb"),
