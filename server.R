@@ -128,7 +128,7 @@ function(input, output, session) {
                          conditionMessage(e)), type = "error"); NULL })
       }
       if (is.null(d0) || !nrow(d0)) {
-        showNotification(sprintf("No beetle data bundled for %s yet — run scripts/refresh_data.R to pull it.", site),
+        showNotification(sprintf("No beetle data bundled for %s yet. Run scripts/refresh_data.R to pull it.", site),
                          type = "warning")
         return(invisible())
       }
@@ -147,7 +147,7 @@ function(input, output, session) {
     if (is.null(d) || !nrow(d)) {
       d <- d0      # never dead-end on an empty window — show the site's full range
       updateDateRangeInput(session, "dateRange", start = cover[1], end = cover[2])
-      showNotification(sprintf("No records in that window — showing %s's full range (%s–%s).",
+      showNotification(sprintf("No records in that window. Showing %s's full range (%s–%s).",
         site, format(cover[1], "%Y"), format(cover[2], "%Y")), type = "message")
     }
     attr(d, "source") <- src
@@ -315,7 +315,7 @@ function(input, output, session) {
   observeEvent(input$compareSite, {
     s <- input$compareSite
     if (is.null(s) || !nzchar(s)) return()
-    showNotification(sprintf("Comparing %s vs %s — shown on the Diversity & Seasonality tabs.",
+    showNotification(sprintf("Comparing %s vs %s, shown on the Diversity & Seasonality tabs.",
       input$site, s), type = "message", duration = 5)
   }, ignoreInit = TRUE)
 
@@ -341,9 +341,9 @@ function(input, output, session) {
         div(class = "welcome-bug", "\U0001FAB2"),
         h3("Welcome to the Ground Beetle Tracker"),
         p("Explore ground-beetle (Carabidae) biodiversity across ", tags$b("46 NEON sites"),
-          " — who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. NEON is the National Ecological Observatory Network, a US program that takes the same ecological measurements the same way at field sites across the country, year after year, and publishes the data for anyone to use."),
+          ": who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. NEON is the National Ecological Observatory Network, a US program that takes the same ecological measurements the same way at field sites across the country, year after year, and publishes the data for anyone to use."),
         tags$ul(class = "welcome-list",
-          tags$li(tags$b("Pick a state & site"), " at left — it loads automatically."),
+          tags$li(tags$b("Pick a state & site"), " at left, it loads automatically."),
           tags$li(tags$b("Open Biogeography"), " and tap any site on the national map."),
           tags$li(tags$b("Compare two sites"), " to contrast a desert with a forest.")),
         div(class = "welcome-cta",
@@ -356,7 +356,7 @@ function(input, output, session) {
     if (is.null(rv$data)) return(NULL)
     if (identical(attr(rv$data, "source"), "demo"))
       div(class = "env-source env-demo", bs_icon("info-circle-fill"),
-          tags$span(HTML(" <b>Demo data</b> — illustrative, <b>not</b> NEON records. Run <code>scripts/refresh_data.R</code> to bundle the real product.")))
+          tags$span(HTML(" <b>Demo data</b>, illustrative, <b>not</b> NEON records. Run <code>scripts/refresh_data.R</code> to bundle the real product.")))
     else
       div(class = "env-source env-real", bs_icon("patch-check-fill"),
           tags$span(" NEON ground-beetle records for this site."))
@@ -368,8 +368,8 @@ function(input, output, session) {
     div(class = "splash",
       div(class = "splash-icon", "\U0001FAB2"),
       h3("Pick a site to begin"),
-      p("Choose a state and site at left — it ", tags$b("loads automatically"),
-        " — or open the Biogeography map and tap a marker."),
+      p("Choose a state and site at left and it ", tags$b("loads automatically"),
+        ", or open the Biogeography map and tap a marker."),
       if (!is.null(SITE_INDEX))
         p(class = "splash-sub", sprintf("%d site%s with beetle data available.",
           nrow(SITE_INDEX), if (nrow(SITE_INDEX) == 1) "" else "s")))
@@ -454,7 +454,7 @@ function(input, output, session) {
       win <- tryCatch(as.character(as.Date(c(input$dateRange[1], input$dateRange[2]))),
                       error = function(e) c(NA, NA))
       writeLines(c(
-        "NEON Ground Beetle Tracker — data export",
+        "NEON Ground Beetle Tracker · data export",
         "========================================",
         sprintf("Site:         %s", rv$label %||% site),
         "Data product: NEON DP1.10022.001 (Ground beetles sampled from pitfall traps)",
@@ -499,7 +499,7 @@ function(input, output, session) {
     share <- round(100 * top$individuals / sum(sp$individuals))
     cls <- if (share >= 50) "trend-flat" else "trend-up"   # one species dominating = amber, not "good"
     div(class = paste("trend-verdict", cls), bs_icon("bar-chart-line-fill"),
-      HTML(sprintf(" <b>%d</b> carabid species identified here. Most abundant: <b><i>%s</i></b> — <b>%d%%</b> of named individuals (%s per 100 trap-nights).",
+      HTML(sprintf(" <b>%d</b> carabid species identified here. Most abundant: <b><i>%s</i></b>, <b>%d%%</b> of named individuals (%s per 100 trap-nights).",
         nrow(sp), top$scientificName, share, top$cpn)),
       # When the #1 species is an introduced European carabid, a clickable marker so
       # "most abundant" isn't read as intact native fauna (the caveat is behind the dot).
@@ -628,9 +628,9 @@ function(input, output, session) {
     qa <- attr(ct_rx(), "qa")
     if (is.null(qa) || qa$higher_taxa == 0)
       return(div(class = "qa-note qa-clean", bs_icon("patch-check-fill"),
-        HTML(sprintf(" All %d taxa here are identified to species — richness counts are clean.", qa$species %||% 0))))
+        HTML(sprintf(" All %d taxa here are identified to species, so richness counts are clean.", qa$species %||% 0))))
     div(class = "qa-note qa-flag", bs_icon("funnel-fill"),
-      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d record-type%s identified only to genus/family (%s individuals, %.1f%% of the catch) are <b>excluded from richness, diversity and ordination</b> — they'd otherwise inflate the species count — but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
+      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d record-type%s identified only to genus/family (%s individuals, %.1f%% of the catch) are <b>excluded from richness, diversity and ordination</b> (they'd otherwise inflate the species count) but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
         qa$species, fmt_int(qa$ind_total - qa$ind_higher),
         qa$higher_taxa, if (qa$higher_taxa == 1) "" else "s",
         fmt_int(qa$ind_higher), qa$pct_ind_higher)))
@@ -651,7 +651,7 @@ function(input, output, session) {
       nA <- sum(sp_counts(d)); nB <- sum(sp_counts(cmp))
       span <- function(x) { yr <- suppressWarnings(range(x$year, na.rm = TRUE))
         if (!all(is.finite(yr))) "" else if (yr[1] == yr[2]) as.character(yr[1]) else paste0(yr[1], "\U2013", yr[2]) }
-      cap <- sprintf("%s: %s ind \U00B7 %s     %s: %s ind \U00B7 %s   \U2014   richness (q0) rises with sample size; sites are not rarefied to equal n",
+      cap <- sprintf("%s: %s ind \U00B7 %s     %s: %s ind \U00B7 %s.   Richness (q0) rises with sample size; sites are not rarefied to equal n",
         input$site, fmt_int(nA), span(d), input$compareSite, fmt_int(nB), span(cmp))
       return(plot_ly() %>%
         add_trace(x = qlab, y = c(hn$q0, hn$q1, hn$q2), type = "bar", name = input$site,
@@ -685,7 +685,7 @@ function(input, output, session) {
     word <- if (hn$even >= 0.6) "an even community" else if (hn$even >= 0.35)
               "a moderately uneven community" else "a community dominated by a few species"
     div(class = "hill-note", bs_icon("info-circle"),
-      HTML(sprintf(" Evenness q1/q0 = <b>%.2f</b> — %s.", hn$even, word)))
+      HTML(sprintf(" Evenness q1/q0 = <b>%.2f</b>, %s.", hn$even, word)))
   })
 
   # plain-English verdict banner (same pattern as the Trends banner)
@@ -700,7 +700,7 @@ function(input, output, session) {
     cls <- if (is.na(hn$even) || hn$even < 0.35) "trend-flat"
            else if (hn$even >= 0.6) "trend-up" else "trend-info"
     div(class = paste("trend-verdict", cls), bs_icon("diagram-3-fill"),
-      HTML(sprintf(" <b>%d</b> beetle species here — q1 = <b>%.1f</b> common, q2 = <b>%.1f</b> dominant — %s.",
+      HTML(sprintf(" <b>%d</b> beetle species here: q1 = <b>%.1f</b> common, q2 = <b>%.1f</b> dominant, %s.",
         as.integer(hn$q0), hn$q1, hn$q2, even_word)))
   })
 
@@ -750,7 +750,7 @@ function(input, output, session) {
     slope <- attr(t, "slope"); p <- attr(t, "p"); pct <- attr(t, "pct_per_yr")
     if (is.null(slope) || is.null(p) || !is.finite(slope)) {
       return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"),
-        HTML(sprintf(" Only %d years of data — too few to fit a trend yet.", nrow(t)))))
+        HTML(sprintf(" Only %d years of data, too few to fit a trend yet.", nrow(t)))))
     }
     # Under ~5 years a regression p-value is noise — show the apparent direction
     # but don't dress it up with a decimal the info-popover itself says to ignore.
@@ -758,9 +758,9 @@ function(input, output, session) {
       appdir <- if (slope > 0) "an apparent rise" else if (slope < 0) "an apparent decline" else "little change"
       pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (~%+.0f%%/yr)", pct) else ""
       return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"),
-        HTML(sprintf(" Over %d years, catch-per-effort shows <b>%s</b>%s — but %d years is too few to test reliably; read the direction, not the decimal.%s",
+        HTML(sprintf(" Over %d years, catch-per-effort shows <b>%s</b>%s, but %d years is too few to test reliably; read the direction, not the decimal.%s",
           nrow(t), appdir, pcttxt, nrow(t),
-          if (identical(attr(t, "metric_kind"), "count")) " <i>(raw counts — no effort data)</i>" else ""))))
+          if (identical(attr(t, "metric_kind"), "count")) " <i>(raw counts, no effort data)</i>" else ""))))
     }
     sig <- is.finite(p) && p < 0.05
     dir <- if (!sig) "flat" else if (slope > 0) "up" else "down"
@@ -772,10 +772,10 @@ function(input, output, session) {
               else if (is.finite(p)) sprintf("not statistically distinguishable from no change (p = %.2f)", p)
               else "not statistically distinguishable from no change"
     div(class = paste("trend-verdict", paste0("trend-", dir)), bs_icon(icon),
-      HTML(sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s — %s. %s",
+      HTML(sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s, %s. %s",
         nrow(t), word, pcttxt, sigtxt,
         if (identical(attr(t, "metric_kind"), "count"))
-          "<i>(raw counts — this bundle has no effort data)</i>" else "")))
+          "<i>(raw counts; this bundle has no effort data)</i>" else "")))
   })
 
   output$trendPlot <- renderPlotly({
@@ -808,7 +808,7 @@ function(input, output, session) {
     e <- rv$env; if (is.null(e)) return(NULL)
     if (identical(attr(e, "source") %||% "neon", "demo"))
       div(class = "env-source env-demo", bs_icon("exclamation-triangle"),
-          HTML(" Illustrative <b>demo</b> environment — not real NEON values."))
+          HTML(" Illustrative <b>demo</b> environment, not real NEON values."))
     else
       div(class = "env-source env-real", bs_icon("patch-check"),
           HTML(" Co-located NEON env products for this site (precip / air temperature / plant phenology)."))
@@ -850,7 +850,7 @@ function(input, output, session) {
     if (!isTRUE(input$seasonBySpecies)) return(NULL)
     div(class = "env-lag-hint", style = "margin-top:4px;",
         bs_icon("info-circle"), " Overlay pauses while ", tags$b("Split by species"),
-        " is on — untick it to compare a driver on the pooled curve.")
+        " is on. Untick it to compare a driver on the pooled curve.")
   })
 
   # styled "answer up front" — eyebrow · hero sentence + hero r-value · metadata
@@ -886,7 +886,7 @@ function(input, output, session) {
           tags$span(class = "ec-strength", slabel), " link with ",
           tags$span(class = "ec-driver", tolower(top$label))),
         div(class = paste("ec-rvalue", if (pos) "ec-sgn-pos" else "ec-sgn-neg"),
-          title = "correlation coefficient, -1 to +1 — see the (i) above for what it means",
+          title = "correlation coefficient, -1 to +1; see the (i) above for what it means",
           bs_icon(glyph), HTML(sprintf("r&nbsp;%+.2f", top$r)))),
       div(class = "ec-foot",
         tags$span(class = "ec-meta", bs_icon("clock-history"),
@@ -1031,7 +1031,7 @@ function(input, output, session) {
     pct <- rank / M
     cls <- if (pct <= 0.34) "trend-up" else if (pct >= 0.67) "trend-flat" else "trend-info"
     div(class = paste("trend-verdict", cls), bs_icon("geo-alt-fill"),
-      HTML(sprintf(" <b>%s</b> ranks <b>#%d of %d</b> NEON sites for carabid richness — <b>%d</b> species recorded across all years.",
+      HTML(sprintf(" <b>%s</b> ranks <b>#%d of %d</b> NEON sites for carabid richness, with <b>%d</b> species recorded across all years.",
         row$name[1], rank, M, as.integer(r))))
   })
 
@@ -1149,22 +1149,22 @@ function(input, output, session) {
       h3("About this app"),
       p("The ", tags$b("NEON Ground Beetle Tracker"), " explores carabid beetle biodiversity from ",
         tags$a(href = "https://data.neonscience.org/data-products/DP1.10022.001", target = "_blank",
-               "NEON DP1.10022.001 — Ground beetles sampled from pitfall traps"), "."),
+               "NEON DP1.10022.001 · Ground beetles sampled from pitfall traps"), "."),
       p("Ground beetles are a classic ", tags$b("bioindicator"),
         ": they respond quickly to habitat, disturbance, and climate, so their richness, diversity, and seasonal activity tell a rich story about each NEON site."),
       h4("What you can explore"),
       tags$ul(
-        tags$li(tags$b("Community"), " — which species dominate, by abundance and per-trap-night effort."),
-        tags$li(tags$b("Diversity"), " — Hill numbers, rarefaction at equal sample size, and species accumulation."),
-        tags$li(tags$b("Seasonality"), " — activity-density by month, overall and per species."),
-        tags$li(tags$b("Trends"), " — inter-annual catch-per-effort with a fitted trend and decline/increase verdict."),
-        tags$li(tags$b("Biogeography"), " — a richness/range map, a Bray–Curtis community ordination, and indicator species (IndVal) per site.")),
+        tags$li(tags$b("Community"), ": which species dominate, by abundance and per-trap-night effort."),
+        tags$li(tags$b("Diversity"), ": Hill numbers, rarefaction at equal sample size, and species accumulation."),
+        tags$li(tags$b("Seasonality"), ": activity-density by month, overall and per species."),
+        tags$li(tags$b("Trends"), ": inter-annual catch-per-effort with a fitted trend and decline/increase verdict."),
+        tags$li(tags$b("Biogeography"), ": a richness/range map, a Bray–Curtis community ordination, and indicator species (IndVal) per site.")),
       h4("Methods"),
       tags$ul(
         tags$li("Abundance is normalised to ", tags$b("catch per 100 trap-nights"),
                 " (effort = unique plot × bout trap-night totals) so sites compare fairly."),
         tags$li(tags$b("Species vs. higher taxa (QA/QC)."),
-                " Not every beetle is named to species — some are left at genus (\"",
+                " Not every beetle is named to species; some are left at genus (\"",
                 tags$em("Bembidion"), " sp.\") or family (\"Carabidae\"). Counting those as if each were its own species ",
                 tags$b("inflates richness and diversity"), ", so all richness-type metrics (richness, Hill numbers, rarefaction, accumulation, ordination, indicator species) use ",
                 tags$b("species-level records only"), ". Total ", tags$b("abundance"),
@@ -1179,7 +1179,7 @@ function(input, output, session) {
         demo_sites <- if (!is.null(SITE_INDEX)) SITE_INDEX$site[SITE_INDEX$source == "demo"] else character(0)
         if (length(demo_sites))
           div(class = "about-note", bs_icon("exclamation-triangle"),
-            HTML(sprintf(" %s shown from <b>illustrative demo data — not real NEON records</b>; run <code>scripts/refresh_data.R</code> to replace with the real product.",
+            HTML(sprintf(" %s shown from <b>illustrative demo data, not real NEON records</b>; run <code>scripts/refresh_data.R</code> to replace with the real product.",
               paste(demo_sites, collapse = ", "))))
         else
           div(class = "about-note", bs_icon("patch-check-fill"),

@@ -347,15 +347,15 @@ make_species_pal <- function(d) {
 beetle_blurb <- function(scientificName) {
   g <- sub(" .*$", "", scientificName %||% "")
   lut <- c(
-    Pterostichus = "Glossy black woodland predators — fast night hunters of soft-bodied prey and a classic forest-floor carabid.",
+    Pterostichus = "Glossy black woodland predators, fast night hunters of soft-bodied prey and a classic forest-floor carabid.",
     Carabus      = "Big, sculptured 'caterpillar hunters' that can't fly; flagship beetles of healthy forest soils.",
-    Calosoma     = "Iridescent 'searchers' that climb plants to hunt caterpillars — voracious agricultural allies.",
+    Calosoma     = "Iridescent 'searchers' that climb plants to hunt caterpillars, voracious agricultural allies.",
     Harpalus     = "Stout seed-eating ground beetles (granivores) common in open prairies and fields.",
     Poecilus     = "Metallic-green active hunters of grasslands, abundant through the warm season.",
     Pasimachus   = "Large flightless predators with massive jaws that patrol bare desert and prairie soil at night.",
     Scarites     = "Pincer-jawed burrowers that ambush prey from tunnels in loose soil.",
     Cyclotrachelus = "Robust late-season woodland and prairie predators active into autumn.",
-    Cicindela    = "Tiger beetles — dazzling, fast-running visual hunters of sunbaked open ground.",
+    Cicindela    = "Tiger beetles: dazzling, fast-running visual hunters of sunbaked open ground.",
     Synuchus     = "Small forest carabids that forage in leaf litter and shelter under bark.",
     Amara        = "Sun-loving seed and plant feeders of open, dry habitats.",
     Notiobia     = "Warm-climate seed-eating beetles of sandy southern soils.",
@@ -364,7 +364,7 @@ beetle_blurb <- function(scientificName) {
     Agonum       = "Slender, often metallic beetles of damp ground and wetland margins.",
     Cychrus      = "Snail-specialist forest beetles with elongate snouts."
   )
-  unname(lut[g]) %||% "A NEON-sampled ground beetle (Carabidae) — a sensitive bioindicator of habitat and climate."
+  unname(lut[g]) %||% "A NEON-sampled ground beetle (Carabidae), a sensitive bioindicator of habitat and climate."
 }
 
 # Introduced (non-native, established European) carabids -----------------------

@@ -240,7 +240,7 @@ species_choices <- function() {
   sp <- SPECIES_SITES %>% dplyr::group_by(.data$scientificName) %>%
     dplyr::summarise(sites = dplyr::n(), inds = sum(.data$individualCount), .groups = "drop") %>%
     dplyr::arrange(dplyr::desc(.data$sites), dplyr::desc(.data$inds))
-  stats::setNames(sp$scientificName, sprintf("%s — %d site%s", sp$scientificName,
+  stats::setNames(sp$scientificName, sprintf("%s · %d site%s", sp$scientificName,
                   sp$sites, ifelse(sp$sites == 1, "", "s")))
 }
 
@@ -296,11 +296,11 @@ info_pop <- function(title, ..., placement = "auto")
 # lives behind a click, keeping the default verdict/card clean (see is_introduced).
 introduced_marker <- function(scientificName, placement = "auto")
   bslib::popover(
-    tags$span(class = "intro-badge", title = "introduced — click for why this matters",
+    tags$span(class = "intro-badge", title = "introduced. Click for why this matters",
               bsicons::bs_icon("globe-americas"), " introduced"),
     tags$p(tags$b(tags$em(scientificName)), " is an ", tags$b("introduced European carabid"),
            ", not native here."),
-    tags$p("So a high rank or “dominant” label is the opposite of intact native fauna — it usually marks a disturbed or human-modified site, not a rich one."),
+    tags$p("So a high rank or “dominant” label is the opposite of intact native fauna. It usually marks a disturbed or human-modified site, not a rich one."),
     title = "Introduced (non-native) species", placement = placement)
 
 # state pickers reused from the mammal app's metadata

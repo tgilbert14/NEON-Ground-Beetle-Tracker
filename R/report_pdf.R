@@ -133,7 +133,7 @@ chart_community <- function(d) {
     ggplot2::geom_text(ggplot2::aes(label = format(.data$individuals, big.mark = ",")),
       hjust = -0.12, size = 3, colour = PG$muted) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.18))) +
-    ggplot2::labs(title = "Carabid community — most abundant first",
+    ggplot2::labs(title = "Carabid community, most abundant first",
       subtitle = "Bar = catch per 100 trap-nights; label = individuals",
       x = "catch per 100 trap-nights", y = NULL, caption = scope_cap(d)) +
     theme_report() + ggplot2::theme(panel.grid.major.y = ggplot2::element_blank(),
