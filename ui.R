@@ -303,7 +303,7 @@ ui <- bslib::page_sidebar(
 
   # ---- footer ------------------------------------------------------------
   div(class = "ddl-footer",
-    p(HTML("Built by <strong>Desert Data Labs</strong> · Tucson, AZ · custom data apps & analytics → "),
+    p(HTML("Built by <strong>Desert Data Labs</strong> · Tucson, AZ · get in touch →"),
       tags$a(href = "mailto:desertdatalabs@gmail.com?subject=NEON%20Ground%20Beetle%20Tracker",
              "desertdatalabs@gmail.com")),
     p(style = "font-size:12px;opacity:.85",

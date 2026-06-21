@@ -341,14 +341,14 @@ function(input, output, session) {
         div(class = "welcome-bug", "\U0001FAB2"),
         h3("Welcome to the Ground Beetle Tracker"),
         p("Explore ground-beetle (Carabidae) biodiversity across ", tags$b("46 NEON sites"),
-          " — who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. Real data, instant loads."),
+          " — who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. NEON is the National Ecological Observatory Network, a US program that takes the same ecological measurements the same way at field sites across the country, year after year, and publishes the data for anyone to use."),
         tags$ul(class = "welcome-list",
           tags$li(tags$b("Pick a state & site"), " at left — it loads automatically."),
           tags$li(tags$b("Open Biogeography"), " and tap any site on the national map."),
           tags$li(tags$b("Compare two sites"), " to contrast a desert with a forest.")),
         div(class = "welcome-cta",
           actionButton("welcomeSurprise", tagList(bs_icon("shuffle"), " Surprise me"), class = "btn-success"),
-          modalButton("Start exploring →")))
+          modalButton("Browse the sites →")))
     ))
   }, once = TRUE)
 

@@ -6,20 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>NEON Ground Beetle Tracker · the Explorer Suite by Desert Data Labs</title>
   <meta name="description"
-    content="Pitfall-trapped ground beetles (Carabidae) as a window on the soil-surface community: which carabids are active at each NEON site, how busy they are, and how diverse the community runs. Real NEON data across 46 field sites. Honest statistics, instant loads." />
+    content="Pitfall-trapped ground beetles (Carabidae) as a window on the soil-surface community: which carabids are active at each NEON site, how busy they are, and how diverse the community runs. Real NEON data across 46 field sites. Honest statistics." />
   <meta name="theme-color" content="#07100b" />
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/" />
   <meta property="og:title" content="NEON Ground Beetle Tracker · Desert Data Labs" />
   <meta property="og:description"
-    content="Real NEON ground-beetle data across 46 field sites: who's active where, how busy, and how diverse. Part of the NEON Explorer Suite. Honest stats, instant loads." />
+    content="Real NEON ground-beetle data across 46 field sites: who's active where, how busy, and how diverse. Part of the NEON Explorer Suite. Honest stats." />
   <meta property="og:image"
     content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="NEON Ground Beetle Tracker · Desert Data Labs" />
   <meta name="twitter:description"
-    content="Real NEON ground-beetle data across 46 field sites. Part of the NEON Explorer Suite. Honest stats, instant loads." />
+    content="Real NEON ground-beetle data across 46 field sites. Part of the NEON Explorer Suite. Honest stats." />
   <meta name="twitter:image"
     content="https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/og-image.png" />
 
@@ -317,8 +317,7 @@
         National Science Foundation that measure plants, animals, and climate the same way everywhere, year
         after year. Ground beetles are easy to catch and quick to react to their surroundings, so they are a
         handy gauge of a site's health. See how many kinds of beetle live at a site, which ones are most
-        common, and how the mix shifts by season and region. It is <b>free</b>, needs no account, and you just
-        pick a site and start.</p>
+        common, and how the mix shifts by season and region.</p>
 
       <div class="cta-row">
         <a id="launch" class="launch" href="https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/">
@@ -372,7 +371,7 @@
         <div class="stat"><div class="n">46</div><div class="l">NEON sites</div></div>
         <div class="stat"><div class="n">~233k</div><div class="l">beetles trapped</div></div>
         <div class="stat"><div class="n">731</div><div class="l">species</div></div>
-        <div class="stat"><div class="n">instant</div><div class="l">no loading waits</div></div>
+        <div class="stat"><div class="n">every year</div><div class="l">same way, same spots</div></div>
       </div>
 
       <details class="more">
@@ -386,7 +385,7 @@
           varied than it is, though the total beetle count still includes every one caught. The diversity and
           map math use standard ecology methods (Hill numbers, rarefaction, a community ordination, and an
           indicator-species test), and trend lines stay quiet until a site has about five years of record.
-          Everything loads from data we bundle ahead of time, so there is no waiting on a live server.
+          Everything loads from data we bundle ahead of time, rather than from a live server.
           <b>This is an educational tool for exploring data. It is not affiliated with NEON, Battelle, or the NSF.</b>
         </div>
       </details>
@@ -395,7 +394,7 @@
 
   <footer>
     <div class="wrap">
-      <a class="cta-foot" href="mailto:desertdatalabs@gmail.com?subject=NEON%20Ground%20Beetle%20Tracker">Want a custom data app like these for your project?</a><br>
+      <a class="cta-foot" href="mailto:desertdatalabs@gmail.com?subject=NEON%20Ground%20Beetle%20Tracker">Get in touch with Desert Data Labs →</a><br>
       Built on the NEON <a href="https://data.neonscience.org/data-products/DP1.10022.001" target="_blank" rel="noopener">Ground Beetles sampled from pitfall traps</a> product by <b>Desert Data Labs</b> &middot; Tucson, AZ.
       Data: National Ecological Observatory Network (operated by Battelle, funded by NSF). Educational tools, not affiliated with NEON, Battelle, or the NSF.
     </div>
@@ -413,7 +412,7 @@
         var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
         var killer = ctrl ? setTimeout(function () { ctrl.abort(); }, 8000) : null;
         fetch(APP_URL, { mode: "no-cors", cache: "no-store", signal: ctrl ? ctrl.signal : undefined })
-          .then(function () { if (warm) warm.textContent = "Ready when you are."; })
+          .then(function () { if (warm) warm.textContent = "The app is ready."; })
           .catch(function () { if (warm) warm.textContent = ""; })
           .finally(function () { if (killer) clearTimeout(killer); });
       } catch (e) {}
