@@ -64,6 +64,55 @@ state_names <- c(
   VA = "Virginia", WA = "Washington", WI = "Wisconsin", WY = "Wyoming"
 )
 
+# ---------------------------------------------------------------------------
+# Biome class per site — a coarse (5-8 class) ecosystem grouping used to colour
+# the cross-site ordination by BIOME instead of by 46 indistinguishable site
+# hues. Carabid communities cluster by biome, so this is the legible signal the
+# ordination is meant to show. Assigned per NEON site from its ecosystem (the
+# `bio` line + domain), kept to a CVD-safe count of classes.
+# ---------------------------------------------------------------------------
+site_biome_lut <- c(
+  # Eastern & Appalachian deciduous / mixed forest
+  HARV = "Eastern forest", BART = "Eastern forest", BLAN = "Eastern forest",
+  SCBI = "Eastern forest", SERC = "Eastern forest", GRSM = "Eastern forest",
+  MLBS = "Eastern forest", ORNL = "Eastern forest", UKFS = "Eastern forest",
+  DELA = "Eastern forest", LENO = "Eastern forest",
+  # Northern / boreal forest (Great Lakes + interior Alaska)
+  STEI = "Northern forest", TREE = "Northern forest", UNDE = "Northern forest",
+  BONA = "Boreal & tundra", DEJU = "Boreal & tundra", HEAL = "Boreal & tundra",
+  BARR = "Boreal & tundra", TOOL = "Boreal & tundra", NIWO = "Boreal & tundra",
+  # Southeastern pine flatwoods / Coastal Plain
+  DSNY = "Southeast pine", JERC = "Southeast pine", OSBS = "Southeast pine",
+  TALL = "Southeast pine", GUAN = "Southeast pine", LAJA = "Southeast pine",
+  # Grassland & prairie
+  KONA = "Grassland", KONZ = "Grassland", DCFS = "Grassland", NOGP = "Grassland",
+  WOOD = "Grassland", CPER = "Grassland", STER = "Grassland", CLBJ = "Grassland",
+  OAES = "Grassland",
+  # Desert & shrub-steppe
+  MOAB = "Desert & shrub", JORN = "Desert & shrub", SRER = "Desert & shrub",
+  ONAQ = "Desert & shrub", YELL = "Desert & shrub",
+  # Western montane / Pacific conifer
+  RMNP = "Western montane", ABBY = "Western montane", WREF = "Western montane",
+  SJER = "Western montane", SOAP = "Western montane", TEAK = "Western montane"
+)
+# Biome for a site code (vectorised); unmapped -> "Other".
+site_biome <- function(site) {
+  b <- unname(site_biome_lut[as.character(site)])
+  b[is.na(b)] <- "Other"
+  b
+}
+# Stable CVD-safe palette keyed by biome class (Okabe-Ito family).
+BIOME_COLORS <- c(
+  "Eastern forest"  = "#0072B2",
+  "Northern forest" = "#56B4E9",
+  "Boreal & tundra" = "#7E5CC9",
+  "Southeast pine"  = "#009E73",
+  "Grassland"       = "#E69F00",
+  "Desert & shrub"  = "#D55E00",
+  "Western montane" = "#1a7f37",
+  "Other"           = "#8a97a8"
+)
+
 # NOTE: the picker/label helpers (state_choices, sites_in_state, site_bio,
 # site_label) live in global.R, where they are scoped to only the sites that
 # actually have bundled data. This file is the canonical DATA (neon_sites +

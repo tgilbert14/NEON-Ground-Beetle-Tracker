@@ -342,6 +342,21 @@ MASCOT_CRITTER <- htmltools::HTML(paste0(
   '<circle cx="48" cy="55.5" r="2.4" fill="#ffffff"/><circle cx="68" cy="55.5" r="2.4" fill="#ffffff"/></g>',
   '</svg>'))
 
+# ---- the NEON suite registry (in-app sibling links) -----------------------
+# Canonical list mirrored from docs/index.html's cross-promo grid. Rendered as an
+# "Explore the NEON series" block in the About panel so every sibling is one tap
+# away from inside the app (suite-cohesion standard).
+SUITE_SIBLINGS <- list(
+  list(name = "Driver Cascade",   emoji = "\U0001F517", url = "https://tgilbert14.github.io/NEON-Driver-Cascade/",                  blurb = "How weather ripples up through plants, bugs, and animals."),
+  list(name = "Small Mammals",    emoji = "\U0001F42D", url = "https://tgilbert14.github.io/NEON-Small-Mammal-Tracker-App/",        blurb = "Who's scurrying around each site, and how the populations shift."),
+  list(name = "Breeding Birds",   emoji = "\U0001F426", url = "https://tgilbert14.github.io/NEON-Breeding-Birds/",                  blurb = "The dawn-chorus point counts, mapped and tracked over the years."),
+  list(name = "Plant Diversity",  emoji = "\U0001F33F", url = "https://tgilbert14.github.io/NEON-Plant-Diversity/",                 blurb = "How many plant species share each plot, and which ones."),
+  list(name = "Plant Phenology",  emoji = "\U0001F331", url = "https://tgilbert14.github.io/NEON-Plant-Phenology-Explorer/",        blurb = "When leaves, flowers, and fruit appear through the seasons."),
+  list(name = "Veg Structure",    emoji = "\U0001F333", url = "https://tgilbert14.github.io/NEON-Vegetation-Structure-Explorer/",   blurb = "How tall and how dense the vegetation stands at each site."),
+  list(name = "Water Chemistry",  emoji = "\U0001F4A7", url = "https://tgilbert14.github.io/NEON-WaterChemistry-Analyte-Viewer-App/", blurb = "What's dissolved in the streams, analyte by analyte."),
+  list(name = "Mosquito Pulse",   emoji = "\U0001F99F", url = "https://tgilbert14.github.io/NEON-Mosquito-Pulse/",                  blurb = "When and where mosquitoes are active, by genus and sex.")
+)
+
 # Server-side PDF site report (sourced last — needs DDL + helpers + ENV_LAYERS).
 source("R/report_pdf.R", local = FALSE)
 

@@ -118,6 +118,19 @@ ui <- bslib::page_sidebar(
       div(class = "splash-map-hint", bs_icon("hand-index-thumb"),
         " Tap a site to explore it. Dot size is species richness, colour is how many beetles were caught."),
       mapPickerUI("picker", height = "520px", spinner = DDL$forest),
+      # Legend for BOTH encoded channels: dot size = richness, dot colour = catch.
+      div(class = "picker-legend",
+        div(class = "pl-block",
+          div(class = "pl-h", "Dot size"),
+          div(class = "pl-size",
+            tags$span(class = "pl-dot pl-d1"), tags$span(class = "pl-dot pl-d2"),
+            tags$span(class = "pl-dot pl-d3"),
+            tags$span(class = "pl-lab", "fewer \U2192 more species"))),
+        div(class = "pl-block",
+          div(class = "pl-h", "Dot colour"),
+          div(class = "pl-ramp"),
+          div(class = "pl-ramp-labs",
+            tags$span("fewer caught"), tags$span("more caught")))),
       # Closed-by-default text fallback to the map: every site, one tap away. Each
       # link drives the SAME input$siteExplore the popup's "Explore" button uses,
       # so selection runs the app's normal cascade -> auto-load. Built from
@@ -166,7 +179,14 @@ ui <- bslib::page_sidebar(
               p(tags$b("Two caveats."), " It's ", tags$b("naive"), ", not corrected for detection. And the denominator is bouts that caught ", tags$b("at least one ground beetle"), " (bouts with no carabids at all, rare in the active season, aren't in the data), so it slightly over-states how widespread a species is. Species-level IDs only."))),
           spin(plotlyOutput("occupancyPlot", height = "420px"))),
         h4(class = "section-title", bs_icon("binoculars"), " Meet the beetles"),
-        uiOutput("meetBeetles")
+        uiOutput("meetBeetles"),
+        card(full_screen = FALSE,
+          card_head("clipboard-check", "Data-quality review",
+            info_pop("Data-quality flags",
+              p("A quick honesty pass over this site's records. Each flag is a ",
+                tags$b("verify, not wrong"), " note: something worth a second look, not an error."),
+              p("Tap a flag to list the exact records behind it, and download any flag (or the whole report) as a CSV."))),
+          uiOutput("qcReview"))
       ),
 
       nav_panel(
@@ -189,7 +209,7 @@ ui <- bslib::page_sidebar(
             card_head("graph-up", "Rarefaction, richness at equal sample size",
               info_pop("Rarefaction",
                 p("Expected species in a random subsample of ", tags$b("n individuals"),
-                  " (Hurlbert 1971), with a ±1 SD band. Comparing at equal n stops a site that simply caught more beetles from looking falsely richer."))),
+                  " (Hurlbert 1971), with an ", tags$b("approximate \U00B11 SD"), " band (an independent-species approximation; Heck et al. 1975). Comparing at equal n stops a site that simply caught more beetles from looking falsely richer."))),
             spin(plotlyOutput("rarePlot", height = "300px")))
         ),
         card(full_screen = TRUE,

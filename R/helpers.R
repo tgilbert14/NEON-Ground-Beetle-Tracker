@@ -428,6 +428,170 @@ beetle_export_codebook <- function() {
 }
 
 # ---------------------------------------------------------------------------
+# Co-located monthly environmental series, materialised for the data export.
+# Builds the date + the driver columns the app overlays (precip / temp / green-up
+# etc.) plus a per-driver _n month-count from a site's env bundle (load_site_env).
+# Returns NULL when no env bundle exists for the site. Columns are emitted in a
+# stable order so the env codebook can iterate the SAME keep-vector (no drift).
+# ---------------------------------------------------------------------------
+beetle_env_export <- function(env) {
+  if (is.null(env) || !nrow(env)) return(NULL)
+  e <- env; e$date <- as.Date(e$date)
+  cols <- c("precip_mm", "temp_c", "greenup_pct", "flowering_pct", "fruiting_pct")
+  have <- intersect(cols, names(e))
+  if (!length(have)) return(NULL)
+  out <- data.frame(date = e$date, stringsAsFactors = FALSE)
+  for (cc in have) out[[cc]] <- suppressWarnings(as.numeric(e[[cc]]))
+  out <- out[order(out$date), , drop = FALSE]
+  # one _n column per driver = how many non-NA months back that driver (honest
+  # coverage, mirrors ENV_MIN_MONTHS gating).
+  for (cc in have) out[[paste0(cc, "_n")]] <- sum(!is.na(out[[cc]]))
+  attr(out, "drivers") <- have
+  tibble::as_tibble(out)
+}
+
+# Codebook for the env export — built by iterating the ACTUAL emitted columns so
+# it can never drift from beetle_env_export()'s output.
+beetle_env_codebook <- function(env_df) {
+  if (is.null(env_df)) return(NULL)
+  unit_lut <- c(precip_mm = "mm/month (sum)", temp_c = "deg C (monthly mean)",
+                greenup_pct = "% of plants leafing out", flowering_pct = "% of plants in flower",
+                fruiting_pct = "% of plants in fruit")
+  def_lut <- c(
+    date          = "First day of the calendar month the value summarises.",
+    precip_mm     = "Total monthly precipitation at the site (NEON DP1.00044.001).",
+    temp_c        = "Mean monthly air temperature at the site (NEON DP1.00002.001).",
+    greenup_pct   = "Share of monitored plants leafing out that month (NEON DP1.10055.001).",
+    flowering_pct = "Share of monitored plants in flower that month (NEON DP1.10055.001).",
+    fruiting_pct  = "Share of monitored plants in fruit that month (NEON DP1.10055.001).")
+  rows <- lapply(names(env_df), function(cc) {
+    base <- sub("_n$", "", cc); is_n <- grepl("_n$", cc)
+    data.frame(
+      column     = cc,
+      type       = if (cc == "date") "date" else "numeric",
+      units      = if (is_n) "# months" else unname(unit_lut[base] %||% ""),
+      definition = if (is_n) sprintf("Number of non-NA monthly values of %s for this site (coverage).", base)
+                   else unname(def_lut[cc] %||% ""),
+      stringsAsFactors = FALSE)
+  })
+  tibble::as_tibble(do.call(rbind, rows))
+}
+
+# ---------------------------------------------------------------------------
+# beetle_qc(): site-level data-quality review flags for the loaded bundle.
+# Returns ranked "verify, not wrong" flags PLUS the exact offending rows behind
+# each, so the UI lists them (clickable) and the user can download a per-flag CSV
+# and a full QC report. Ported from the suite's bird_qc()/mos_qc() contract:
+#   out <- list(flags = <ranked list of {level,title,key,n,detail}>,
+#               sets  = <named list: key -> data.frame of the flagged rows>)
+# Flagged rows are RETAINED, never deleted. Thresholds are data-derived and
+# domain-grounded so the system stays near-zero "high" on clean NEON data.
+#   high = a result that reads BACKWARDS unless you know the caveat
+#          (an introduced European carabid is the dominant "signature" species)
+#   warn = worth a look (a high coarse-ID share; one species swamps the catch)
+#   info = a transparency note (genus/family-only rows; singleton-heavy tail)
+# `d` is the cleaned long table (clean_beetle output) for ONE site.
+# ---------------------------------------------------------------------------
+beetle_qc <- function(d) {
+  out <- list(flags = list(), sets = list())
+  if (is.null(d) || !nrow(d)) return(out)
+  cols <- intersect(c("siteID", "plotID", "collectDate", "year", "taxonID",
+                      "scientificName", "taxonRank", "species_level",
+                      "individualCount", "trapnights"), names(d))
+  tidy <- function(rows, label) {
+    rows <- rows[!is.na(rows)]; if (!length(rows)) return(NULL)
+    x <- d[rows, cols, drop = FALSE]; if (!nrow(x)) return(NULL); x$flag <- label; x
+  }
+  add <- function(level, title, key, rows, detail) {
+    rows <- unique(rows[!is.na(rows)]); n <- length(rows); if (!n) return(invisible())
+    out$flags[[length(out$flags) + 1L]] <<- list(level = level, title = title,
+      key = key, n = n, detail = detail)
+    out$sets[[key]] <<- tidy(rows, title)
+  }
+
+  sl  <- d$species_level %in% TRUE
+  ind <- suppressWarnings(as.numeric(d$individualCount))
+  tot_ind <- sum(ind, na.rm = TRUE)
+
+  # 1 (HIGH) — the most-abundant SPECIES is an introduced European carabid.
+  # A "dominant" or "#1" label then reads backwards: a numerically dominant
+  # non-native is the opposite of intact native fauna (see is_introduced).
+  sp_ind <- tapply(ind[sl], d$scientificName[sl], sum, na.rm = TRUE)
+  if (length(sp_ind)) {
+    dom <- names(sp_ind)[which.max(sp_ind)]
+    if (length(dom) && is_introduced(dom))
+      add("high", sprintf("Dominant species is introduced (%s)", dom), "introduced",
+          which(sl & is_introduced(d$scientificName)),
+          sprintf("%s, the most abundant named beetle here, is an introduced European carabid, not native. A 'dominant/top species' verdict reads backwards: a numerically dominant non-native usually marks a disturbed or human-modified site, not a rich native fauna. The rows behind this flag are every catch of an introduced species at this site.", dom))
+  }
+
+  # 2 (WARN) — high coarse-ID share. When a large share of INDIVIDUALS is left at
+  # genus/family (not resolved to species), richness/diversity (species-level only)
+  # rest on a thin slice of the catch. Threshold is the suite default 25% of
+  # individuals unresolved; the flagged rows are the unresolved catch itself.
+  pct_higher <- if (tot_ind > 0) 100 * sum(ind[!sl], na.rm = TRUE) / tot_ind else 0
+  if (pct_higher >= 25)
+    add("warn", sprintf("Coarse IDs: %.0f%% of the catch isn't named to species", pct_higher),
+        "coarse",
+        which(!sl),
+        sprintf("%.0f%% of the individuals here stop at genus or family (for example 'Bembidion sp.' or 'Carabidae'). Those are kept in total abundance but excluded from richness, diversity, the ordination and indicators, so the diversity story rests on the named slice. Worth knowing how much of the community is unresolved.", pct_higher))
+
+  # 3 (WARN) — one species swamps the catch. When a single species is >=60% of all
+  # named individuals, the community is very uneven; verify it isn't a sampling or
+  # ID artifact (e.g. a pitfall over-catching one fast surface hunter).
+  if (length(sp_ind)) {
+    top_sp <- names(sp_ind)[which.max(sp_ind)]
+    top_sh <- if (sum(sp_ind) > 0) 100 * max(sp_ind) / sum(sp_ind) else 0
+    if (top_sh >= 60)
+      add("warn", sprintf("One species is %.0f%% of the named catch (%s)", top_sh, top_sp),
+          "dominance",
+          which(sl & d$scientificName == top_sp),
+          sprintf("%s alone is %.0f%% of every named beetle caught here. Pitfall catch tracks activity x density, so a fast, large, surface-active hunter can swamp the trap without being that much more abundant. Read the diversity numbers with that in mind; the rows are every catch of this species.", top_sp, top_sh))
+  }
+
+  # 4 (WARN) — bouts missing trap-night effort. A plot x bout with catch but no
+  # trapnights can't be effort-normalised, so it's dropped from the per-trap-night
+  # denominator (counts still appear in totals). Flag the affected rows.
+  tn <- suppressWarnings(as.numeric(d$trapnights))
+  no_eff <- which((is.na(tn) | tn <= 0) & is.finite(ind) & ind > 0)
+  if (length(no_eff))
+    add("warn", "Catch with no trap-night effort", "noeffort", no_eff,
+        "These records have beetles counted but no usable trap-night effort, so they can't be turned into a catch-per-100-trap-nights rate and drop out of the effort-normalised metrics (they still count toward raw totals). A trapping record with no recorded effort is unusable for fair site comparison.")
+
+  # 5 (INFO) — genus/family-only identifications (transparency list). Distinct from
+  # the WARN threshold: this always lists the unresolved rows so they're inspectable
+  # even when the coarse share is modest.
+  add("info", "Genus / family-only identifications", "higher",
+      which(!sl),
+      "Rows left at genus or family rather than a species. They are kept in total abundance and listed here for transparency, but excluded from every richness-type metric (richness, Hill numbers, rarefaction, accumulation, ordination, indicators), so counting them as species can't inflate diversity.")
+
+  # 6 (INFO) — singleton-heavy tail. Many species seen as a single individual is a
+  # normal hallmark of under-sampling, not an error; it means richness is a minimum
+  # and the accumulation curve hasn't flattened. Flag the singleton species' rows.
+  if (length(sp_ind)) {
+    singles <- names(sp_ind)[sp_ind == 1]
+    if (length(singles) >= 5)
+      add("info", sprintf("%d species seen just once (singletons)", length(singles)),
+          "singletons",
+          which(sl & d$scientificName %in% singles),
+          sprintf("%d of the named species were each caught as a single individual. A long singleton tail is the normal fingerprint of an under-sampled community: richness here is a minimum, and more trapping would likely turn up more species. It is not a data error, just a note on how to read the richness number.", length(singles)))
+  }
+
+  # rank the flags high -> warn -> info for display
+  if (length(out$flags)) {
+    ord <- order(match(vapply(out$flags, function(f) f$level, ""), c("high", "warn", "info")))
+    out$flags <- out$flags[ord]
+  }
+  out
+}
+
+# Full QC report: every flagged row across all flags, bound into one frame.
+beetle_qc_report <- function(d) {
+  q <- beetle_qc(d); if (!length(q$sets)) return(NULL)
+  do.call(rbind, c(q$sets, list(make.row.names = FALSE)))
+}
+
+# ---------------------------------------------------------------------------
 # assemble_beetles() — turn a neonUtilities loadByProduct() result for
 # DP1.10022.001 into the app's tidy long schema:
 #   siteID, plotID, collectDate, taxonID, scientificName, taxonRank,

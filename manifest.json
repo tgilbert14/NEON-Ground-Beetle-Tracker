@@ -3072,8 +3072,11 @@
     }
   },
   "files": {
-    "R/report_pdf.R": {
-      "checksum": "bd04973944e4bad8d33c64c435c98ce3"
+    "data-sample/beetle_demo.csv": {
+      "checksum": "a9ad29c08cc66c6a45cafba55fb6b1dc"
+    },
+    "data-sample/env_demo.csv": {
+      "checksum": "7e335a0b4e978711168ca5aa677b3778"
     },
     "data/env/ABBY.rds": {
       "checksum": "7ab41721cc285cd950c65775f7c43658"
@@ -3213,14 +3216,8 @@
     "data/env/YELL.rds": {
       "checksum": "09eaf8b677d24ddcc48b6fa0e23e6040"
     },
-    "data-sample/env_demo.csv": {
-      "checksum": "7e335a0b4e978711168ca5aa677b3778"
-    },
-    "data-sample/beetle_demo.csv": {
-      "checksum": "a9ad29c08cc66c6a45cafba55fb6b1dc"
-    },
     "data/precomputed.rds": {
-      "checksum": "e107e9c5dbc54cba680dafe5db7c5a83"
+      "checksum": "d30bd19334f5f67fc44ae453e96f5bec"
     },
     "data/sites/ABBY.rds": {
       "checksum": "b9b195c9424444e72a12090ce5cd3807"
@@ -3361,22 +3358,28 @@
       "checksum": "1f4db8d5975b3ac812f98da68ca36951"
     },
     "global.R": {
-      "checksum": "bed4f3607f53dcafa182b7d4fc02cbd7"
+      "checksum": "216040e0b6333328eaa25520e1c5a6a0"
     },
     "R/helpers.R": {
-      "checksum": "b9708f583d850a778a38bae36879bda5"
+      "checksum": "6db5a6f32018c93011569f13c296335e"
+    },
+    "R/map_picker.R": {
+      "checksum": "0963262ca7c0e7aeb692f1ffb4f0f932"
+    },
+    "R/report_pdf.R": {
+      "checksum": "e12935fa6da6fe6965f378254a0813b1"
     },
     "R/site_metadata.R": {
-      "checksum": "181c615063347333767e494e0401d8ef"
+      "checksum": "0e921fadab6a64a4d4a9dbf5e06329bd"
     },
     "server.R": {
-      "checksum": "43d1a97ade2649cb48aa3442abca1d5e"
+      "checksum": "63cf41b18b2d8f23bc16006c7b41e89b"
     },
     "ui.R": {
-      "checksum": "4d18a710e2e782fdbcbd88a593318776"
+      "checksum": "ab66846d2852de129b5139d47b6ba50e"
     },
     "www/styles.css": {
-      "checksum": "274ff36d585150449b41ac0ef6de4144"
+      "checksum": "3e54dd77a9b68b8ca847ac8716702c3b"
     }
   },
   "users": null

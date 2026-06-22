@@ -98,19 +98,12 @@ tryCatch(source("scripts/precompute.R"),
          error = function(e) cat("  precompute FAILED:", conditionMessage(e), "\n"))
 
 if (requireNamespace("rsconnect", quietly = TRUE)) {
-  cat("Regenerating manifest.json (explicit appFiles; excludes scripts/ so neonUtilities stays out)…\n")
-  app_files <- c("global.R", "server.R", "ui.R",
-                 list.files("R",           full.names = TRUE, recursive = TRUE),
-                 list.files("www",         full.names = TRUE, recursive = TRUE),
-                 list.files("data",        full.names = TRUE, recursive = TRUE),
-                 list.files("data-sample", full.names = TRUE, recursive = TRUE))
-  app_files <- app_files[file.exists(app_files)]
-  tryCatch({
-    rsconnect::writeManifest(appDir = ".", appFiles = app_files)
-    cat(sprintf("  manifest.json regenerated (%d app files).\n", length(app_files)))
-  }, error = function(e) cat("  writeManifest FAILED:", conditionMessage(e), "\n"))
+  cat("Regenerating manifest.json via scripts/write_manifest.R (lean appFiles + hard gate)…\n")
+  # Defer to the single gated builder so the manifest is always written the same
+  # way AND the hard gate (stop on neonUtilities / arrow) runs on every refresh.
+  source("scripts/write_manifest.R")
 } else {
-  cat("rsconnect not installed — skipping manifest regen (run rsconnect::writeManifest() yourself).\n")
+  cat("rsconnect not installed — skipping manifest regen (run scripts/write_manifest.R yourself).\n")
 }
 
 cat("\nNext steps:\n")

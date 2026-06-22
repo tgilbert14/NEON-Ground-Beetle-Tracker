@@ -159,11 +159,17 @@ function(input, output, session) {
     # co-located environmental overlays for THIS site (reused from the mammal app)
     rv$env <- load_site_env(site)
     ch <- env_layer_choices(rv$env)
-    # default the overlay to the MOST-correlated driver at its best lag (the
-    # ranking's #1), so the env story shows on load instead of a blank "None".
-    rk0 <- tryCatch(env_corr_all(d, rv$env), error = function(e) NULL)
-    sel0 <- if (!is.null(rk0) && nrow(rk0)) rk0$layer[1] else "none"
-    lag0 <- if (!is.null(rk0) && nrow(rk0)) as.integer(rk0$lag[1]) else 0L
+    # Default the overlay to NONE. The driver dredge ranks the single best of
+    # ~n-drivers x 13-lags candidates, so auto-drawing the #1 hit on every load
+    # paints a correlation that is usually just the largest of many noise draws
+    # (p-hacking by default). Only pre-select a driver when the permutation null
+    # says the best-of-dredge link beats chance (p < 0.05); otherwise the user
+    # picks a driver deliberately and reads it as the lead-to-investigate it is.
+    rk0  <- tryCatch(env_corr_all(d, rv$env), error = function(e) NULL)
+    pv0  <- tryCatch(env_corr_pvalue(d, rv$env), error = function(e) NULL)
+    sig0 <- !is.null(pv0) && is.finite(pv0$p) && pv0$p < 0.05
+    sel0 <- if (sig0 && !is.null(rk0) && nrow(rk0)) rk0$layer[1] else "none"
+    lag0 <- if (sig0 && !is.null(rk0) && nrow(rk0)) as.integer(rk0$lag[1]) else 0L
     updateSelectInput(session, "envLayer", choices = ch, selected = if (sel0 %in% ch) sel0 else "none")
     updateSliderInput(session, "envLag", value = lag0)
     prog$set(value = 1, detail = "done")
@@ -259,10 +265,20 @@ function(input, output, session) {
   local({
     st <- picker_site_table
     if (!is.null(st) && nrow(st)) {
-      mx <- suppressWarnings(max(st$individuals, na.rm = TRUE)); if (!is.finite(mx) || mx <= 0) mx <- 1
-      pal <- leaflet::colorNumeric(c("#d6f3e4", "#36d98a", "#1f8a5a"), domain = c(0, mx), na.color = "#c9d3bb")
+      # Colour = total individuals, a heavy-tailed count one outlier (STER ~24.8k)
+      # washes out under a raw-linear ramp. Match the colour channel to the dot's
+      # log1p RADIUS channel: ramp over log1p(individuals) clamped to robust p5/p95
+      # so the bulk of sites spread across the full ramp and the single giant pins
+      # to the dark end instead of flattening everyone else to pale green.
+      iv  <- suppressWarnings(as.numeric(st$individuals)); iv[!is.finite(iv)] <- 0
+      liv <- log1p(iv)
+      ql  <- stats::quantile(liv[liv > 0], c(0.05, 0.95), na.rm = TRUE)
+      dom <- if (is.finite(diff(ql)) && diff(ql) > 0) as.numeric(ql) else range(liv)
+      pal <- leaflet::colorNumeric(c("#d6f3e4", "#36d98a", "#1f8a5a"),
+                                   domain = dom, na.color = "#c9d3bb")
+      pal_clamp <- function(x) pal(pmin(pmax(log1p(pmax(0, x)), dom[1]), dom[2]))
       mapPickerServer("picker", site_table = st, radius_metric = "richness",
-        color_fn = function(s) pal(ifelse(is.finite(s$individuals), s$individuals, 0)),
+        color_fn = function(s) pal_clamp(ifelse(is.finite(s$individuals), s$individuals, 0)),
         label_fn = function(r) sprintf(
           "<b>%s</b> · %s, %s<br><b>%s</b> species · <b>%s</b> individuals<br>dominant: <i>%s</i>%s",
           r$site, r$name %||% r$site, r$state %||% "", r$richness %||% "?",
@@ -451,6 +467,17 @@ function(input, output, session) {
       f_rm   <- file.path(tmp, "README.txt")
       utils::write.csv(out, f_data, row.names = FALSE, na = "")
       utils::write.csv(cb,  f_cb,   row.names = FALSE, na = "")
+      # second CSV: the co-located monthly environment (precip / temp / green-up,
+      # each with an _n coverage column), bundled with its own codebook rows, so a
+      # researcher can reproduce the env overlays alongside the beetle counts.
+      env_df  <- tryCatch(beetle_env_export(rv$env), error = function(e) NULL)
+      env_csv <- env_cb_csv <- NULL
+      if (!is.null(env_df) && nrow(env_df)) {
+        env_csv    <- file.path(tmp, paste0(base, "-environment.csv"))
+        env_cb_csv <- file.path(tmp, paste0(base, "-environment-codebook.csv"))
+        utils::write.csv(env_df, env_csv, row.names = FALSE, na = "")
+        utils::write.csv(beetle_env_codebook(env_df), env_cb_csv, row.names = FALSE, na = "")
+      }
       win <- tryCatch(as.character(as.Date(c(input$dateRange[1], input$dateRange[2]))),
                       error = function(e) c(NA, NA))
       writeLines(c(
@@ -468,6 +495,8 @@ function(input, output, session) {
         "-----",
         sprintf("%s.csv          tidy data, one row per plot x bout x taxon", base),
         sprintf("%s-codebook.csv column dictionary (name, type, units, definition)", base),
+        if (!is.null(env_csv)) sprintf("%s-environment.csv          co-located monthly env (precip / temp / green-up), one row per month", base) else NULL,
+        if (!is.null(env_csv)) sprintf("%s-environment-codebook.csv  column dictionary for the environment table", base) else NULL,
         "",
         "Method notes",
         "------------",
@@ -481,13 +510,96 @@ function(input, output, session) {
         "An educational data-exploration tool by Desert Data Labs. Not affiliated with",
         "NEON, Battelle, or the NSF."
       ), f_rm)
+      zip_files <- c(f_data, f_cb, env_csv, env_cb_csv, f_rm)
+      zip_files <- zip_files[!vapply(zip_files, is.null, logical(1))]
       ok <- tryCatch({
-        utils::zip(file, files = c(f_data, f_cb, f_rm), flags = "-j -q")
+        utils::zip(file, files = zip_files, flags = "-j -q")
         file.exists(file) && file.size(file) > 0
       }, error = function(e) FALSE)
       if (!isTRUE(ok)) utils::write.csv(out, file, row.names = FALSE, na = "")  # last-ditch
     }
   )
+
+  # ---- QC: data-quality review flags (site-level) -------------------------
+  # Ranked "verify, not wrong" flags + the exact offending rows. Each flag is
+  # clickable -> an inspector table; per-flag CSV + full QC-report CSV download.
+  # Green reassurance on the clean path. Mirrors the bird/mosquito QC contract.
+  qc_rx <- reactive({ d <- rv$data; req(d); beetle_qc(d) })
+  qc_icon <- function(level) switch(level,
+    high = "exclamation-octagon-fill", warn = "exclamation-triangle-fill",
+    info = "info-circle-fill", "check-circle-fill")
+
+  output$qcReview <- renderUI({
+    d <- rv$data; req(d)
+    q <- qc_rx(); qf <- q$flags
+    flags_ui <- if (length(qf))
+      tagList(
+        div(class = "qc-flags", lapply(qf, function(f) div(
+          class = paste0("qc-flag qc-flag-", f$level, " qc-flag-click"),
+          role = "button", tabindex = "0",
+          onclick = sprintf("Shiny.setInputValue('beetleQcInspect','%s',{priority:'event'})", f$key),
+          onkeydown = sprintf("if(event.key==='Enter'||event.key===' '){Shiny.setInputValue('beetleQcInspect','%s',{priority:'event'});}", f$key),
+          bs_icon(qc_icon(f$level)),
+          div(class = "qcf-body",
+            div(class = "qcf-title", f$title, tags$span(class = "qcf-n", f$n)),
+            div(class = "qcf-detail", f$detail)),
+          tags$span(class = "qcf-go", bs_icon("chevron-right"))))),
+        div(class = "qcf-hint", bs_icon("hand-index-thumb"),
+            " Tap a flag to list the exact records behind it."),
+        div(class = "qc-toolbar",
+          downloadButton("qcReportCsv", "Download QC report (CSV)", class = "btn-outline-secondary btn-sm")),
+        uiOutput("beetleQcInspector"))
+    else
+      div(class = "qc-flag qc-flag-ok", bs_icon("check-circle-fill"),
+        div(class = "qcf-body",
+          div(class = "qcf-title", "No data-quality flags for this site"),
+          div(class = "qcf-detail",
+            "The dominant species is native, IDs are mostly resolved to species, effort is recorded, and no single species swamps the catch. Nothing here needs a second look.")))
+    div(class = "qc-review",
+      div(class = "qc-section-h", bs_icon("clipboard-check"), " Data-quality review flags ",
+        tags$span(class = "qcf-sub", "\U00B7 verify, not errors")),
+      flags_ui)
+  })
+
+  output$beetleQcInspector <- renderUI({
+    key <- input$beetleQcInspect; q <- qc_rx()
+    req(!is.null(key), key %in% names(q$sets))
+    st <- q$sets[[key]]; req(!is.null(st), nrow(st))
+    f  <- Filter(function(x) x$key == key, q$flags)[[1]]
+    show <- intersect(c("siteID", "plotID", "collectDate", "year", "taxonID",
+      "scientificName", "taxonRank", "species_level", "individualCount", "trapnights"), names(st))
+    head_n <- min(nrow(st), 200L); sv <- st[seq_len(head_n), show, drop = FALSE]
+    div(class = "qc-inspector",
+      div(class = "qci-head", bs_icon(qc_icon(f$level)),
+        tags$b(sprintf(" %s \U00B7 %d record%s", f$title, f$n, if (f$n == 1) "" else "s")),
+        downloadButton("qcSubsetCsv", "Download these", class = "btn-outline-secondary btn-sm qci-dl")),
+      div(class = "qc-cap-scroll", tags$table(class = "inspect-tbl",
+        tags$thead(tags$tr(lapply(show, tags$th))),
+        tags$tbody(lapply(seq_len(nrow(sv)), function(i)
+          tags$tr(lapply(show, function(cc) tags$td(format(sv[[cc]][i])))))))),
+      if (nrow(st) > head_n)
+        p(class = "qc-cap-note", sprintf("Showing first %d of %d. Download for the full list.", head_n, nrow(st))))
+  })
+
+  output$qcSubsetCsv <- downloadHandler(
+    filename = function() sprintf("NEON-beetles_QC-%s_%s_%s.csv",
+      input$beetleQcInspect %||% "flag", rv$siteCode %||% "site", format(Sys.Date(), "%Y%m%d")),
+    content = function(file) {
+      q <- qc_rx(); st <- q$sets[[input$beetleQcInspect]]; req(!is.null(st))
+      st <- cbind(site = rv$siteCode %||% NA_character_,
+                  flag = input$beetleQcInspect %||% NA_character_, st)
+      utils::write.csv(st, file, row.names = FALSE, na = "")
+    }, contentType = "text/csv")
+
+  output$qcReportCsv <- downloadHandler(
+    filename = function() sprintf("NEON-beetles_QC-report_%s_%s.csv",
+      rv$siteCode %||% "site", format(Sys.Date(), "%Y%m%d")),
+    content = function(file) {
+      rep <- beetle_qc_report(rv$data)
+      if (is.null(rep)) rep <- data.frame(note = "No data-quality flags for this site.")
+      else rep <- cbind(site = rv$siteCode %||% NA_character_, rep)
+      utils::write.csv(rep, file, row.names = FALSE, na = "")
+    }, contentType = "text/csv")
 
   # "answer up front" banner for the Overview — the community-composition story
   output$overviewVerdict <- renderUI({
@@ -511,10 +623,18 @@ function(input, output, session) {
     ct <- ct_rx(); if (is.null(ct) || !nrow(ct)) return(note_plot("No community data"))
     ct <- ct[ct$species_level %in% TRUE, , drop = FALSE]   # name species, not genera
     if (!nrow(ct)) return(note_plot("No species-level identifications yet"))
+    # Cap the bar list to the top species so a long tail of singletons doesn't
+    # squash every bar into a hairline. The remaining species are pooled into one
+    # on-figure note (they are still in the diversity metrics + the data export).
+    TOPN <- 25L
+    ct <- ct[order(dplyr::desc(ct$individuals)), , drop = FALSE]
+    n_more <- max(0L, nrow(ct) - TOPN)
+    more_ind <- if (n_more > 0) sum(ct$individuals[(TOPN + 1):nrow(ct)]) else 0
+    ct <- utils::head(ct, TOPN)
     ct <- ct[order(ct$individuals), ]   # plotly bars: bottom = first
     pal <- rv$pal
     cols <- unname(pal[ct$scientificName]); cols[is.na(cols)] <- DDL$forest
-    plot_ly(ct, x = ~individuals, y = ~factor(scientificName, levels = scientificName),
+    p <- plot_ly(ct, x = ~individuals, y = ~factor(scientificName, levels = scientificName),
             type = "bar", orientation = "h",
             marker = list(color = cols),
             text = ~paste0(cpn, " /100TN"), textposition = "outside",
@@ -524,10 +644,17 @@ function(input, output, session) {
       plotly_theme(legend = FALSE) %>%
       plotly::layout(xaxis = list(title = "individuals"),
                      yaxis = list(title = "", automargin = TRUE),  # fits names; shrinks on phones
-                     margin = list(l = 10, r = 70)) %>%             # r: room for outside /100TN labels
+                     margin = list(l = 10, r = 70, b = if (n_more > 0) 56 else 40)) %>%
       plotly::add_annotations(text = rv$ctx, x = 1, y = 1.04, xref = "paper", yref = "paper",
         xanchor = "right", showarrow = FALSE,
         font = list(color = if (is_dark()) "#9fb0a6" else "#6b7a89", size = 11))
+    if (n_more > 0)
+      p <- p %>% plotly::add_annotations(
+        text = sprintf("+ %d more species pooled (%s individuals) \U2014 all are in the diversity tab and the data export",
+                       n_more, fmt_int(more_ind)),
+        x = 0, y = -0.12, xref = "paper", yref = "paper", xanchor = "left", showarrow = FALSE,
+        font = list(color = if (is_dark()) "#9fb0a6" else "#6b7a89", size = 11.5))
+    p
   })
 
   output$meetBeetles <- renderUI({
@@ -713,7 +840,7 @@ function(input, output, session) {
                 line = list(width = 0), showlegend = FALSE, hoverinfo = "skip") %>%
       add_trace(x = rc$n, y = rc$lo, type = "scatter", mode = "lines", fill = "tonexty",
                 fillcolor = "rgba(19,99,43,0.14)", line = list(width = 0),
-                name = "±1 SD", hoverinfo = "skip") %>%
+                name = "approximate \U00B11 SD", hoverinfo = "skip") %>%
       add_trace(x = rc$n, y = rc$richness, type = "scatter", mode = "lines",
                 line = list(color = "#36d98a", width = 3), name = "expected species",
                 hovertemplate = "%{x} individuals<br>%{y:.1f} species<extra></extra>") %>%
@@ -1098,18 +1225,22 @@ function(input, output, session) {
     o <- ORDINATION
     if (is.null(o) || nrow(o) < 4)
       return(note_plot("Not enough sites/samples to ordinate<br><span style='font-size:13px'>Bundle more sites with scripts/refresh_data.R</span>"))
-    pal <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(8, "Dark2"))(length(unique(o$site)))
-    pal <- stats::setNames(pal, sort(unique(o$site)))
+    # Colour by BIOME (a handful of CVD-safe classes), not by 46 indistinguishable
+    # site hues. Carabid communities cluster by biome, so colouring the cloud by
+    # ecosystem makes that the legible story; the site is still in the hover.
+    o$biome <- site_biome(o$site)
     ve <- attr(o, "var_explained")
+    classes <- intersect(names(BIOME_COLORS), unique(o$biome))   # legend in palette order
     p <- plot_ly()
-    for (s in sort(unique(o$site))) {
-      os <- o[o$site == s, ]
-      p <- p %>% add_trace(data = os, x = ~x, y = ~y, type = "scatter", mode = "markers",
-        name = s, marker = list(size = 9, color = pal[[s]], opacity = 0.8,
+    for (b in classes) {
+      ob <- o[o$biome == b, ]
+      p <- p %>% add_trace(data = ob, x = ~x, y = ~y, type = "scatter", mode = "markers",
+        name = b, marker = list(size = 9, color = unname(BIOME_COLORS[b]), opacity = 0.8,
                                 line = list(color = "#fff", width = 1)),
-        hovertemplate = paste0("<b>", s, "</b><br>%{text}<extra></extra>"), text = ~sample)
+        hovertemplate = paste0("<b>%{text}</b><br>", b, "<extra></extra>"), text = ~site)
     }
     plotly_theme(p) %>% plotly::layout(
+      legend = list(title = list(text = "biome")),
       xaxis = list(title = if (!is.na(ve[1])) sprintf("PCoA 1 (%d%%)", ve[1]) else "PCoA 1"),
       yaxis = list(title = if (!is.na(ve[2])) sprintf("PCoA 2 (%d%%)", ve[2]) else "PCoA 2"))
   })
@@ -1169,6 +1300,7 @@ function(input, output, session) {
                 tags$b("inflates richness and diversity"), ", so all richness-type metrics (richness, Hill numbers, rarefaction, accumulation, ordination, indicator species) use ",
                 tags$b("species-level records only"), ". Total ", tags$b("abundance"),
                 " still counts every beetle trapped. The Diversity tab shows exactly how many records this excludes."),
+        tags$li(tags$b("How current is this?"), " NEON publishes ground-beetle records after the specimens are sorted and an expert taxonomist confirms the IDs, so the most recent year or two of trapping is usually not in the data yet. The latest season you see here lags real time by about two years. A site looking quiet at the end of its record often just means those bouts have not been published, not that the beetles vanished."),
         tags$li("Hill numbers (Hill 1973; Jost 2006); Hurlbert (1971) rarefaction; Gotelli & Colwell (2001) accumulation; Dufrêne & Legendre (1997) indicator value; NEON ground-beetle sampling design (Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744)."),
         tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs"),
                 " and normalise the 2018 trap-count and 2023 plot-count protocol changes via per-trap-night effort."),
@@ -1186,7 +1318,46 @@ function(input, output, session) {
             sprintf(" All %d bundled sites use real NEON records (DP1.10022.001).",
                     if (!is.null(SITE_INDEX)) nrow(SITE_INDEX) else 0L))
       }),
+      div(style = "margin-top:18px",
+        actionButton("methodsModalBtn",
+          tagList(bs_icon("info-circle"), " Methods & sources"),
+          class = "btn-outline-secondary btn-sm")),
+      # ---- Part of the NEON suite: in-app sibling links --------------------
+      div(class = "suite-block",
+        h4(class = "suite-h", bs_icon("grid-3x3-gap-fill"), " Part of the NEON suite"),
+        p(class = "suite-lead", "Sibling explorers from Desert Data Labs, each built on a different NEON dataset. They all share this look and the same honest-numbers approach."),
+        div(class = "suite-grid",
+          lapply(SUITE_SIBLINGS, function(s)
+            tags$a(class = "suite-card", href = s$url, target = "_blank", rel = "noopener",
+              tags$span(class = "suite-emoji", s$emoji),
+              div(class = "suite-card-body",
+                div(class = "suite-name", s$name, bs_icon("box-arrow-up-right")),
+                div(class = "suite-blurb", s$blurb)))))),
       p(style = "margin-top:16px", "An educational data-exploration tool by Desert Data Labs. Not affiliated with NEON, Battelle, or the NSF.")
     )
+  })
+
+  # ---- "Methods & sources" modal (single (i) for the methods + references) --
+  observeEvent(input$methodsModalBtn, {
+    showModal(modalDialog(
+      title = HTML("\U0001FAB2 Methods &amp; sources"),
+      easyClose = TRUE, size = "l", footer = modalButton("Close"),
+      div(class = "about",
+        h4("How the numbers are built"),
+        tags$ul(
+          tags$li(tags$b("Effort-normalised catch."), " Counts are expressed as catch per 100 trap-nights (effort = the sum of unique plot x bout trap-night totals), so sites and windows with different sampling effort compare fairly. This also absorbs NEON's protocol changes (4 to 3 traps per plot in 2018; 10 to 6 plots per site in 2023)."),
+          tags$li(tags$b("Species vs. higher taxa."), " Not every beetle is named to species. Records left at genus or family are kept in total abundance but excluded from every richness-type metric, so they can't inflate diversity. The split is driven by NEON's expert-taxonomist rank where present."),
+          tags$li(tags$b("Diversity."), " Hill numbers (Hill 1973; Jost 2006); individual-based rarefaction with an approximate analytic SD (Hurlbert 1971; Heck et al. 1975); sample-based accumulation averaged over random bout orders (Gotelli & Colwell 2001)."),
+          tags$li(tags$b("Biogeography."), " A Bray-Curtis PCoA places each site x year community, coloured by biome; indicator species use the Dufrene-Legendre IndVal (1997)."),
+          tags$li(tags$b("Environment overlays."), " For each co-located NEON driver we deseasonalise both series and scan lags 0 to 12 months, then a permutation null asks whether the best-of-dredge correlation beats chance before any verdict is shown. The overlay defaults to None so nothing is drawn until the link is real or you pick a driver yourself."),
+          tags$li(tags$b("How current is this?"), " NEON publishes ground-beetle records after specimens are sorted and an expert taxonomist confirms the IDs, so the most recent year or two of trapping is usually not in the data yet. A quiet-looking end of a record often just means those bouts have not been published.")),
+        h4("References"),
+        tags$ul(class = "ref-list",
+          tags$li("Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744 (NEON ground-beetle design)."),
+          tags$li("Hill 1973; Jost 2006 (Hill numbers); Hurlbert 1971; Heck et al. 1975 (rarefaction)."),
+          tags$li("Gotelli & Colwell 2001 (accumulation); Dufrene & Legendre 1997 (indicator value)."),
+          tags$li("Bousquet 2012; Lindroth 1961-69 (introduced European carabids)."),
+          tags$li(tags$a(href = "https://data.neonscience.org/data-products/DP1.10022.001", target = "_blank",
+                         "NEON DP1.10022.001, Ground beetles sampled from pitfall traps")))) ))
   })
 }

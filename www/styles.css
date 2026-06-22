@@ -76,6 +76,20 @@ body {
   box-shadow: 0 4px 16px rgba(19,99,43,.10); }
 .map-picker-wrap .leaflet-container { background: var(--paper); }
 
+/* picker map legend — size = richness, colour = catch (matches the leaflet dots) */
+.picker-legend { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center;
+  margin: 10px 0 2px; font-size: 12px; color: var(--muted); }
+.picker-legend .pl-h { font-weight: 600; color: var(--ink); margin-bottom: 4px; font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .03em; }
+.pl-size { display: flex; align-items: center; gap: 7px; }
+.pl-dot { display: inline-block; border-radius: 50%; background: #2f9e55;
+  border: 1.4px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.pl-d1 { width: 8px; height: 8px; } .pl-d2 { width: 13px; height: 13px; } .pl-d3 { width: 19px; height: 19px; }
+.pl-lab { margin-left: 6px; }
+.pl-ramp { width: 150px; height: 11px; border-radius: 6px;
+  background: linear-gradient(90deg, #d6f3e4, #36d98a, #1f8a5a); }
+.pl-ramp-labs { display: flex; justify-content: space-between; margin-top: 3px; }
+
 /* ---- "Browse all 46 sites" — closed-by-default text fallback to the map ---- */
 .picker-list { margin: 14px auto 0; max-width: 920px; text-align: left; }
 /* kill the native disclosure triangle so our chevron is the only marker */
@@ -398,6 +412,71 @@ body {
   background: var(--forest) !important; color: #fff !important; border-color: transparent !important; }
 
 /* ====================================================================== *
+ *  QC review flags — clickable "verify, not wrong" cards + inspector.     *
+ *  Standard suite classes (.qc-flag-<level>), beetle-themed surfaces.     *
+ * ====================================================================== */
+.qc-review { margin-top: 4px; }
+.qc-section-h { font-weight: 800; font-size: 12.5px; color: var(--forest);
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.qcf-sub { font-weight: 500; font-size: 12px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.qc-flags { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 2px; }
+.qc-flag { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px;
+  border-left: 4px solid var(--line); border-radius: 10px; background: var(--bg); }
+.qc-flag > .bi { flex: 0 0 auto; margin-top: 2px; font-size: 15px; }
+.qc-flag-high { border-left-color: #d94f7a; background: #fdecf1; color: #7a1d3a; }
+.qc-flag-warn { border-left-color: var(--gold); background: #fff6e0; color: #6b5300; }
+.qc-flag-info { border-left-color: var(--sky); background: #eef5f6; color: #1d4a51; }
+.qc-flag-ok   { border-left-color: var(--green); background: #e8f5ec; color: #1a5e2e; }
+.qc-flag-click { cursor: pointer; transition: transform .1s ease, box-shadow .1s ease; }
+.qc-flag-click:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(19,99,43,.12); }
+.qc-flag-click:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+.qcf-body { flex: 1 1 auto; min-width: 0; }
+.qcf-title { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.qcf-n { font-size: 11px; font-weight: 800; color: #fff; background: rgba(0,0,0,.45);
+  border-radius: 999px; padding: 1px 8px; }
+.qcf-detail { font-size: 12px; line-height: 1.42; margin-top: 3px; opacity: .94; }
+.qcf-go { flex: 0 0 auto; opacity: .5; align-self: center; }
+.qcf-hint { font-size: 11.5px; color: var(--muted); margin: 8px 2px 0;
+  display: flex; align-items: center; gap: 5px; }
+.qc-toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 2px; align-items: center; }
+.qc-inspector { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--paper); padding: 12px 14px; }
+.qci-head { display: flex; align-items: center; gap: 8px; font-size: 13.5px; margin-bottom: 8px; flex-wrap: wrap; }
+.qci-dl { margin-left: auto; }
+.qc-cap-scroll { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.qc-cap-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.inspect-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.inspect-tbl th { text-align: left; color: var(--muted); font-weight: 700; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .3px; padding: 6px 9px; position: sticky; top: 0; background: var(--paper); }
+.inspect-tbl td { padding: 5px 9px; border-top: 1px solid var(--line); white-space: nowrap; }
+.inspect-tbl tbody tr:hover { background: rgba(31,138,90,.05); }
+[data-bs-theme="dark"] .qc-flag { background: var(--paper); }
+[data-bs-theme="dark"] .qc-flag-high { background: #3a1626; color: #f3acc4; }
+[data-bs-theme="dark"] .qc-flag-warn { background: #352c12; color: #ecd28a; }
+[data-bs-theme="dark"] .qc-flag-info { background: #16302f; color: #9fd5cf; }
+[data-bs-theme="dark"] .qc-flag-ok   { background: #1d3216; color: #b8e89a; }
+[data-bs-theme="dark"] .qc-inspector { background: rgba(255,255,255,0.03); }
+[data-bs-theme="dark"] .inspect-tbl th { background: #12241a; }
+
+/* in-app sibling links — "Part of the NEON suite" */
+.suite-block { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
+.suite-h { display: flex; align-items: center; gap: 8px; color: var(--forest); font-weight: 800; }
+.suite-lead { font-size: 13px; color: var(--muted); margin: 2px 0 12px; max-width: 640px; }
+.suite-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.suite-card { display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
+  text-decoration: none; color: var(--ink); transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease; }
+.suite-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(19,99,43,.12);
+  border-color: var(--forest); }
+.suite-emoji { font-size: 22px; line-height: 1; flex: 0 0 auto; }
+.suite-name { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 6px; }
+.suite-name .bi { font-size: 11px; opacity: .55; }
+.suite-blurb { font-size: 12px; color: var(--muted); line-height: 1.38; margin-top: 2px; }
+.ref-list li { font-size: 12.5px; }
+[data-bs-theme="dark"] .suite-card { background: var(--paper); }
+
+/* ====================================================================== *
  *  PREMIUM DESERT-NIGHT layer — command-band hero, starfield, sheen, and  *
  *  DARK "info-box" stat surfaces on the LIGHT page (the cascade look).    *
  *  Every animation is prefers-reduced-motion gated at the bottom.        *
@@ -518,4 +597,6 @@ body {
   .splash-guide .sg-mascot .mascot, .splash-guide .sg-mascot .mascot-ear-l, .splash-guide .sg-mascot .mascot-ear-r,
   .splash-guide .sg-mascot .mascot-eyes, .splash-guide.wave .sg-mascot { animation:none !important; }
   .mascot-cheer { display:none; }
+  .qc-flag-click, .suite-card { transition: none !important; }
+  .qc-flag-click:hover, .suite-card:hover { transform: none !important; }
 }
