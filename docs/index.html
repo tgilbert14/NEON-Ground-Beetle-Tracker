@@ -172,7 +172,7 @@
     .frung + .frung { margin-top:10px }
     .frung::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.0;
       background:linear-gradient(100deg, transparent, rgba(var(--lrgb),.16), transparent); }
-    .frung.pip-on::before { animation: pip 2.4s ease-in-out; }     /* energy pulse sweeps each rung in turn */
+    .frung.pip-on::before { animation: pip 3.2s ease-in-out; }     /* energy pulse sweeps each rung in turn (slowed) */
     @keyframes pip { 0%{opacity:0; transform:translateX(-30%)} 40%{opacity:1} 100%{opacity:0; transform:translateX(30%)} }
     .frung .fmark { width:34px; height:34px; flex:0 0 auto; border-radius:9px; position:relative;
       background:rgba(var(--lrgb),.16); border:1px solid rgba(var(--lrgb),.5) }
@@ -180,10 +180,13 @@
       background:var(--lc); box-shadow:0 0 12px var(--lc) }
     .frung .ftxt b { font-weight:800; font-size:1rem } .frung .ftxt span { color:var(--dim); font-size:.86rem }
     .frung.r1 { --lc:var(--clim); --lrgb:110,240,176 }
-    .frung.r2 { --lc:var(--phen); --lrgb:54,217,138; margin-left:14px }
-    .frung.r3 { --lc:var(--prod); --lrgb:47,174,122; margin-left:28px }
-    .frung.r4 { --lc:var(--cons); --lrgb:217,138,60; margin-left:42px }
-    .farrow { color:rgba(255,255,255,.32); text-align:center; margin:2px 0 2px 17px; font-size:1.05rem }
+    .frung.r2 { --lc:var(--phen); --lrgb:54,217,138 }
+    .frung.r3 { --lc:var(--prod); --lrgb:47,174,122 }
+    .frung.r4 { --lc:var(--cons); --lrgb:217,138,60 }
+    .frung.r5 { --lc:var(--clim); --lrgb:110,240,176 }
+    .frung.r6 { --lc:var(--phen); --lrgb:54,217,138 }
+    .cascade-band .hl-head { margin-top:30px }
+    .lead a { color:var(--bright); text-decoration:underline; text-underline-offset:2px; text-decoration-thickness:1px }
 
     /* ---------- stats + about ---------- */
     .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:26px 0 0; position:relative; z-index:2 }
@@ -312,12 +315,7 @@
 
       <div class="eyebrow">The NEON Explorer Suite · Consumers</div>
       <h1>NEON Ground Beetle Tracker</h1>
-      <p class="lead">Explore the <b>ground beetles</b> caught in cup traps set in the soil at research sites
-        across the country. NEON, the National Ecological Observatory Network, is a set of sites funded by the
-        National Science Foundation that measure plants, animals, and climate the same way everywhere, year
-        after year. Ground beetles are easy to catch and quick to react to their surroundings, so they are a
-        handy gauge of a site's health. See how many kinds of beetle live at a site, which ones are most
-        common, and how the mix shifts by season and region.</p>
+      <p class="lead">A Shiny web app for exploring the <a href="https://www.neonscience.org/" target="_blank" rel="noopener">National Ecological Observatory Network</a>'s ground beetle (Carabidae) data, caught in cup traps sunk in the soil. It turns real records from 46 field sites, prairie to forest to desert, into community rankings, diversity profiles, seasonal activity, multi-year trends, and a map of who lives where, with every count expressed as catch per 100 trap-nights so sites and seasons compare fairly. Ground beetles react fast to habitat and climate, which makes them a handy gauge of a site's health.</p>
 
       <div class="cta-row">
         <a id="launch" class="launch" href="https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/">
@@ -353,18 +351,18 @@
   <!-- how the tracker reads: pitfall trap -> identify -> activity-density -> diversity -->
   <section class="cascade-band">
     <div class="wrap">
-      <span class="kick">What this shows you</span>
-      <h2>From one trap to a whole community.</h2>
-      <p>Every number starts with a beetle in a cup trap. The app follows the same four steps in order, the same
-        way at every NEON site, and shows the math behind each one.</p>
+      <span class="kick">What it does</span>
+      <p>The app opens to a national map of NEON sites. Pick one and it loads instantly from a per-site data bundle that ships with the app (no network round-trip), with the date window snapped to that site's real coverage. From there it ranks the community by abundance, profiles diversity, charts seasonal activity and multi-year trends, places every site in community space, and names each site's signature beetles. Tap a map marker to jump there, choose a second site to compare a prairie next to a forest, or hit Surprise me for a random site.</p>
+      <p>It is built for two audiences: anyone curious about how NEON samples ground beetles, and new field technicians getting to know the carabids at their site.</p>
+
+      <h2 class="hl-head">Highlights</h2>
       <div class="flow" data-flow>
-        <div class="frung r1"><span class="fmark"></span><span class="ftxt"><b>Cup trap</b> &middot; <span>a cup sunk in the ground catches beetles that walk by</span></span></div>
-        <div class="farrow" aria-hidden="true">&darr;</div>
-        <div class="frung r2"><span class="fmark"></span><span class="ftxt"><b>Identify</b> &middot; <span>each beetle named down to its species</span></span></div>
-        <div class="farrow" aria-hidden="true">&darr;</div>
-        <div class="frung r3"><span class="fmark"></span><span class="ftxt"><b>How busy</b> &middot; <span>catch per 100 trap-nights, so sites compare fairly</span></span></div>
-        <div class="farrow" aria-hidden="true">&darr;</div>
-        <div class="frung r4"><span class="fmark"></span><span class="ftxt"><b>How varied</b> &middot; <span>how many kinds live there, compared across sites</span></span></div>
+        <div class="frung r1"><span class="fmark"></span><span class="ftxt"><b>Overview</b> &middot; <span>The carabid community ranked by abundance and catch per 100 trap-nights, plus "meet the beetles" natural-history cards.</span></span></div>
+        <div class="frung r2"><span class="fmark"></span><span class="ftxt"><b>Diversity</b> &middot; <span>Hill numbers (q0/q1/q2 effective species), Hurlbert rarefaction at equal sample size, and species accumulation across bouts.</span></span></div>
+        <div class="frung r3"><span class="fmark"></span><span class="ftxt"><b>Seasonality</b> &middot; <span>Activity-density by month (catch per 100 trap-nights), overall or split by the top species to reveal each one's peak.</span></span></div>
+        <div class="frung r4"><span class="fmark"></span><span class="ftxt"><b>Trends</b> &middot; <span>Inter-annual catch-per-effort with a fitted trend line and a plain-English verdict (rising, declining, or flat, with %/yr and p-value).</span></span></div>
+        <div class="frung r5"><span class="fmark"></span><span class="ftxt"><b>Biogeography</b> &middot; <span>A national map sized by richness or a chosen species' abundance, a Bray-Curtis community ordination, and an indicator-species table naming each site's signature beetles.</span></span></div>
+        <div class="frung r6"><span class="fmark"></span><span class="ftxt"><b>Compare two sites</b> &middot; <span>Overlay any second site on the Diversity and Seasonality charts to read one place against another.</span></span></div>
       </div>
 
       <div class="stats">
@@ -479,7 +477,7 @@
         // force reflow so the animation restarts each cycle
         void el.offsetWidth; el.classList.add("pip-on");
         i++;
-      }, 900);
+      }, 1800);
     })();
   </script>
   <script>
