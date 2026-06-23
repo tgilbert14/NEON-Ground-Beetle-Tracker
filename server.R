@@ -977,14 +977,31 @@ function(input, output, session) {
     if (is.null(rk) || !nrow(rk)) return(note_plot("Not enough overlapping months<br>to rank drivers here", "\U0001F326"))
     rk <- rk[order(abs(rk$r)), ]
     cols <- vapply(seq_len(nrow(rk)), function(i) ec_corr_color(rk$layer[i], rk$r[i], is_dark()), character(1))
+    # customdata=~layer + source="envrank" so a bar click can drive the overlay to
+    # THAT driver (the observeEvent below snaps envLayer, whose own cascade then
+    # snaps envLag to the driver's best lag). event_register arms the click stream.
     plot_ly(rk, x = ~r, y = ~factor(label, levels = label), type = "bar", orientation = "h",
+            source = "envrank", customdata = ~layer,
             marker = list(color = cols),
             text = ~sprintf("r=%.2f · lag %d", r, lag), textposition = "outside",
             hovertemplate = ~paste0("<b>", label, "</b><br>r = ", r, " at ", lag,
-              "-mo lag<br>n = ", n, " months<extra></extra>")) %>%
+              "-mo lag<br>n = ", n, " months<br><i>click to overlay this driver</i><extra></extra>")) %>%
       plotly_theme(legend = FALSE) %>%
+      plotly::event_register("plotly_click") %>%
       plotly::layout(xaxis = list(title = "deseasonalized correlation r (−1…+1)", range = c(-1, 1), zeroline = TRUE),
                      yaxis = list(title = "", automargin = TRUE), margin = list(l = 10, r = 78))
+  })
+
+  # Clicking a driver bar drives the headline + overlay to THAT driver (BE2). The
+  # envLayer cascade above (ignoreInit) then snaps envLag to its best lag, and we
+  # pop open the advanced overlay <details> so the user sees the curve appear.
+  observeEvent(event_data("plotly_click", source = "envrank"), {
+    ev <- event_data("plotly_click", source = "envrank")
+    k <- ev$customdata
+    if (!is.null(k) && length(k) && !is.na(k) && nzchar(k)) {
+      updateSelectInput(session, "envLayer", selected = k)
+      shinyjs::runjs("var d=document.querySelector('.env-overlay-details'); if(d) d.open=true;")
+    }
   })
 
   # switching the overlay driver snaps the lag slider to THAT driver's best match
@@ -1056,6 +1073,34 @@ function(input, output, session) {
             if (!is.null(ptxt)) paste0(" \U00B7 ", ptxt) else ""))),
         tags$span(class = paste("ec-meta ec-dir", if (pos) "ec-sgn-pos" else "ec-sgn-neg"),
           HTML(sprintf("higher \U2192 <b>%s</b> beetles", dir)))))
+  })
+
+  # The DEMOTED dredge block (BE4): the static #envDredgeBlock in ui.R holds the
+  # headline (envCorrNote) + bars (envDriverRank) below the prior-first seasonal
+  # read, already framed by the "exploratory best-of-52" eyebrow + honest popover.
+  # Here we (a) fill the sub-label and (b) DIM the whole block when the permutation
+  # isn't significant, so a reader can't mistake a big grey r for a finding. We use
+  # the SAME not_sig gate (env_pval, p >= 0.05) the headline already uses — env_corr_pvalue
+  # and the permutation null are untouched.
+  env_dredge_notsig <- reactive({
+    pv <- env_pval()
+    !is.null(pv) && is.finite(pv$p) && pv$p >= 0.05
+  })
+  observe({
+    rk <- env_rank()
+    shinyjs::toggleClass("envDredgeBlock", "env-dredge-muted",
+                         condition = !is.null(rk) && nrow(rk) > 0 && isTRUE(env_dredge_notsig()))
+  })
+  output$envDredgeSub <- renderUI({
+    rk <- env_rank(); if (is.null(rk) || !nrow(rk)) return(NULL)
+    if (isTRUE(env_dredge_notsig()))
+      div(class = "env-dredge-sub env-dredge-sub-muted",
+          bs_icon("exclamation-triangle"),
+          " This search did not beat chance (shuffle test p \U2265 0.05), so the match below is most likely noise, dimmed here as a reminder.")
+    else
+      div(class = "env-dredge-sub",
+          bs_icon("info-circle"),
+          " A best-of-52 driver \U00D7 lag search. Strongest match shown, so read it as a lead to chase, not a result.")
   })
 
   # ---- Seasonal climate: the cascade read (the desert/degree-day fix) -------
