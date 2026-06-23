@@ -39,7 +39,21 @@ ui <- bslib::page_fillable(
       # celebration: a beetle hops up + fades on a legendary find (no confetti in this app — exposed for parity/future use)
       "window.mascotCheer=function(big){try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;var src=document.querySelector('#bootOverlay .mascot')||document.querySelector('.sg-mascot .mascot');if(!src)return;var wrap=document.createElement('div');wrap.className='mascot-cheer';wrap.appendChild(src.cloneNode(true));document.body.appendChild(wrap);setTimeout(function(){if(wrap.parentNode){wrap.parentNode.removeChild(wrap);}},1700);}catch(e){}};",
       "jQuery(document).one('shiny:idle',function(){hideOv();showWelcome();waveMascot();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
-      "}init();})();"))
+      "}init();})();")),
+    # Robust boot-overlay dismiss — vanilla JS, NO jQuery / shiny:idle dependency, so
+    # the "Waking up the Ground Beetle Tracker..." overlay can NEVER stick (the path
+    # above could hang if shiny:idle never fired or window.jQuery was late, leaving
+    # init() spinning). Mirrors the flagship Small Mammal loader: dismiss the moment
+    # real content (the picker map or hero stats) renders, with a hard fallback timer
+    # registered IMMEDIATELY so it is guaranteed to run regardless of Shiny/jQuery.
+    tags$script(HTML(paste0(
+      "(function(){var done=false;",
+      "function hide(){if(done){return;}done=true;var o=document.getElementById('bootOverlay');if(!o){return;}o.classList.add('is-hidden');setTimeout(function(){if(o.parentNode){o.parentNode.removeChild(o);}},600);}",
+      "function ready(){return !!(document.querySelector('.map-picker-wrap .leaflet-container')||(document.getElementById('heroStats')&&document.getElementById('heroStats').children.length>0));}",
+      "function arm(){if(ready()){return hide();}try{var mo=new MutationObserver(function(){if(ready()){mo.disconnect();hide();}});mo.observe(document.documentElement,{childList:true,subtree:true});}catch(e){hide();}}",
+      "if(document.readyState!=='loading'){arm();}else{document.addEventListener('DOMContentLoaded',arm);}",
+      "setTimeout(hide,10000);})();"
+    )))
   ),
   useShinyjs(),
 
