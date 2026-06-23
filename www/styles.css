@@ -630,7 +630,9 @@ body {
 
 /* ---- persistent top bar (theme toggle + How-it-works) ---- */
 .top-bar { display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; padding: 8px 4px 4px; margin-bottom: 2px; }
+  gap: 12px; flex-wrap: wrap; padding: 8px 4px 4px; margin-bottom: 2px;
+  position: sticky; top: 0; z-index: 1000; background: var(--bg);
+  border-bottom: 1px solid var(--line); }
 .top-bar-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .top-bar-brand .tb-mark { font-size: 22px; line-height: 1; }
 .top-bar-brand .tb-title { font-weight: 800; color: var(--forest); font-size: 15px;

@@ -32,9 +32,10 @@ rule (`is_species_level` / `taxonRank ∈ {species, subspecies, speciesGroup}`).
 - **The QA/QC chain is real and mostly clean, but not free.** Network-wide, **95.9% of
   individuals are resolved to species**; **4.1% (≈9,543 individuals)** are stranded at
   genus (3,102) or family (3,866) and correctly **excluded from richness/diversity/ordination**.
-  But the higher-taxon load is very uneven: **TEAK 45.0%**, **GUAN 40.8%**, **BARR 42.4%** of
+  But the higher-taxon load is very uneven: **BARR 45.0%**, **GUAN 40.8%** of
   individuals are NOT named to species — exactly the species-poor, hard-to-key sites, where the
-  "richness" number rests on the smallest identified base.
+  "richness" number rests on the smallest identified base. (TEAK, by contrast, is well-resolved at
+  just **0.5%** higher-taxon.)
 - **Seasonal activity peaks in June–July** (27 of 46 sites peak in month 6 or 7; the warm-season
   pitfall signal), shifting later (Aug–Oct) at cold/montane sites (e.g. OAES, HARV, RMNP) — a
   clean, defensible phenology.
@@ -86,7 +87,7 @@ density**. Richness-type metrics use `species_level == TRUE` only; abundance cou
 - **[med] Naive occupancy denominator bias is documented but structural.** `occupancy_table` divides
   by carabid-*positive* plot×bouts (zero-catch bouts are dropped at `clean_beetle`), over-stating how
   widespread a species is. Honest caveat is in the UI; flagged here as a known ceiling, not a bug.
-- **[med] Species-poor sites lean on the thinnest ID base.** TEAK/GUAN/BARR exclude 40–45% of
+- **[med] Species-poor sites lean on the thinnest ID base.** GUAN/BARR exclude ~41–45% of
   individuals as higher taxa before computing richness. *Fix:* show the species-level **individual
   count** (not just the % excluded) next to richness at these sites so users see the small base.
 
@@ -130,7 +131,7 @@ density**. Richness-type metrics use `species_level == TRUE` only; abundance cou
   (tiger beetles vs litter specialists) are not density comparisons.
 - **Not "intact native richness" at STEI/UNDE/WOOD/TREE** — those communities are
   numerically dominated by introduced European carabids.
-- **Richness at TEAK/GUAN/BARR rests on a small identified base** (40–45% of individuals never
+- **Richness at GUAN/BARR rests on a small identified base** (~41–45% of individuals never
   reach species); treat those counts as lower-confidence.
 
 ## Place in the cascade

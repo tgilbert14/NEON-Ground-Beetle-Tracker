@@ -93,6 +93,21 @@ jobs:
         run: |
           Rscript scripts/precompute.R
 
+      # Rebuild the bundled "Search the network" index (data/search_index.rds) from
+      # the freshly-rebuilt site bundles so it can never drift from the committed data.
+      # Runs on BOTH paths (full re-pull and skip-download), before the manifest +
+      # before the commit, so the index ships with the deploy.
+      - name: Rebuild the search index
+        run: |
+          Rscript scripts/build_search_index.R
+
+      # Finalize the lean deploy manifest AFTER the index is on disk (so manifest.json
+      # reflects the rebuilt files) and run the lean hard-gate. Idempotent: refresh_data.R
+      # already regenerates it on the full path; re-running keeps the skip path honest.
+      - name: Regenerate + gate the deploy manifest
+        run: |
+          Rscript scripts/write_manifest.R
+
       # Commit + push refreshed data DIRECTLY to main. THIS is the deploy: the push
       # makes Connect Cloud auto-republish (matching the SM / Veg / Plant siblings,
       # and the suite standard of auto-push to the watched branch, not PR-merge).
