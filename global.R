@@ -235,6 +235,30 @@ SPECIES_SITES <- NATIONAL_INDEX$species_sites
 picker_site_table <- if (!is.null(SITE_INDEX))
   SITE_INDEX[is.finite(SITE_INDEX$lat) & is.finite(SITE_INDEX$lng), , drop = FALSE] else NULL
 
+# ---- "Search the network" index (small, bundled, precomputed) -------------
+# data/search_index.rds (scripts/build_search_index.R) is a tiny table the
+# "Search" tab filters in memory: one row per (taxon × site) with the within-site
+# activity-density measure + years + an is_introduced flag. Loaded once at boot,
+# like the precompute cache. If absent (never built), the tab falls back to the
+# live SPECIES_SITES table so it still works, just without the years/measure.
+SEARCH_INDEX <- local({
+  f <- file.path("data", "search_index.rds")
+  if (file.exists(f)) tryCatch(readRDS(f), error = function(e) NULL) else NULL
+})
+SEARCH_TAXA <- if (!is.null(SEARCH_INDEX)) SEARCH_INDEX$taxa else NULL
+
+# Autocomplete choices for the Search tab: every taxon in the index, labelled with
+# how many sites it occurs at so the picker doubles as a quick range hint.
+search_taxon_choices <- function() {
+  if (is.null(SEARCH_TAXA) || !nrow(SEARCH_TAXA)) return(NULL)
+  sp <- SEARCH_TAXA %>% dplyr::group_by(.data$scientificName) %>%
+    dplyr::summarise(sites = dplyr::n_distinct(.data$siteID),
+                     inds = sum(.data$individuals, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::arrange(dplyr::desc(.data$sites), dplyr::desc(.data$inds))
+  stats::setNames(sp$scientificName, sprintf("%s · %d site%s", sp$scientificName,
+                  sp$sites, ifelse(sp$sites == 1, "", "s")))
+}
+
 species_choices <- function() {
   if (is.null(SPECIES_SITES)) return(NULL)
   sp <- SPECIES_SITES %>% dplyr::group_by(.data$scientificName) %>%

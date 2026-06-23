@@ -323,6 +323,55 @@ ui <- bslib::page_fillable(
       ),
 
       nav_panel(
+        title = tagList(bs_icon("search"), " Search"), value = "search",
+        div(class = "tab-head",
+          div(class = "tab-head-text",
+            h4("Search the network"),
+            p("Look across every NEON site at once. Find one beetle and see everywhere it has been caught, or pull up the sites that match a number. This searches a small bundled index, so it is instant and never goes online."))),
+        div(class = "search-modeswitch",
+          radioButtons("searchMode", NULL, inline = TRUE,
+            choices = c("Find a beetle" = "taxon", "Filter sites" = "thresh"),
+            selected = "taxon")),
+
+        # (a) FIND A TAXON ---------------------------------------------------
+        conditionalPanel(
+          "input.searchMode == 'taxon'",
+          card(
+            card_head("bug", "Find a beetle, see where it lives"),
+            div(class = "search-controls",
+              selectizeInput("searchTaxon", "Pick a beetle (type to filter)",
+                             choices = NULL, width = "420px",
+                             options = list(placeholder = "Start typing a species name..."))),
+            uiOutput("searchTaxonCount"),
+            div(style = "width:100%;", DT::DTOutput("searchTaxonTable")),
+            p(class = "search-caption",
+              "Activity-density is catch per 100 trap-nights at that site, a within-site activity index, not an absolute population density. Sites differ in habitat and effort, so read it as where a beetle turns up, not a ranking of how many there really are.")
+          )
+        ),
+
+        # (b) THRESHOLD QUERY ------------------------------------------------
+        conditionalPanel(
+          "input.searchMode == 'thresh'",
+          card(
+            card_head("funnel", "Filter the network"),
+            div(class = "search-controls",
+              radioButtons("searchThreshKind", NULL, inline = TRUE,
+                choices = c("Introduced (European) species, and where" = "intro",
+                            "Activity-density over a cutoff" = "ad"),
+                selected = "intro"),
+              conditionalPanel(
+                "input.searchThreshKind == 'ad'",
+                numericInput("searchAdMin", "Activity-density at least (per 100 trap-nights)",
+                             value = 5, min = 0, step = 1, width = "320px"))),
+            uiOutput("searchThreshCount"),
+            div(style = "width:100%;", DT::DTOutput("searchThreshTable")),
+            p(class = "search-caption",
+              "Introduced carabids are established non-native European species (Bousquet 2012; Lindroth 1961-69); a high rank for one usually marks a disturbed or human-modified site, not a rich one. Activity-density is catch per 100 trap-nights, a within-site index, not an absolute density.")
+          )
+        )
+      ),
+
+      nav_panel(
         title = tagList(bs_icon("info-circle"), " About"), value = "about",
         uiOutput("aboutPanel")
       )

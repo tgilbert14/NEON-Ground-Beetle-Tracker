@@ -3219,6 +3219,9 @@
     "data/precomputed.rds": {
       "checksum": "d30bd19334f5f67fc44ae453e96f5bec"
     },
+    "data/search_index.rds": {
+      "checksum": "1f88413c296580063018c18efd760a41"
+    },
     "data/sites/ABBY.rds": {
       "checksum": "b9b195c9424444e72a12090ce5cd3807"
     },
@@ -3358,7 +3361,7 @@
       "checksum": "1f4db8d5975b3ac812f98da68ca36951"
     },
     "global.R": {
-      "checksum": "216040e0b6333328eaa25520e1c5a6a0"
+      "checksum": "5100c8734fadf4b3b51840f9c0c30fac"
     },
     "R/helpers.R": {
       "checksum": "6db5a6f32018c93011569f13c296335e"
@@ -3373,13 +3376,13 @@
       "checksum": "0e921fadab6a64a4d4a9dbf5e06329bd"
     },
     "server.R": {
-      "checksum": "9248b2dd69303792068a24167644d66f"
+      "checksum": "2faed28ffcc7a66c59822a331985184d"
     },
     "ui.R": {
-      "checksum": "8863adb9debc27f92fd168b72f29bf04"
+      "checksum": "33bf9f2c8c28e62f7724af67f6e717e6"
     },
     "www/styles.css": {
-      "checksum": "76da5c73e871ef8ea6a2719739af7c0f"
+      "checksum": "d6010fad8bdb657c4cc586e4b53d9b7e"
     }
   },
   "users": null

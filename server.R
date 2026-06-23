@@ -295,6 +295,9 @@ function(input, output, session) {
     removeModal()
     s <- input$siteExplore; if (is.null(s) || !nzchar(s)) return()
     m <- neon_sites[neon_sites$site == s, ]; if (!nrow(m)) return()
+    # land on the Overview no matter which tab the jump came from (e.g. Search),
+    # so "Go to this site" always shows the site's single-site profile.
+    nav_select("tabs", "overview", session = session)
     if (identical(input$stateSel, m$state)) updateSelectInput(session, "site", selected = s)
     else { rv$pendingSite <- s; updateSelectInput(session, "stateSel", selected = m$state) }
   })
@@ -1167,6 +1170,110 @@ function(input, output, session) {
     div(class = "trend-verdict trend-info", bs_icon("calendar-heart"),
       HTML(sprintf(" Activity peaks in <b>%s</b>; the warm-season window runs <b>%s</b>.",
         month.abb[peak], win)))
+  })
+
+  # ---- Search the network -------------------------------------------------
+  # A small bundled index (data/search_index.rds, SEARCH_TAXA) filtered in memory.
+  # Two modes: (a) find a taxon -> sites where caught + activity-density; (b) a
+  # threshold query -> matching sites. Every result row carries a "Go" button that
+  # fires the SAME input$siteExplore path the map popups use, so the jump loads
+  # from the bundle (instant) and lands on the Overview (see the siteExplore
+  # observer, which nav_select()s "overview").
+  updateSelectizeInput(session, "searchTaxon", server = TRUE,
+                       choices = search_taxon_choices(),
+                       selected = "", options = list(placeholder = "Start typing a species name..."))
+
+  # A "Go to this site" button cell that raises the loading overlay then fires
+  # input$siteExplore (the bundle-load + Overview jump).
+  search_go_btn <- function(code) sprintf(
+    "<button type='button' class='sp-btn sp-go search-go' onclick=\"Shiny.setInputValue('siteExplore','%s',{priority:'event'});\">Go to this site &rarr;</button>",
+    code)
+
+  # (a) FIND A TAXON -------------------------------------------------------
+  search_taxon_rows <- reactive({
+    sp <- input$searchTaxon %||% ""
+    if (sp == "" || is.null(SEARCH_TAXA)) return(NULL)
+    r <- SEARCH_TAXA[SEARCH_TAXA$scientificName == sp, , drop = FALSE]
+    if (!nrow(r)) return(NULL)
+    r[order(-r$activity_density %in% NA, dplyr::desc(r$activity_density)), , drop = FALSE]
+  })
+
+  output$searchTaxonCount <- renderUI({
+    sp <- input$searchTaxon %||% ""
+    n_sites <- length(available_sites())
+    if (sp == "") return(div(class = "search-empty",
+      "Pick a beetle above to see every NEON site where it has been caught."))
+    r <- search_taxon_rows()
+    if (is.null(r) || !nrow(r)) return(div(class = "search-empty",
+      sprintf("No record of %s in the bundled sites.", sp)))
+    intro <- any(r$is_introduced)
+    div(class = "search-count",
+      HTML(sprintf("<b><i>%s</i></b> found at <b>%d of %d</b> NEON sites%s.",
+        sp, nrow(r), n_sites,
+        if (intro) " &middot; <span class='intro-inline'>introduced European species</span>" else "")))
+  })
+
+  output$searchTaxonTable <- DT::renderDT({
+    r <- search_taxon_rows(); req(r)
+    yr <- ifelse(is.na(r$year_min), "", ifelse(r$year_min == r$year_max,
+            as.character(r$year_min), paste0(r$year_min, "-", r$year_max)))
+    tab <- data.frame(
+      Site = r$siteID, Name = r$site_name, State = r$state,
+      `Activity-density` = r$activity_density, Individuals = r$individuals,
+      Years = yr, Go = vapply(r$siteID, search_go_btn, character(1)),
+      check.names = FALSE, stringsAsFactors = FALSE)
+    DT::datatable(tab, rownames = FALSE, escape = FALSE, selection = "none",
+      options = list(pageLength = 10, dom = "tp", scrollX = TRUE,
+                     columnDefs = list(list(orderable = FALSE, targets = 6)))) %>%
+      DT::formatCurrency("Individuals", currency = "", interval = 3, mark = ",", digits = 0)
+  })
+
+  # (b) THRESHOLD QUERY ----------------------------------------------------
+  search_thresh_rows <- reactive({
+    if (is.null(SEARCH_TAXA)) return(NULL)
+    kind <- input$searchThreshKind %||% "intro"
+    if (kind == "intro") {
+      r <- SEARCH_TAXA[SEARCH_TAXA$is_introduced %in% TRUE, , drop = FALSE]
+    } else {
+      cut <- suppressWarnings(as.numeric(input$searchAdMin)); if (!is.finite(cut)) cut <- 0
+      r <- SEARCH_TAXA[is.finite(SEARCH_TAXA$activity_density) &
+                       SEARCH_TAXA$activity_density >= cut, , drop = FALSE]
+    }
+    if (!nrow(r)) return(r)
+    r[order(dplyr::desc(r$activity_density)), , drop = FALSE]
+  })
+
+  output$searchThreshCount <- renderUI({
+    r <- search_thresh_rows()
+    n_sites <- length(available_sites())
+    kind <- input$searchThreshKind %||% "intro"
+    if (is.null(r) || !nrow(r)) return(div(class = "search-empty",
+      if (kind == "intro") "No introduced European carabids in the bundled sites."
+      else "No taxon-site records meet that cutoff. Try a lower number."))
+    hit_sites <- length(unique(r$siteID))
+    lbl <- if (kind == "intro") "introduced taxon-site records"
+           else sprintf("taxon-site records at or above %s per 100 trap-nights",
+                        format(input$searchAdMin))
+    div(class = "search-count",
+      HTML(sprintf("<b>%d</b> %s across <b>%d of %d</b> NEON sites.",
+        nrow(r), lbl, hit_sites, n_sites)))
+  })
+
+  output$searchThreshTable <- DT::renderDT({
+    r <- search_thresh_rows(); req(r); req(nrow(r) > 0)
+    yr <- ifelse(is.na(r$year_min), "", ifelse(r$year_min == r$year_max,
+            as.character(r$year_min), paste0(r$year_min, "-", r$year_max)))
+    tab <- data.frame(
+      Species = sprintf("<i>%s</i>", r$scientificName),
+      Site = r$siteID, State = r$state,
+      `Activity-density` = r$activity_density, Individuals = r$individuals,
+      Years = yr, Go = vapply(r$siteID, search_go_btn, character(1)),
+      check.names = FALSE, stringsAsFactors = FALSE)
+    DT::datatable(tab, rownames = FALSE, escape = FALSE, selection = "none",
+      options = list(pageLength = 12, dom = "tp", scrollX = TRUE,
+                     order = list(list(3, "desc")),
+                     columnDefs = list(list(orderable = FALSE, targets = 6)))) %>%
+      DT::formatCurrency("Individuals", currency = "", interval = 3, mark = ",", digits = 0)
   })
 
   # ---- Biogeography -------------------------------------------------------
