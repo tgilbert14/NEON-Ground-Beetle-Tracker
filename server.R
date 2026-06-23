@@ -1058,6 +1058,77 @@ function(input, output, session) {
           HTML(sprintf("higher \U2192 <b>%s</b> beetles", dir)))))
   })
 
+  # ---- Seasonal climate: the cascade read (the desert/degree-day fix) -------
+  # The monthly scan above DESEASONALIZES monthly catch vs monthly driver, so it
+  # CANNOT see "a big summer monsoon -> that year's beetle activity" — the
+  # monsoon is averaged out of the very annual cycle it subtracts. This card uses
+  # the Driver Cascade's method: aggregate the driver by SEASON (monsoon Jul-Sep,
+  # winter Oct-Mar, spring temp Mar-May) into one value per year and correlate at
+  # the prior's lag. Beetles are a FAST within-season responder (like mosquitoes),
+  # so monsoon -> activity is LAG 0 (NOT lag 1 as for the slow seed-eater boom).
+  # Temperate sites lead with warm-spring degree-days -> emergence (also lag 0).
+  # Per-site annual n is tiny (6-10 yrs) — SUGGESTIVE, not a verdict; the pooled
+  # cross-site test lives in the Driver Cascade app.
+  output$seasonalDriver <- renderUI({
+    d <- rv$data; if (is.null(d) || is.null(rv$env)) return(NULL)
+    at <- tryCatch(annual_trend(d), error = function(e) NULL)   # the app's OWN annual catch-per-100-trap-nights
+    if (is.null(at) || !nrow(at) || !"cpn" %in% names(at)) return(NULL)
+    resp <- data.frame(year = at$year, value = at$cpn)
+    resp <- resp[is.finite(resp$year) & is.finite(resp$value), , drop = FALSE]
+    if (nrow(resp) < 3) return(NULL)
+    site_code <- rv$siteCode %||% (if ("siteID" %in% names(d)) {
+      sx <- d$siteID[!is.na(d$siteID)]; if (length(sx)) names(sort(table(sx), decreasing = TRUE))[1] else NULL
+    } else NULL)
+    biome <- seasonal_biome(site_code)
+    # Beetles respond within the season they are active in: monsoon water and
+    # spring warmth both act at LAG 0 (no carry-over year as in the granivore boom).
+    links <- tryCatch(seasonal_driver_links(rv$env, resp, biome = biome,
+      lags = c(precip_monsoon = 0L, precip_winter = 0L, temp_spring = 0L)),
+      error = function(e) NULL)
+    eyebrow <- div(class = "ec-eyebrow", bs_icon("calendar-range"),
+                   tags$span("seasonal climate \U00B7 the cascade read"),
+                   info_pop("The seasonal read",
+                     p("Beetle activity tracks the season that ", tags$b("limits it here"), ": warm springs at temperate sites (degree-days drive emergence), summer-monsoon water in the desert. A single annual rain or temperature average mixes that limiting season into the rest of the year and blurs the signal."),
+                     p("Here we aggregate the driver by season and correlate it against this site's yearly catch rate, the way the Driver Cascade does. Beetles respond ", tags$b("within the same year"), " (lag 0), unlike the seed-eater boom that lands a year later. ", tags$b("Per-site n is only a handful of years"), ", so this is suggestive, not significant. The honest test pools many sites in the Driver Cascade app.")))
+    if (is.null(links) || !nrow(links)) {
+      return(div(class = "ec ec-seasonal rail-weak", style = "margin-top:14px;", eyebrow,
+        div(class = "ec-hero", div(class = "ec-hero-text",
+          "No co-located seasonal climate record at this site, so the monsoon, winter and spring-warmth seasons can't be tested here. That is missing climate data, not a missing signal."))))
+    }
+    lead <- links[links$expected, , drop = FALSE]; if (!nrow(lead)) lead <- links
+    L <- lead[1, ]; pos <- L$r >= 0; dir <- if (pos) "more" else "fewer"
+    strength <- abs(L$r)
+    rail <- if (strength >= 0.6) "rail-strong" else if (strength >= 0.35) "rail-mod" else "rail-weak"
+    sub  <- tolower(L$label)
+    lead_txt <- sprintf("%s %s tracks %s beetles%s",
+      if (grepl("precip", L$driver)) "A wetter" else "A warmer", sub, dir,
+      if (L$lag >= 1) " the next year" else " the same year")
+    mr <- tryCatch(env_corr_scan(d, rv$env, if (grepl("temp", L$driver)) "temp" else "precip")$r,
+                   error = function(e) NA_real_)
+    pstr <- if (is.finite(L$p)) sprintf("p = %.2f", L$p) else sprintf("%d yrs, too few for a p", L$n)
+    div(class = paste("ec ec-seasonal", rail),
+      style = "margin-top:14px;",
+      eyebrow,
+      div(class = "ec-hero",
+        div(class = "ec-hero-text", lead_txt, "."),
+        div(class = paste("ec-rvalue", if (pos) "ec-sgn-pos" else "ec-sgn-neg"),
+          bs_icon(if (pos) "arrow-up-right" else "arrow-down-right"),
+          HTML(sprintf("r&nbsp;%+.2f", L$r)))),
+      div(class = "ec-foot",
+        tags$span(class = "ec-meta", bs_icon("calendar3"), HTML(sprintf("<b>%d</b> years", L$n))),
+        tags$span(class = "ec-meta-dot"), tags$span(class = "ec-meta", pstr),
+        if (is.finite(L$p_adj)) tagList(tags$span(class = "ec-meta-dot"),
+          tags$span(class = "ec-meta", title = "p after accounting for testing several seasons",
+                    HTML(sprintf("season-corrected p = %.2f", L$p_adj))))),
+      div(class = "ec-seasonal-note",
+        if (is.finite(mr))
+          HTML(sprintf("The month-to-month overlay shows only about <b>r %+.2f</b> for the plain monthly driver. Splitting the year by season recovers the limiting-season signal a single annual average blends away.", mr))
+        else "Splitting the year by season recovers the limiting-season signal a single annual average blends away."),
+      div(class = "ec-seasonal-caveat", bs_icon("info-circle"),
+        HTML(" One site, a handful of years, so suggestive not settled. The cross-site test that pools many sites is in the "),
+        tags$a(href = "https://tgilbert14.github.io/NEON-Driver-Cascade/", target = "_blank", "Driver Cascade app"), "."))
+  })
+
   output$envScatter <- renderPlotly({
     d <- rv$data; e <- rv$env; req(d, !is.null(e))
     layer <- input$envLayer

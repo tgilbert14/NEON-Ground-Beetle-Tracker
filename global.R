@@ -25,6 +25,7 @@ suppressPackageStartupMessages({
 # ---- helpers + metadata ---------------------------------------------------
 source("R/site_metadata.R", local = FALSE)
 source("R/helpers.R", local = FALSE)
+source("R/seasonal_env.R", local = FALSE) # the cascade's seasonal-aggregate driver read (beetles: lag-0 fast responder)
 source("R/map_picker.R", local = FALSE)   # reusable national site-picker map (flagship front door)
 
 # ---- NEON data product ----------------------------------------------------

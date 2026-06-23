@@ -385,6 +385,14 @@ body {
 .ec-dir { margin-left: auto; }
 .ec-dir.ec-sgn-pos b { color: #3f9a52; }
 .ec-dir.ec-sgn-neg b { color: var(--cardinal); }
+
+/* Seasonal-climate (the cascade read) card — sits under the env ranking, reuses .ec chrome */
+.ec-seasonal-note { margin-top: 10px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.ec-seasonal-note b { color: var(--ink); font-weight: 800; }
+.ec-seasonal-caveat { margin-top: 7px; font-size: 11.5px; color: var(--muted); line-height: 1.5; opacity: .92; }
+.ec-seasonal-caveat .bi { font-size: 12px; margin-right: 3px; opacity: .85; }
+.ec-seasonal-note a, .ec-seasonal-caveat a { color: var(--ec-rail); font-weight: 700; text-decoration: underline; }
+
 [data-bs-theme="dark"] .ec { background: linear-gradient(180deg, #12241a 0%, var(--paper) 100%);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
 [data-bs-theme="dark"] .ec.rail-strong { --ec-rail: #6ef0b0; }
