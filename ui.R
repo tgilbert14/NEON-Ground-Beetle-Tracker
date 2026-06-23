@@ -8,7 +8,7 @@ card_head <- function(icon, title, ...)
   bslib::card_header(class = "with-info", bsicons::bs_icon(icon),
                      tags$span(class = "ch-title", " ", title), ...)
 
-ui <- bslib::page_sidebar(
+ui <- bslib::page_fillable(
   theme = app_theme,
   window_title = "NEON Ground Beetle Tracker",
   fillable = FALSE,
@@ -27,6 +27,11 @@ ui <- bslib::page_sidebar(
       "var s=p||localStorage.getItem('gbt_site');",
       "if(s){Shiny.setInputValue('restore_site',s,{priority:'event'});}}catch(e){}});",
       "Shiny.addCustomMessageHandler('gbt_remember',function(s){try{if(s){localStorage.setItem('gbt_site',s);}}catch(e){}});",
+      # 'change site' re-shows the picker map after it was hidden under a loaded
+      # site; Leaflet measured 0px while hidden, so nudge a window resize across
+      # several frames so it re-fits the settled width instead of painting
+      # half-width (flagship Small Mammal Tracker's kickMaps handler).
+      "Shiny.addCustomMessageHandler('kickMaps',function(){var kick=function(){try{window.dispatchEvent(new Event('resize'));}catch(e){}};if(window.requestAnimationFrame){requestAnimationFrame(kick);}[80,250,500,900].forEach(function(t){setTimeout(kick,t);});});",
       "function hideOv(){var o=document.getElementById('bootOverlay');if(o){o.classList.add('is-hidden');setTimeout(function(){if(o&&o.parentNode){o.parentNode.removeChild(o);}},600);}} ",
       "function showWelcome(){try{if(!localStorage.getItem('gbt_seen')){localStorage.setItem('gbt_seen','1');Shiny.setInputValue('first_visit',1,{priority:'event'});}}catch(e){}}",
       # first-visit: the splash mascot waves hello once (mirrors the flagship's localStorage gate)
@@ -38,60 +43,23 @@ ui <- bslib::page_sidebar(
   ),
   useShinyjs(),
 
-  # ---- sidebar -----------------------------------------------------------
-  sidebar = sidebar(
-    width = 320, class = "control-deck",
-    div(class = "brand",
-      div(class = "brand-mark", "\U0001FAB2"),  # beetle
-      div(
-        div(class = "brand-title", "Ground Beetle Tracker"),
-        div(class = "brand-sub", "NEON carabid biodiversity")
-      ),
-      # light/dark toggle — bslib flips data-bs-theme; charts read input$colorMode
-      div(class = "mode-toggle", input_dark_mode(id = "colorMode", mode = "light"))
-    ),
-
-    selectInput("stateSel", label = tagList(bs_icon("geo-alt-fill"), " 1 · Pick a state"),
-                choices = NULL, width = "100%"),
-    selectInput("site", label = tagList(bs_icon("pin-map-fill"), " 2 · Pick a site"),
-                choices = NULL, width = "100%"),
-    uiOutput("siteBio"),
-
-    dateRangeInput("dateRange", label = tagList(bs_icon("calendar3"), " 3 · Date window"),
-                   format = "yyyy-mm", startview = "year",
-                   start = "2016-01-01", end = Sys.Date()),
-
-    actionButton("loadBtn", tagList(bs_icon("bug-fill"), " Load this site"),
-                 class = "btn-primary btn-lg w-100"),
-    actionButton("surpriseBtn", tagList(bs_icon("shuffle"), " Surprise me"),
-                 class = "btn-outline-success w-100 mt-2"),
-    downloadButton("reportPdf", tagList(bs_icon("file-earmark-pdf"), " Site report (PDF)"),
-                   class = "btn-outline-secondary w-100 mt-2"),
-    downloadButton("reportCsv", tagList(bs_icon("filetype-csv"), " Data + codebook"),
-                   class = "btn-outline-secondary w-100 mt-2"),
-    div(class = "demo-hint", bs_icon("info-circle"),
-        if (isTRUE(LIVE_FETCH))
-          " Picking a site loads it automatically. Bundled sites are instant; live NEON pulls take a moment. Adjust the date window and tap Load to refine."
-        else
-          " Picking a site loads it automatically. The date window snaps to that site's coverage. Narrow it and tap Load to zoom in."),
-
-    uiOutput("srcNote"),
-
-    div(class = "compare-pick",
-      selectInput("compareSite",
-        label = tagList(bs_icon("layers-half"), " Compare with (optional)"),
-        choices = NULL, width = "100%"),
-      div(class = "demo-hint", bs_icon("info-circle"),
-          " Overlaid on the Diversity & Seasonality tabs.")),
-
-    hr(class = "deck-hr"),
-    div(class = "deck-foot",
-      bs_icon("database"), " NEON ", tags$code("DP1.10022.001"),
-      br(), tags$a(href = "https://www.neonscience.org/data-collection/ground-beetles",
-                   target = "_blank", bs_icon("box-arrow-up-right"), " about the data"),
-      br(), tags$a(href = "https://desertdatalabs.com", target = "_blank",
-                   bs_icon("box-arrow-up-right"), " Desert Data Labs")
-    )
+  # ---- persistent top control bar (theme + help) -------------------------
+  # v2 flow: the sidebar is gone. The picker map IS the way to select a site,
+  # and its controls (state, site, date window, load, reports, compare) now live
+  # in a select panel on the landing (next to the map). The two controls that
+  # must stay reachable everywhere — the theme toggle and the How-it-works
+  # dialog — sit in this slim top-right bar. Same input id (colorMode) so every
+  # chart's dark-mode dependency is untouched.
+  div(class = "top-bar",
+    div(class = "top-bar-brand",
+      tags$span(class = "tb-mark", "\U0001FAB2"),  # beetle
+      tags$span(class = "tb-title", "Ground Beetle Tracker")),
+    div(class = "top-bar-actions",
+      actionButton("help", tagList(bs_icon("question-circle"), " How it works"),
+                   class = "btn-outline-secondary btn-sm tb-help"),
+      div(class = "tb-theme",
+        tags$span(class = "tb-theme-lab", bs_icon("circle-half")),
+        input_dark_mode(id = "colorMode", mode = "light")))
   ),
 
   # ---- boot / cold-start overlay (removed by JS once Shiny goes idle) -----
@@ -131,6 +99,46 @@ ui <- bslib::page_sidebar(
           div(class = "pl-ramp"),
           div(class = "pl-ramp-labs",
             tags$span("fewer caught"), tags$span("more caught")))),
+
+      # ---- relocated select panel (was the sidebar) ----------------------
+      # Tapping a dot is the primary path; this panel is the by-name path and
+      # the place to narrow the date window before loading. SAME input ids the
+      # server's cascade + load path depend on (stateSel, site, dateRange,
+      # loadBtn, surpriseBtn, reportPdf, reportCsv, compareSite) so server.R is
+      # untouched.
+      div(class = "select-panel",
+        div(class = "sp-head", bs_icon("sliders"),
+            " Or pick a site by name, and set the date window"),
+        div(class = "sp-row",
+          div(class = "sp-field",
+            selectInput("stateSel", label = tagList(bs_icon("geo-alt-fill"), " State"),
+                        choices = NULL, width = "100%")),
+          div(class = "sp-field",
+            selectInput("site", label = tagList(bs_icon("pin-map-fill"), " Site"),
+                        choices = NULL, width = "100%")),
+          div(class = "sp-field sp-field-date",
+            dateRangeInput("dateRange", label = tagList(bs_icon("calendar3"), " Date window (all years by default)"),
+                           format = "yyyy-mm", startview = "year",
+                           start = "2016-01-01", end = Sys.Date()))),
+        uiOutput("siteBio"),
+        div(class = "sp-actions",
+          actionButton("loadBtn", tagList(bs_icon("bug-fill"), " Explore this site"),
+                       class = "btn-primary btn-lg sp-load"),
+          actionButton("surpriseBtn", tagList(bs_icon("shuffle"), " Surprise me"),
+                       class = "btn-outline-success sp-surprise")),
+        div(class = "demo-hint", bs_icon("info-circle"),
+            if (isTRUE(LIVE_FETCH))
+              " Picking a site loads it automatically. Bundled sites are instant; live NEON pulls take a moment. Adjust the date window and tap Explore to refine."
+            else
+              " Picking a site loads it automatically. The date window snaps to that site's coverage. Narrow it and tap Explore to zoom in."),
+        uiOutput("srcNote"),
+        div(class = "compare-pick",
+          selectInput("compareSite",
+            label = tagList(bs_icon("layers-half"), " Compare with (optional)"),
+            choices = NULL, width = "100%"),
+          div(class = "demo-hint", bs_icon("info-circle"),
+              " Overlaid on the Diversity & Seasonality tabs."))),
+
       # Closed-by-default text fallback to the map: every site, one tap away. Each
       # link drives the SAME input$siteExplore the popup's "Explore" button uses,
       # so selection runs the app's normal cascade -> auto-load. Built from

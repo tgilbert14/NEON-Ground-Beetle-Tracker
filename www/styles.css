@@ -279,7 +279,7 @@ body {
 @keyframes bootpulse { 0%, 100% { transform: scale(1); opacity: .85; } 50% { transform: scale(1.16); opacity: 1; } }
 
 /* ===========================================================================
-   DARK MODE — bslib flips data-bs-theme="dark" via the sidebar toggle. We
+   DARK MODE — bslib flips data-bs-theme="dark" via the top-bar toggle. We
    redefine the house-style CSS vars (so every var()-based rule adapts) and
    override the rules that hardcode light hexes (banners, badges, notes).
    =========================================================================== */
@@ -599,4 +599,76 @@ body {
   .mascot-cheer { display:none; }
   .qc-flag-click, .suite-card { transition: none !important; }
   .qc-flag-click:hover, .suite-card:hover { transform: none !important; }
+}
+
+/* ===========================================================================
+   v2 FLOW — sidebar removed. Slim top bar (theme + help), a landing select
+   panel beside the picker map, and a loaded-view hero band with change-site +
+   report. All built on the theme tokens so they flip light/dark for free.
+   =========================================================================== */
+
+/* ---- persistent top bar (theme toggle + How-it-works) ---- */
+.top-bar { display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; padding: 8px 4px 4px; margin-bottom: 2px; }
+.top-bar-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.top-bar-brand .tb-mark { font-size: 22px; line-height: 1; }
+.top-bar-brand .tb-title { font-weight: 800; color: var(--forest); font-size: 15px;
+  letter-spacing: .2px; white-space: nowrap; }
+.top-bar-actions { display: flex; align-items: center; gap: 10px; }
+.top-bar-actions .tb-help { min-height: 44px; border-radius: 10px; font-weight: 600; }
+.tb-theme { display: flex; align-items: center; gap: 6px; }
+.tb-theme .tb-theme-lab { color: var(--muted); font-size: 15px; }
+
+/* ---- landing select panel (relocated sidebar controls) ---- */
+.select-panel { background: var(--paper); border: 1px solid var(--line);
+  border-radius: 14px; padding: 14px 16px 16px; margin-top: 14px;
+  box-shadow: 0 4px 18px var(--shadow); }
+.select-panel .sp-head { font-weight: 700; color: var(--forest); font-size: 14px;
+  margin-bottom: 10px; display: flex; gap: 8px; align-items: center; }
+.sp-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.sp-field { flex: 1 1 180px; min-width: 160px; }
+.sp-field-date { flex: 1 1 240px; }
+.sp-field .form-label, .sp-field label { font-weight: 600; color: var(--ink); }
+.sp-field .form-control, .sp-field .selectize-input,
+.sp-field .form-select { min-height: 44px; font-size: 16px; } /* 16px dodges iOS zoom */
+.sp-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.sp-load { flex: 1 1 220px; min-height: 48px; font-weight: 700; }
+.sp-surprise { flex: 0 1 auto; min-height: 48px; }
+.select-panel .compare-pick { margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed var(--line); }
+.select-panel .compare-pick .form-control,
+.select-panel .compare-pick .form-select { min-height: 44px; font-size: 16px; }
+
+/* ---- loaded-view hero band (site context + change-site + report) ---- */
+.hero-site { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  background: var(--paper); border: 1px solid var(--line);
+  border-left: 4px solid var(--forest); border-radius: 12px;
+  padding: 10px 14px; margin: 6px 0 14px; box-shadow: 0 3px 14px var(--shadow); }
+.hero-site > .bi { color: var(--forest); font-size: 18px; }
+.hero-site-label { font-weight: 800; color: var(--forest); font-size: 16px; }
+.hero-site-range { color: var(--muted); font-size: 13px; }
+.hero-site .demo-pill { background: var(--gold); color: #3a2f00; font-weight: 700;
+  font-size: 11px; border-radius: 6px; padding: 2px 7px; }
+.hero-change, .hero-report { display: inline-flex; align-items: center; gap: 5px;
+  min-height: 44px; padding: 6px 12px; border-radius: 10px; font-weight: 600;
+  font-size: 14px; text-decoration: none; cursor: pointer; }
+.hero-change { color: #fff; background: var(--forest);
+  border: 1px solid var(--forest); margin-left: auto; }
+.hero-change:hover { filter: brightness(1.06); color: #fff; }
+.hero-report { color: var(--forest); background: transparent;
+  border: 1px solid var(--line); }
+.hero-report:hover { color: var(--forest); border-color: var(--forest);
+  background: rgba(31,138,90,0.06); }
+[data-bs-theme="dark"] .hero-report:hover { background: rgba(54,217,138,0.10); }
+
+/* ---- mobile: stack the panel + top bar, full-width primary actions ---- */
+@media (max-width: 640px) {
+  .top-bar { padding-top: 6px; }
+  .top-bar-brand .tb-title { font-size: 13px; }
+  .sp-row { flex-direction: column; gap: 10px; }
+  .sp-field, .sp-field-date { flex: 1 1 100%; min-width: 0; }
+  .sp-actions { flex-direction: column; }
+  .sp-load, .sp-surprise { flex: 1 1 100%; width: 100%; }
+  .hero-change { margin-left: 0; }
+  .hero-change, .hero-report { flex: 1 1 100%; justify-content: center; }
 }

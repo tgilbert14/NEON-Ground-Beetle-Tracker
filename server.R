@@ -6,7 +6,7 @@
 function(input, output, session) {
 
   # ---- small plot helpers -------------------------------------------------
-  # is the dark theme active? Driven by the sidebar input_dark_mode("colorMode").
+  # is the dark theme active? Driven by the top-bar input_dark_mode("colorMode").
   # Reading it inside the shared plot helpers makes every chart that calls them
   # take a reactive dependency on the toggle, so they re-render on theme switch.
   is_dark <- function() identical(input$colorMode, "dark")
@@ -350,23 +350,22 @@ function(input, output, session) {
   observeEvent(input$welcomeSurprise, { removeModal(); do_surprise() })
 
   # ---- first-visit welcome (once per browser; gated client-side) -----------
-  observeEvent(input$first_visit, {
-    showModal(modalDialog(
-      title = NULL, easyClose = TRUE, footer = NULL,
-      div(class = "welcome",
-        div(class = "welcome-bug", "\U0001FAB2"),
-        h3("Welcome to the Ground Beetle Tracker"),
-        p("Explore ground-beetle (Carabidae) biodiversity across ", tags$b("46 NEON sites"),
-          ": who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. NEON is the National Ecological Observatory Network, a US program that takes the same ecological measurements the same way at field sites across the country, year after year, and publishes the data for anyone to use."),
-        tags$ul(class = "welcome-list",
-          tags$li(tags$b("Pick a state & site"), " at left, it loads automatically."),
-          tags$li(tags$b("Open Biogeography"), " and tap any site on the national map."),
-          tags$li(tags$b("Compare two sites"), " to contrast a desert with a forest.")),
-        div(class = "welcome-cta",
-          actionButton("welcomeSurprise", tagList(bs_icon("shuffle"), " Surprise me"), class = "btn-success"),
-          modalButton("Browse the sites →")))
-    ))
-  }, once = TRUE)
+  # Shared by the first-visit gate AND the top-bar "How it works" button.
+  welcome_modal <- function() modalDialog(
+    title = NULL, easyClose = TRUE, footer = NULL,
+    div(class = "welcome",
+      div(class = "welcome-bug", "\U0001FAB2"),
+      h3("Welcome to the Ground Beetle Tracker"),
+      p("Explore ground-beetle (Carabidae) biodiversity across ", tags$b("46 NEON sites"),
+        ": who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. NEON is the National Ecological Observatory Network, a US program that takes the same ecological measurements the same way at field sites across the country, year after year, and publishes the data for anyone to use."),
+      tags$ul(class = "welcome-list",
+        tags$li(tags$b("Tap a site on the map"), " to explore it, or pick one from the Browse-all list."),
+        tags$li(tags$b("Set the date window"), " in the panel beside the map before you explore."),
+        tags$li(tags$b("Compare two sites"), " to contrast a desert with a forest.")),
+      div(class = "welcome-cta",
+        actionButton("welcomeSurprise", tagList(bs_icon("shuffle"), " Surprise me"), class = "btn-success"),
+        modalButton("Pick a site \U2192"))))
+  observeEvent(input$first_visit, showModal(welcome_modal()), once = TRUE)
 
   output$srcNote <- renderUI({
     if (is.null(rv$data)) return(NULL)
@@ -384,8 +383,8 @@ function(input, output, session) {
     div(class = "splash",
       div(class = "splash-icon", "\U0001FAB2"),
       h3("Pick a site to begin"),
-      p("Choose a state and site at left and it ", tags$b("loads automatically"),
-        ", or open the Biogeography map and tap a marker."),
+      p("Tap a dot on the map below and it ", tags$b("loads automatically"),
+        ", or pick a site by name in the panel beside the map."),
       if (!is.null(SITE_INDEX))
         p(class = "splash-sub", sprintf("%d site%s with beetle data available.",
           nrow(SITE_INDEX), if (nrow(SITE_INDEX) == 1) "" else "s")))
@@ -398,14 +397,42 @@ function(input, output, session) {
     hn <- hill_numbers(sp$individuals)
     tn <- effort_trapnights(d)
     bouts <- length(unique(paste(d$plotID, d$collectDate)))
+    is_demo <- identical(attr(d, "source") %||% "neon", "demo")
     stat <- function(v, l) div(class = "hero-stat", div(class = "hs-v", v), div(class = "hs-l", l))
-    div(class = "hero-stats",
-      stat(fmt_int(sum(ct$individuals)), "individuals"),
-      stat(nrow(sp), "species"),
-      stat(hn$q1, "effective species (q1)"),
-      stat(fmt_int(bouts), "trap bouts"),
-      stat(fmt_int(round(tn)), "trap-nights"))
+    div(
+      # context band: which site is loaded + the two controls that have to stay
+      # reachable in the loaded view — "change site" (back to the picker map) and
+      # the report download (PDF). Mirrors the flagship Small Mammal hero band.
+      div(class = "hero-site",
+        bs_icon("broadcast-pin"), span(class = "hero-site-label", rv$label %||% rv$siteCode),
+        if (isTRUE(is_demo)) span(class = "demo-pill", bs_icon("stars"), " DEMO"),
+        span(class = "hero-site-range", rv$ctx %||% ""),
+        actionLink("changeSite", tagList(bs_icon("arrow-left-circle"), " change site"),
+                   class = "hero-change"),
+        downloadLink("reportPdf", tagList(bs_icon("file-earmark-arrow-down"), " report (PDF)"),
+                     class = "hero-report"),
+        downloadLink("reportCsv", tagList(bs_icon("filetype-csv"), " data + codebook"),
+                     class = "hero-report")),
+      div(class = "hero-stats",
+        stat(fmt_int(sum(ct$individuals)), "individuals"),
+        stat(nrow(sp), "species"),
+        stat(hn$q1, "effective species (q1)"),
+        stat(fmt_int(bouts), "trap bouts"),
+        stat(fmt_int(round(tn)), "trap-nights")))
   })
+
+  # "Change site" (hero band) -> drop the loaded data and re-show the picker map.
+  observeEvent(input$changeSite, {
+    rv$data <- NULL; rv$pal <- NULL; rv$ctx <- NULL; rv$env <- NULL
+    shinyjs::hide("mainTabsWrap")
+    shinyjs::show("splashHome"); shinyjs::show("splash")
+    # the picker map was hidden while a site was loaded; nudge it to recompute
+    # size now that it's visible again so it never paints blank/half-width.
+    session$sendCustomMessage("kickMaps", list())
+  })
+
+  # "How it works" (top bar) -> the same welcome dialog the first visit shows.
+  observeEvent(input$help, showModal(welcome_modal()))
 
   # ---- Overview: community bar -------------------------------------------
   # ---- server-side PDF site report ----------------------------------------
@@ -766,7 +793,7 @@ function(input, output, session) {
   output$hillPlot <- renderPlotly({
     d <- rv$data; req(d)
     hn <- hill_numbers(sp_counts(d))
-    if (is.na(hn$q0)) return(note_plot("Not enough data for diversity<br><span style='font-size:13px'>try widening the date window at left</span>"))
+    if (is.na(hn$q0)) return(note_plot("Not enough data for diversity<br><span style='font-size:13px'>try a wider date window via change site</span>"))
     qlab <- c("q0\nrichness", "q1\ncommon", "q2\ndominant")
     cmp <- compareData()
     if (!is.null(cmp)) {                       # two-site grouped comparison
@@ -834,7 +861,7 @@ function(input, output, session) {
   output$rarePlot <- renderPlotly({
     d <- rv$data; req(d)
     rc <- rarefaction_curve(sp_counts(d))
-    if (is.null(rc)) return(note_plot("Not enough individuals to rarefy<br><span style='font-size:13px'>try widening the date window at left</span>"))
+    if (is.null(rc)) return(note_plot("Not enough individuals to rarefy<br><span style='font-size:13px'>try a wider date window via change site</span>"))
     plot_ly() %>%
       add_trace(x = rc$n, y = rc$hi, type = "scatter", mode = "lines",
                 line = list(width = 0), showlegend = FALSE, hoverinfo = "skip") %>%
@@ -852,7 +879,7 @@ function(input, output, session) {
   output$accumPlot <- renderPlotly({
     d <- rv$data; req(d)
     ac <- accum_rx()
-    if (is.null(ac)) return(note_plot("Not enough bouts for accumulation<br><span style='font-size:13px'>try widening the date window at left</span>"))
+    if (is.null(ac)) return(note_plot("Not enough bouts for accumulation<br><span style='font-size:13px'>try a wider date window via change site</span>"))
     plot_ly() %>%
       add_trace(x = ac$bouts, y = ac$richness + ac$sd, type = "scatter", mode = "lines",
                 line = list(width = 0), showlegend = FALSE, hoverinfo = "skip") %>%
@@ -908,7 +935,7 @@ function(input, output, session) {
   output$trendPlot <- renderPlotly({
     t <- trend_data()
     if (is.null(t) || nrow(t) < 2)
-      return(note_plot("Need at least two years of data for a trend<br><span style='font-size:13px'>try widening the date window at left</span>"))
+      return(note_plot("Need at least two years of data for a trend<br><span style='font-size:13px'>try a wider date window via change site</span>"))
     kind <- attr(t, "metric_kind") %||% "cpn"
     ytitle <- if (kind == "cpn") "catch per 100 trap-nights" else "individuals caught"
     p <- plot_ly(x = ~t$year, y = ~t$metric, type = "scatter", mode = "lines+markers",
@@ -1061,7 +1088,7 @@ function(input, output, session) {
       sA <- seasonality(d, by_species = FALSE)
       sB <- seasonality(cmp, by_species = FALSE)
       if ((is.null(sA) || !nrow(sA)) && (is.null(sB) || !nrow(sB)))
-        return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
+        return(note_plot("No seasonal data<br><span style='font-size:13px'>try a wider date window via change site</span>"))
       p <- plot_ly()
       if (!is.null(sA) && nrow(sA))
         p <- p %>% add_trace(x = month.abb[sA$mon], y = sA$cpn, type = "scatter",
@@ -1079,7 +1106,7 @@ function(input, output, session) {
     }
     if (isTRUE(input$seasonBySpecies)) {
       s <- seasonality(d, by_species = TRUE)
-      if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
+      if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try a wider date window via change site</span>"))
       pal <- rv$pal; p <- plot_ly()
       for (sp in unique(s$scientificName)) {
         ss <- s[s$scientificName == sp, ]
@@ -1094,7 +1121,7 @@ function(input, output, session) {
         yaxis = list(title = "catch per 100 trap-nights")))
     }
     s <- seasonality(d, by_species = FALSE)
-    if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try widening the date window at left</span>"))
+    if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try a wider date window via change site</span>"))
     p <- plot_ly(x = month.abb[s$mon], y = s$cpn, type = "scatter", mode = "lines+markers",
             name = "all ground beetles", fill = "tozeroy", fillcolor = "rgba(19,99,43,0.16)",
             line = list(color = "#36d98a", width = 3), marker = list(size = 7, color = "#36d98a"),
