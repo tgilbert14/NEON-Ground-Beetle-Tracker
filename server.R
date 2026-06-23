@@ -1075,6 +1075,61 @@ function(input, output, session) {
           HTML(sprintf("higher \U2192 <b>%s</b> beetles", dir)))))
   })
 
+  # The honest-note popover body (Cara), rendered dynamically so it quotes THIS
+  # site's actual dredge (driver, r, lag, p, n) and biome-conditions the noise
+  # paragraph + the lag critique. A hardcoded SRER note would misreport at a
+  # temperate site where the dredge lands on a different driver / lag.
+  output$envHonestNote <- renderUI({
+    rk <- env_rank(); if (is.null(rk) || !nrow(rk))
+      return(p("Load a site with co-located climate to see this read."))
+    pv <- env_pval(); top <- rk[1, ]
+    drv <- tolower(top$label); rtxt <- sprintf("%+.2f", top$r)
+    nser <- if (!is.null(pv)) pv$n_search else nrow(rk) * 13L
+    nmo <- top$n; lag <- top$lag
+    p_ok <- !is.null(pv) && is.finite(pv$p); not_sig <- p_ok && pv$p >= 0.05
+    pct <- if (p_ok) round(pv$p * 100) else NA_integer_
+    d <- rv$data
+    site_code <- rv$siteCode %||% (if (!is.null(d) && "siteID" %in% names(d)) {
+      sx <- d$siteID[!is.na(d$siteID)]; if (length(sx)) names(sort(table(sx), decreasing = TRUE))[1] else NULL
+    } else NULL)
+    water <- identical(seasonal_biome(site_code), "water-limited")
+
+    luck <- if (!p_ok)
+      tagList(tags$b("Too few years to run the luck check."),
+        sprintf(" The match (r = %s on %s) is the best of %d driver-and-lag combinations over only %d months, too short to shuffle-test. With a search this wide and a series this short, the strongest line-up is very likely chance, so treat it as a lead, not a result.",
+          rtxt, drv, nser, nmo))
+    else if (not_sig)
+      tagList(tags$b("The luck check did not pass."),
+        sprintf(" The match (r = %s on %s) is the best of %d driver-and-lag combinations over just %d overlapping months. When you look %d times, your best look is usually large by chance. The shuffle test agrees: random reshuffles beat this match about %d times in 100 (p = %.2f). So this is most likely noise, which is why we label it Apparent, not real.",
+          rtxt, drv, nser, nmo, nser, pct, pv$p))
+    else
+      tagList(tags$b("It cleared the luck check, but stay cautious."),
+        sprintf(" The match (r = %s on %s) beat the shuffle test (p = %.2f), uncommon for the best of %d driver-and-lag combinations. Over only %d months, even a real-looking link can ride on a couple of big years, so treat it as a lead to confirm, not a settled driver.",
+          rtxt, drv, pv$p, nser, nmo))
+
+    lagp <- if (lag >= 3)
+      tagList(tags$b(sprintf("A %d-month lag does not fit beetle biology.", lag)),
+        " What a pitfall trap counts is activity, how much beetles walk, not how many there are. Warm, moist nights get beetles moving the same night, so any real weather effect should show up fast, within a month or so, not most of a year later. A delay this long has no carabid mechanism behind it; it is usually just the lag where two wandering lines happened to cross.")
+    else
+      tagList(tags$b("Remember what a pitfall trap measures."),
+        sprintf(" It counts activity, how much beetles walk, not how many there are, so warm, moist conditions can lift the catch just by getting beetles moving. The %s lag here is at least biologically plausible, but read it as movement plus abundance, not a clean population signal.",
+          if (lag == 0) "same-month" else sprintf("%d-month", lag)))
+
+    noisep <- if (water)
+      tagList(tags$b("And monsoon storms can wash the signal out, literally."),
+        " Heavy rain floods and overflows the trap cups, so specimens float out and catch is lost; it also dilutes the preservative and can knock traps around. The rainiest months are the months with the least reliable catch, so a true short-lag rain effect gets buried by lost samples. Many desert ground beetles are also spring or night active, only loosely tied to the peak summer rains.")
+    else
+      tagList(tags$b("And the catch itself carries noise."),
+        " Storms, flooding, and trap disturbance cost samples in the wettest stretches, bout timing varies year to year, and many carabids are seasonal or night active, so the months with the strongest weather are often the months with the least reliable catch.")
+
+    tagList(
+      p("This panel hunts through dozens of driver-and-lag combinations and shows you the strongest match it finds. That is a fishing expedition, not a test, so treat the headline gently."),
+      p(luck), p(lagp), p(noisep),
+      p(tags$b("Read this panel as a place to generate ideas, not proof that weather drives beetle activity."),
+        if (water) " The honest next step is a within-season look at the monsoon months, not a longer lag."
+        else " The honest next step is a within-season look, not a longer lag."))
+  })
+
   # The DEMOTED dredge block (BE4): the static #envDredgeBlock in ui.R holds the
   # headline (envCorrNote) + bars (envDriverRank) below the prior-first seasonal
   # read, already framed by the "exploratory best-of-52" eyebrow + honest popover.
