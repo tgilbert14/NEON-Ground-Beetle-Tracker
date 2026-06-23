@@ -403,6 +403,32 @@ is_introduced <- function(scientificName) {
 fmt_int <- function(x) formatC(x, format = "d", big.mark = ",")
 
 # ---------------------------------------------------------------------------
+# Pin-card HTML for the tap-to-pin charts (pincards.js). Each point's customdata
+# carries this small card; the JS makes a draggable/resizable pin from it and
+# bakes it into the exported PNG. data-tag keys the pin so a duplicate tap on the
+# same point just pulses the existing card instead of stacking duplicates.
+#
+# Vectorized: title/lines/tag may be vectors (one card per plotted point), as the
+# lines+markers traces pass a customdata vector. `lines` may be a single string
+# (one line) or, for multi-line cards, a character vector the same length built by
+# the caller. HTML-escapes every interpolated value (taxon names are data).
+# ---------------------------------------------------------------------------
+.html_escape <- function(x) {
+  x <- as.character(x %||% "")
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;",  x, fixed = TRUE)
+  x <- gsub(">", "&gt;",  x, fixed = TRUE)
+  gsub("'", "&#39;", x, fixed = TRUE)
+}
+pin_card_html <- function(title, lines, tag = title) {
+  title <- .html_escape(title)
+  lines <- .html_escape(lines)
+  tag   <- .html_escape(tag)
+  sprintf("<div data-tag='%s'><b>%s</b><br><span class='smt-pin-stats'>%s</span></div>",
+          tag, title, lines)
+}
+
+# ---------------------------------------------------------------------------
 # Codebook (data dictionary) for the CSV export — one row per exported column.
 # Single source of truth so the shipped codebook can never drift from the data;
 # the download handler asserts these `column` names match the frame it writes.

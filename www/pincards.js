@@ -1,0 +1,396 @@
+/* =========================================================================
+   pincards.js — tap-to-pin cards + export-with-pins for the Ground Beetle charts.
+
+   Ported from the flagship Small Mammal Tracker pin-card system (via the Plant
+   Diversity / Veg Structure ports) onto PLOTLY: a draggable / resizable card +
+   gold leader line + html-to-image "download with the pins baked in" — but the
+   click is detected with plotly's native `plotly_click` event and the card HTML
+   rides in each point's `customdata`, so there's no second rendering stack (the
+   app stays plotly).
+
+   The pins, the leader-line SVG layer, and the gold anchor dots all live INSIDE
+   the chart's `.smt-pinnable` box (not the plot div), so they travel with the
+   box and — crucially — get captured when html-to-image snapshots the box.
+
+   Anchors are stored as DATA coordinates (not frozen pixels), so they reposition
+   correctly on resize / fullscreen / relayout. The plotly_click handler is
+   RE-attached on every (re)render: a Shiny+plotly re-render runs purge+newPlot
+   on the SAME div, which silently wipes gd.on() listeners — so a one-time bind
+   left the chart dead after the first re-render.
+
+   Beetle accents: gold leader line (--gold) + carabid-green dot stroke (--green).
+   ========================================================================= */
+(function () {
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+
+  /* leader-line palette, read once from the live CSS tokens so the pins stay
+     theme-aware. Static hexes are the fallback if the tokens aren't present. */
+  var cssVar = function (name, fallback) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  };
+  var LINE_STROKE = cssVar("--gold", "#c79a1c");    // desert gold leader line
+  var DOT_STROKE = cssVar("--green", "#3f9a52");    // carabid green dot stroke
+
+  function boxOf(node) { return node ? node.closest(".smt-pinnable") : null; }
+  function bgColor() {
+    var dark = document.documentElement.getAttribute("data-bs-theme") === "dark" ||
+               document.body.getAttribute("data-bs-theme") === "dark";
+    return cssVar("--paper", dark ? "#16261c" : "#ffffff");
+  }
+
+  /* map a data point (dx, dy) to box-relative pixels via plotly's live axes, so
+     a pin's leader line follows the dot through any resize/relayout.
+     l2p wants the axis's LINEAR coordinate. plotly_click hands x/y back as the raw
+     DATA value, so coerce against the axis type before projecting: log10 it on a log
+     axis (the rank-abundance curve), epoch-ms it on a date axis — else the leader line
+     falls back to box-centre with no anchor. */
+  function l2pVal(ax, v) {
+    if (ax && ax.type === "log" && typeof v === "number" && v > 0) v = Math.log(v) / Math.LN10;
+    else if (ax && ax.type === "date" && typeof v === "string") { var t = Date.parse(v); if (!isNaN(t)) v = t; }
+    return ax.l2p(v);
+  }
+  function anchorPx(gd, box, dx, dy) {
+    var fl = gd && gd._fullLayout;
+    if (!fl || !fl.xaxis || !fl.yaxis || typeof fl.xaxis.l2p !== "function") return null;
+    var gdR = gd.getBoundingClientRect(), boxR = box.getBoundingClientRect();
+    return {
+      ax: l2pVal(fl.xaxis, dx) + fl.xaxis._offset + (gdR.left - boxR.left),
+      ay: l2pVal(fl.yaxis, dy) + fl.yaxis._offset + (gdR.top - boxR.top)
+    };
+  }
+
+  function linesLayer(box) {
+    var s = box.querySelector(":scope > svg.smt-pin-lines");
+    if (!s) {
+      s = document.createElementNS(NS, "svg");
+      s.setAttribute("class", "smt-pin-lines");
+      box.appendChild(s);
+    }
+    return s;
+  }
+  /* x2/y2 chase the card centre (honours its scale() transform via getBoundingClientRect) */
+  function updateLine(pin) {
+    if (!pin.__line) return;
+    var r = pin.getBoundingClientRect(), b = pin.__box.getBoundingClientRect();
+    pin.__line.setAttribute("x2", r.left - b.left + r.width / 2);
+    pin.__line.setAttribute("y2", r.top - b.top + r.height / 2);
+  }
+
+  /* clear pins. With a boxId, scope to that one chart's box (so a multi-chart page
+     can clear one without wiping the others); with no arg, clear every box. */
+  window.smtClearPins = function (boxId) {
+    var root = boxId ? document.getElementById(boxId) : document;
+    if (!root) return;
+    root.querySelectorAll(".smt-pin").forEach(function (p) { p.remove(); });
+    root.querySelectorAll("svg.smt-pin-lines").forEach(function (s) { s.innerHTML = ""; });
+  };
+
+  /* re-anchor every pin's leader line + dot from its stored DATA coords */
+  function repositionAll(gd, box) {
+    box.querySelectorAll(".smt-pin").forEach(function (pin) {
+      if (pin.__dx == null || !pin.__line) return;
+      var a = anchorPx(gd, box, pin.__dx, pin.__dy);
+      if (!a) return;
+      pin.__line.setAttribute("x1", a.ax); pin.__line.setAttribute("y1", a.ay);
+      if (pin.__dot) { pin.__dot.setAttribute("cx", a.ax); pin.__dot.setAttribute("cy", a.ay); }
+      updateLine(pin);
+    });
+  }
+
+  function makePin(gd, box, html, dx, dy, key) {
+    var bR = box.getBoundingClientRect();
+    var a = anchorPx(gd, box, dx, dy) || { ax: bR.width / 2, ay: bR.height / 2 };
+    var pin = document.createElement("div");
+    pin.className = "smt-pin";
+    pin.__box = box; pin.__key = key; pin.__dx = dx; pin.__dy = dy;
+    pin.innerHTML = "<button class='smt-pin-close' title='Close'>&times;</button>" + html;
+    pin.querySelectorAll("em.smt-pin-hint").forEach(function (em) {
+      var br = em.previousElementSibling;
+      if (br && br.tagName === "BR") br.remove();
+      em.remove();
+    });
+    var grip = document.createElement("div");
+    grip.className = "smt-pin-resize";
+    grip.title = "Drag to resize · double-tap to reset";
+    pin.appendChild(grip);
+
+    /* position the card near the dot, clamped on BOTH axes so the close button
+       and resize grip always stay inside the box (and inside an exported PNG) */
+    pin.style.left = Math.max(4, Math.min(a.ax + 24, bR.width - 250)) + "px";
+    pin.style.top = Math.max(4, Math.min(a.ay + 14, bR.height - 150)) + "px";
+    box.appendChild(pin);
+
+    var layer = linesLayer(box);
+    var ln = document.createElementNS(NS, "line");
+    ln.setAttribute("x1", a.ax); ln.setAttribute("y1", a.ay);
+    ln.setAttribute("stroke", LINE_STROKE); ln.setAttribute("stroke-width", "2.5");
+    ln.setAttribute("stroke-linecap", "round");
+    layer.appendChild(ln);
+    var dot = document.createElementNS(NS, "circle");
+    dot.setAttribute("cx", a.ax); dot.setAttribute("cy", a.ay); dot.setAttribute("r", "4.5");
+    dot.setAttribute("fill", LINE_STROKE); dot.setAttribute("stroke", DOT_STROKE);
+    dot.setAttribute("stroke-width", "1.5");
+    layer.appendChild(dot);
+    pin.__line = ln; pin.__dot = dot;
+    updateLine(pin);
+
+    pin.querySelector(".smt-pin-close").addEventListener("click", function () {
+      ln.remove(); dot.remove(); pin.remove();
+    });
+
+    /* drag-to-move (clamped so a fat-thumb drag can't fling the card off-box).
+       A 4px move threshold (S8): a near-miss TAP — e.g. a few px off a chip —
+       never engages the drag or preventDefaults, so the intended click still fires.
+       move/up/cancel bound on WINDOW + capture released (S7): a pointerup off the
+       card (scroll-steal, edge swipe, pointercancel) can never leave it stuck. */
+    pin.addEventListener("pointerdown", function (ev) {
+      if (ev.target.closest("a, .smt-pin-close, .smt-open, .smt-pin-resize")) return;
+      var sx = ev.clientX - pin.offsetLeft, sy = ev.clientY - pin.offsetTop;
+      var startX = ev.clientX, startY = ev.clientY, dragging = false;
+      function mv(em) {
+        if (!dragging) {
+          if (Math.abs(em.clientX - startX) < 4 && Math.abs(em.clientY - startY) < 4) return;
+          dragging = true;
+          try { pin.setPointerCapture(ev.pointerId); } catch (e) {}
+        }
+        em.preventDefault();
+        var nb = pin.__box.getBoundingClientRect();
+        pin.style.left = Math.max(4, Math.min(em.clientX - sx, nb.width - 40)) + "px";
+        pin.style.top = Math.max(4, Math.min(em.clientY - sy, nb.height - 28)) + "px";
+        updateLine(pin);
+      }
+      function up() {
+        window.removeEventListener("pointermove", mv);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        try { pin.releasePointerCapture(ev.pointerId); } catch (e) {}
+      }
+      window.addEventListener("pointermove", mv);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    });
+
+    /* grip-to-resize via scale() (clientX throughout, matching drag, so a
+       scrolling mobile viewport can't make the scale jump). move/up/cancel on
+       WINDOW + capture released, matching the drag handler (S7). */
+    grip.addEventListener("pointerdown", function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      try { grip.setPointerCapture(ev.pointerId); } catch (e) {}
+      var startX = ev.clientX, startScale = pin.__scale || 1;
+      var baseW = pin.getBoundingClientRect().width / startScale;
+      function mv(em) {
+        var s = Math.min(2.4, Math.max(0.5, startScale + (em.clientX - startX) / baseW));
+        pin.__scale = s; pin.style.transform = "scale(" + s + ")"; updateLine(pin);
+      }
+      function up() {
+        window.removeEventListener("pointermove", mv);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        try { grip.releasePointerCapture(ev.pointerId); } catch (e) {}
+      }
+      window.addEventListener("pointermove", mv);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    });
+    grip.addEventListener("dblclick", function () {
+      pin.__scale = 1; pin.style.transform = ""; updateLine(pin);
+    });
+    return pin;
+  }
+
+  function handleClick(gd, box, d) {
+    if (!d || !d.points || !d.points.length) return;
+    var pt = d.points[0];
+    var html = pt.customdata;
+    if (!html || typeof html !== "string") return;   // only points carrying a card (skip the fit line)
+    // Only treat customdata as a PIN card when it carries card markup. A bare
+    // member-reveal key (e.g. a taxon name routed to the server via source=) is a
+    // string too, but it has no tag/markup — leave it for the server's observeEvent.
+    if (html.indexOf("<") === -1 && html.indexOf("data-tag='") === -1) return;
+    var key = (html.match(/data-tag='([^']+)'/) || [])[1] || html.slice(0, 48);
+    var dup = Array.prototype.find.call(box.querySelectorAll(".smt-pin"),
+      function (p) { return p.__key === key; });
+    if (dup) { dup.classList.remove("smt-pulse"); void dup.offsetWidth; dup.classList.add("smt-pulse"); return; }
+    /* anchor from the DATA point (not the finger): exact, and touch-safe — on
+       touch devices plotly's synthesized event has no usable clientX/Y */
+    makePin(gd, box, html, pt.x, pt.y, key);
+  }
+
+  /* identity-based signature: the sorted set of pinnable point tags. Stable when
+     the chart is merely recoloured or a point is selected (same plot set), so
+     pinned cards survive those re-renders; changes only when the plotted
+     entities actually change (e.g. a new site) -> then pins clear. */
+  function dataSig(gd) {
+    if (!gd.data || !gd.data.length) return "";
+    var tags = [];
+    gd.data.forEach(function (t) {
+      if (t.customdata) t.customdata.forEach(function (h) {
+        var m = String(h).match(/data-tag='([^']+)'/); if (m) tags.push(m[1]);
+      });
+    });
+    return tags.sort().join(",");
+  }
+
+  /* (re)bind a plotly graph div. Safe to call repeatedly — it removes any prior
+     handler first. Clears pins when the underlying DATA changed (filter / select).
+     A graph div carrying a Shiny `source=` (the env-driver-rank click stream) keeps
+     its OWN plotly_click for the server; we still add the pin handler — both fire,
+     pins ignore the non-string member-reveal customdata above. */
+  function bindPlot(gd) {
+    if (!gd || typeof gd.on !== "function") return;
+    var box = boxOf(gd); if (!box) return;
+
+    var sig = dataSig(gd);
+    if (gd.__smtSig !== undefined && gd.__smtSig !== sig) {
+      box.querySelectorAll(".smt-pin").forEach(function (p) { p.remove(); });
+      var ll = box.querySelector("svg.smt-pin-lines"); if (ll) ll.innerHTML = "";
+    }
+    gd.__smtSig = sig;
+
+    if (gd.__smtClick && gd.removeListener) { try { gd.removeListener("plotly_click", gd.__smtClick); } catch (e) {} }
+    gd.__smtClick = function (d) { handleClick(gd, box, d); };
+    gd.on("plotly_click", gd.__smtClick);
+
+    if (gd.__smtRelayout && gd.removeListener) { try { gd.removeListener("plotly_relayout", gd.__smtRelayout); } catch (e) {} }
+    gd.__smtRelayout = function () { repositionAll(gd, box); };
+    gd.on("plotly_relayout", gd.__smtRelayout);
+
+    if (!box.__smtRO && window.ResizeObserver) {
+      box.__smtRO = new ResizeObserver(function () {
+        var g = box.querySelector(".js-plotly-plot"); if (g) repositionAll(g, box);
+      });
+      box.__smtRO.observe(box);
+    }
+  }
+
+  function scan() {
+    document.querySelectorAll(".smt-pinnable .js-plotly-plot").forEach(bindPlot);
+  }
+  /* rAF-coalesced scan so the document-wide observer doesn't run scan() on every
+     count-up / DT / plotly mutation (it fires in bursts during animations) */
+  var scanPending = false;
+  function scanSoon() {
+    if (scanPending) return;
+    scanPending = true;
+    requestAnimationFrame(function () { scanPending = false; scan(); });
+  }
+
+  /* ---- exports (with a toast + double-fire guard) ------------------------- */
+  function toastStart(msg) {
+    if (typeof Swal === "undefined") return;
+    Swal.fire({ toast: true, position: "top-end", title: msg, showConfirmButton: false,
+      allowOutsideClick: false, didOpen: function () { if (Swal.showLoading) Swal.showLoading(); } });
+  }
+  function toastDone(msg, isErr) {
+    if (typeof Swal === "undefined") return;
+    Swal.fire({ toast: true, position: "top-end", icon: isErr ? "error" : "success",
+      title: msg, showConfirmButton: false, timer: 2200 });
+  }
+  function downloadUrl(url, name) {
+    var a = document.createElement("a"); a.download = name; a.href = url; a.click();
+  }
+  var saving = false;
+  function snap(node, name) {
+    if (!node || typeof htmlToImage === "undefined" || saving) return;
+    saving = true;
+    // force the plotly chart to its current size first (a tab that rendered while
+    // hidden, or a just-toggled fullscreen, can leave a 0-sized / stale SVG)
+    var gd = node.querySelector ? node.querySelector(".js-plotly-plot") : null;
+    if (gd && window.Plotly && Plotly.Plots) { try { Plotly.Plots.resize(gd); } catch (e) {} }
+    node.querySelectorAll(".smt-pin.smt-pulse").forEach(function (p) { p.classList.remove("smt-pulse"); });
+    toastStart("Rendering image…");
+    setTimeout(function () {
+      htmlToImage.toPng(node, { pixelRatio: 2, backgroundColor: bgColor(), cacheBust: true, skipFonts: true,
+        filter: function (n) { return !(n.classList && (n.classList.contains("smt-pin-close") ||
+          n.classList.contains("smt-pin-resize") || n.classList.contains("smt-snap-btn") ||
+          n.classList.contains("smt-clear-btn"))); } })   // keep cards + leader lines; drop chrome buttons
+        .then(function (url) { downloadUrl(url, name); toastDone("Saved ✓"); })
+        .catch(function () { toastDone("Render failed — try again", true); })
+        .then(function () { saving = false; });
+    }, 90);
+  }
+  function stamp() {
+    var d = new Date();
+    return d.getFullYear() + ("0" + (d.getMonth() + 1)).slice(-2) + ("0" + d.getDate()).slice(-2);
+  }
+  function siteTag() { return (window.__beetleSite || "site").replace(/[^A-Za-z0-9]+/g, ""); }
+
+  /* per-box export: snapshot ONE chart's .smt-pinnable box (pins + leader lines
+     baked in) by its id. filename may be a literal or contain "<site>"/"<date>"
+     placeholders the toolbar buttons don't need to compute in R. */
+  window.smtSave = function (boxId, filename) {
+    var node = boxId ? document.getElementById(boxId) : document.querySelector(".smt-pinnable");
+    if (!node) return;
+    var name = String(filename || ("neon-beetle-" + (boxId || "chart") + "-" + siteTag() + "_" + stamp()))
+      .replace(/<site>/g, siteTag()).replace(/<date>/g, stamp());
+    if (!/\.png$/i.test(name)) name += ".png";
+    snap(node, name);
+  };
+
+  /* Scroll a rendered QC/profile card into view once it materialises (kept for
+     parity with the suite; harmless if #qcCardNode never renders here). Hard-won:
+     • the card re-renders async, so poll for the actual rendered node ~2.5s.
+     • behavior:"auto" (instant), NOT "smooth": inside a nested bslib fill
+       container smooth scrollIntoView silently no-ops; instant is reliable and
+       respects reduced-motion by definition. */
+  function revealQcCard() {
+    var tries = 0;
+    (function go() {
+      var n = document.getElementById("qcCardNode");
+      if (n && n.getBoundingClientRect().height > 1) {
+        n.scrollIntoView({ behavior: "auto", block: "start" });
+        return;
+      }
+      if (++tries < 50) setTimeout(go, 50);
+    })();
+  }
+
+  /* tap (or keyboard-activate) a highlighted chip inside a pinned card -> ask the
+     server for that entity (kept for parity; the beetle QC flags use inline-onclick
+     to beetleQcInspect directly, so this is dormant unless a card adds a .smt-open). */
+  function openChip(el) {
+    if (!el || !window.Shiny) return;
+    var tag = el.getAttribute("data-tag");
+    if (!tag) return;
+    Shiny.setInputValue("qcCardRequest", tag, { priority: "event" });
+    revealQcCard();
+  }
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest(".smt-open");
+    if (el) openChip(el);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var el = e.target.closest && e.target.closest(".smt-open");
+    if (el) { e.preventDefault(); openChip(el); }
+  });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var mo = new MutationObserver(scanSoon);
+    mo.observe(document.body, { childList: true, subtree: true });
+    scan();
+  });
+  /* re-bind/re-fit when a tab becomes visible (plotly in a hidden tab can render
+     late, and a tab-show dispatches a resize that relayouts the plot) */
+  document.addEventListener("shown.bs.tab", function () { setTimeout(scan, 80); });
+
+  /* the server may fire "beetleSite" with the loaded site code so self-describing
+     export filenames name the site; also accepts "smtRevealQc" for parity.
+     Registered LAST and fully guarded so a duplicate/late registration can never
+     kill the pin-binding listeners above; self-polls because this IIFE runs at
+     <head> before Shiny exists. */
+  (function registerReveal() {
+    try {
+      if (window.Shiny && Shiny.addCustomMessageHandler) {
+        Shiny.addCustomMessageHandler("smtRevealQc", function () { revealQcCard(); });
+        Shiny.addCustomMessageHandler("beetleSite", function (msg) {
+          if (msg && msg.site) window.__beetleSite = String(msg.site);
+        });
+        return;
+      }
+    } catch (e) { return; }
+    setTimeout(registerReveal, 60);
+  })();
+})();

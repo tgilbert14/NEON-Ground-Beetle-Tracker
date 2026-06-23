@@ -725,3 +725,80 @@ body {
   .hero-change { margin-left: 0; }
   .hero-change, .hero-report { flex: 1 1 100%; justify-content: center; }
 }
+
+/* ===========================================================================
+   PIN CARDS — tap-to-pin info cards, gold leader lines, per-chart export
+   toolbars (driven by www/pincards.js). Ported from the flagship Small Mammal
+   Tracker via the Plant Diversity / Veg Structure suite ports, recolored to the
+   beetle accents: gold (--gold) leader line, carabid-green (--green) toolbar.
+   =========================================================================== */
+
+/* the chart box is the positioning context for pins + the leader-line layer */
+.smt-pinnable { position: relative; }
+svg.smt-pin-lines {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; overflow: visible; z-index: 5;
+}
+
+/* the pinned info card (dark, gold-edged, draggable, scalable) */
+.smt-pin {
+  position: absolute; z-index: 6; max-width: 250px;
+  background: rgba(22, 38, 28, 0.97); color: #fff;
+  border: 2px solid var(--gold); border-radius: 10px;
+  padding: 9px 12px 12px; font-size: 12.5px; line-height: 1.42;
+  box-shadow: 0 12px 32px rgba(16, 30, 20, 0.40);
+  cursor: grab; transform-origin: top left; touch-action: none;
+}
+.smt-pin:active { cursor: grabbing; }
+.smt-pin b { color: #fff; }
+.smt-pin i, .smt-pin em { color: #cfe0d3; font-style: italic; }
+.smt-pin-stats { color: #b6c7ba; font-size: 11.5px; }
+.smt-pin .smt-open {
+  display: inline-block; margin-top: 7px; padding: 2px 9px;
+  color: #16261c; background: var(--gold); border-radius: 6px;
+  font-weight: 600; font-size: 11.5px; cursor: pointer;
+}
+.smt-pin .smt-open:hover { background: #d8ab2a; }
+.smt-pin-close {
+  position: absolute; top: 1px; right: 6px; background: none; border: none;
+  color: #cfe0d3; font-size: 17px; line-height: 1; cursor: pointer; padding: 0;
+}
+.smt-pin-close:hover { color: #fff; }
+.smt-pin-resize {
+  position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px;
+  cursor: nwse-resize; touch-action: none; opacity: 0.5;
+  background: linear-gradient(135deg, transparent 50%, var(--gold) 50%);
+  border-radius: 0 0 8px 0;
+}
+.smt-pin-resize:hover { opacity: 1; }
+@keyframes smtPulse {
+  0%, 100% { box-shadow: 0 12px 32px rgba(16, 30, 20, 0.40); }
+  50% { box-shadow: 0 0 0 4px var(--gold), 0 12px 32px rgba(16, 30, 20, 0.5); }
+}
+.smt-pin.smt-pulse { animation: smtPulse 0.5s ease 2; }
+
+/* per-chart export toolbar (Download with pins · Clear pins) */
+.smt-toolbar {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 10px;
+}
+.smt-snap-btn, .smt-clear-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 8px; padding: 5px 12px; font-weight: 600; font-size: 12.5px; cursor: pointer;
+}
+.smt-snap-btn { background: var(--green); color: #fff; border: none; }
+.smt-snap-btn:hover { background: var(--forest); }
+.smt-clear-btn { background: transparent; color: var(--green); border: 1px solid var(--line); }
+.smt-clear-btn:hover { background: var(--bg); }
+.smt-toolbar-hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+[data-bs-theme="dark"] .smt-clear-btn { border-color: rgba(255,255,255,.16); }
+
+/* member-reveal modals (a clicked taxon / community's records) reuse the QC
+   inspector table styles already in this sheet; this is just the intro copy. */
+.reveal-intro { font-size: 13.5px; color: var(--ink); margin: 2px 0 12px; line-height: 1.5; }
+.reveal-intro b { color: var(--forest); }
+.reveal-cta { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .smt-pin.smt-pulse { animation: none !important; }
+}

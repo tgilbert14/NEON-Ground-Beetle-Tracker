@@ -8,6 +8,26 @@ card_head <- function(icon, title, ...)
   bslib::card_header(class = "with-info", bsicons::bs_icon(icon),
                      tags$span(class = "ch-title", " ", title), ...)
 
+# A pinnable chart box: wraps a plotlyOutput in the `.smt-pinnable` positioning
+# context (so pins + leader lines live inside it and ride into the exported PNG)
+# and prepends a per-chart export toolbar. `chart` is a short slug used in the
+# self-describing filename neon-beetle-<chart>-<site>.png; the scoped JS fns take
+# the box id so one chart's pins clear/export without touching the others.
+pinnable_chart <- function(box_id, chart, output_id, height = "440px", hint = NULL) {
+  fname <- sprintf("neon-beetle-%s-<site>_<date>.png", chart)
+  tagList(
+    div(class = "smt-toolbar",
+      tags$button(type = "button", class = "smt-snap-btn",
+        onclick = sprintf("window.smtSave('%s','%s')", box_id, fname),
+        bsicons::bs_icon("download"), " Download (with pins)"),
+      tags$button(type = "button", class = "smt-clear-btn",
+        onclick = sprintf("window.smtClearPins('%s')", box_id),
+        bsicons::bs_icon("x-circle"), " Clear pins"),
+      if (!is.null(hint)) div(class = "smt-toolbar-hint", bsicons::bs_icon("hand-index-thumb"), " ", hint)),
+    div(class = "smt-pinnable", id = box_id,
+      spin(plotly::plotlyOutput(output_id, height = height))))
+}
+
 ui <- bslib::page_fillable(
   theme = app_theme,
   window_title = "NEON Ground Beetle Tracker",
@@ -17,6 +37,14 @@ ui <- bslib::page_fillable(
     tags$link(rel = "stylesheet",
       href = "https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap"),
     tags$link(rel = "stylesheet", href = "styles.css"),
+    # pin-card export deps (toast + DOM->PNG) and the pin-card engine itself.
+    # SweetAlert is optional chrome (the export still runs without it); html-to-image
+    # bakes the pins + leader lines into the downloaded PNG. pincards.js binds the
+    # plotly_click pin handler on every (re)render of any .smt-pinnable chart.
+    tags$link(rel = "stylesheet", href = "https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css"),
+    tags$script(src = "https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js"),
+    tags$script(src = "https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"),
+    tags$script(src = "pincards.js"),
     # Remember the last site across visits, and honour ?site=SRER in the URL so a
     # site is bookmarkable/shareable. Polls until Shiny + jQuery exist (load-order
     # safe); every step is wrapped so a privacy-locked localStorage never breaks boot.
@@ -194,7 +222,8 @@ ui <- bslib::page_fillable(
                 " so effort is accounted for."),
               p(tags$b("Activity, not density."), " Pitfall catch \U221D activity \U00D7 density, so fast, large, surface-active hunters (tiger beetles, ", tags$em("Pasimachus"), ") score high regardless of true abundance, so compare like body plans, not a tiger beetle against a litter specialist."),
               p("Pitfall catch is activity times density, so active surface hunters score high \U2014 it is not a head count."))),
-          spin(plotlyOutput("commBar", height = "460px"))),
+          pinnable_chart("commBarBox", "community", "commBar", height = "460px",
+            hint = "Tap a bar to list that species' records")),
         card(full_screen = TRUE,
           card_head("pin-map-fill", "Most widespread species, frequency of occurrence",
             info_pop("Frequency of occurrence (naive occupancy)",
@@ -244,7 +273,8 @@ ui <- bslib::page_fillable(
           card_head("bar-chart-steps", "Rank-abundance, the dominance curve",
             info_pop("Rank-abundance (Whittaker)",
               p("Species ranked from most to least abundant (log scale). The ", tags$b("shape"), " is the evenness story: a steep drop means a few species dominate; a shallow line means an even community, the same signal the Hill numbers above put into one number."))),
-          spin(plotlyOutput("rankAbundance", height = "360px")))
+          pinnable_chart("rankAbundanceBox", "rank-abundance", "rankAbundance", height = "360px",
+            hint = "Tap a point to pin its species + rank"))
       ),
 
       nav_panel(
@@ -270,7 +300,15 @@ ui <- bslib::page_fillable(
                   uiOutput("envHonestNote"))),
               uiOutput("envDredgeSub"),
               uiOutput("envCorrNote"),
-              spin(plotlyOutput("envDriverRank", height = "300px")))),
+              # export-only chrome: a click on a bar drives the overlay (server
+              # source="envrank"), so this chart isn't pinned — just give it the
+              # download toolbar + the .smt-pinnable box so it exports cleanly.
+              div(class = "smt-toolbar",
+                tags$button(type = "button", class = "smt-snap-btn",
+                  onclick = "window.smtSave('envDriverRankBox','neon-beetle-driver-rank-<site>_<date>.png')",
+                  bs_icon("download"), " Download chart")),
+              div(class = "smt-pinnable", id = "envDriverRankBox",
+                spin(plotlyOutput("envDriverRank", height = "300px"))))),
           tags$details(class = "env-overlay-details",
             tags$summary(bs_icon("sliders"), " Overlay a driver on the activity curve, with custom lead time (advanced)"),
             div(class = "env-pop-bar",
@@ -290,7 +328,8 @@ ui <- bslib::page_fillable(
               p("Mean ", tags$b("catch per 100 trap-nights"), " by calendar month, the whole-community activity curve, pooling ", tags$b("every ground beetle (Carabidae) trapped"), " at this site, including records left at genus/family. Toggle to split it by the top species."))),
           div(class = "season-toggle",
             checkboxInput("seasonBySpecies", "Split by species", value = FALSE)),
-          spin(plotlyOutput("seasonPlot", height = "440px"))),
+          pinnable_chart("seasonPlotBox", "seasonality", "seasonPlot", height = "440px",
+            hint = "Tap a month to pin it")),
         card(full_screen = TRUE,
           card_head("grid-3x3", "Phenology heatmap, each species' active months",
             info_pop("Phenology heatmap",
@@ -314,7 +353,8 @@ ui <- bslib::page_fillable(
             info_pop("Inter-annual trend",
               p("Annual ", tags$b("catch per 100 trap-nights"), " (or raw counts when a bundle lacks effort), with an ordinary-least-squares trend line."),
               p("The slope and its p-value drive the verdict above. Short series (a few years) are noisy, so read the direction, not the decimal."))),
-          spin(plotlyOutput("trendPlot", height = "440px")))
+          pinnable_chart("trendPlotBox", "trend", "trendPlot", height = "440px",
+            hint = "Tap a year to pin its catch"))
       ),
 
       nav_panel(
@@ -334,7 +374,8 @@ ui <- bslib::page_fillable(
               p("Every point is a ", tags$b("site × year"), " beetle community, placed by ",
                 tags$b("Bray–Curtis"), " dissimilarity (PCoA) so similar communities sit close together."),
               p("Points from the same site/biome cluster, the carabid biogeography signal. Computed across all bundled sites."))),
-          spin(plotlyOutput("ordPlot", height = "440px"))),
+          pinnable_chart("ordPlotBox", "ordination", "ordPlot", height = "440px",
+            hint = "Tap a point to reveal that site \U00D7 year community")),
         card(full_screen = TRUE,
           card_head("award", "Indicator species, each site's signature beetles",
             info_pop("Indicator value (IndVal)",

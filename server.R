@@ -175,6 +175,7 @@ function(input, output, session) {
     prog$set(value = 1, detail = "done")
     shinyjs::show("mainTabsWrap"); shinyjs::hide("splash"); shinyjs::hide("splashHome")
     session$sendCustomMessage("gbt_remember", site)   # persist last site for next visit
+    session$sendCustomMessage("beetleSite", list(site = site))  # name the site in pin-export filenames
   }
   # The Load button re-applies the current (possibly narrowed) date window.
   observeEvent(input$loadBtn, load_site(input$site, snap = FALSE))
@@ -631,6 +632,119 @@ function(input, output, session) {
       utils::write.csv(rep, file, row.names = FALSE, na = "")
     }, contentType = "text/csv")
 
+  # ---- clickable member-reveals: tap a chart element -> the exact records ----
+  # behind it, in a modal table, with a per-reveal CSV. Reuses the QC inspector
+  # table look (.inspect-tbl). Two streams: a community bar -> that SPECIES' rows;
+  # an ordination point -> that site x year community (top taxa).
+  reveal_cols <- c("siteID", "plotID", "collectDate", "year", "taxonID",
+    "scientificName", "taxonRank", "individualCount", "trapnights")
+  records_table_ui <- function(st, cap = NULL) {
+    show <- intersect(reveal_cols, names(st))
+    head_n <- min(nrow(st), 200L); sv <- st[seq_len(head_n), show, drop = FALSE]
+    tagList(
+      if (!is.null(cap)) div(class = "reveal-intro", HTML(cap)),
+      div(class = "qc-cap-scroll", tags$table(class = "inspect-tbl",
+        tags$thead(tags$tr(lapply(show, tags$th))),
+        tags$tbody(lapply(seq_len(nrow(sv)), function(i)
+          tags$tr(lapply(show, function(cc) tags$td(format(sv[[cc]][i])))))))),
+      if (nrow(st) > head_n)
+        p(class = "qc-cap-note", sprintf("Showing first %d of %d. Download for the full list.", head_n, nrow(st))))
+  }
+
+  # (a) COMMUNITY BAR -> that species' records ------------------------------
+  revealTaxon <- reactiveVal(NULL)
+  observeEvent(event_data("plotly_click", source = "commBar"), {
+    ev <- event_data("plotly_click", source = "commBar")
+    sp <- ev$customdata
+    d <- rv$data
+    if (is.null(sp) || !length(sp) || is.na(sp) || is.null(d)) return()
+    sp <- as.character(sp)[1]; revealTaxon(sp)
+    st <- d[!is.na(d$scientificName) & d$scientificName == sp, , drop = FALSE]
+    if (!nrow(st)) return()
+    st <- st[order(st$collectDate), , drop = FALSE]
+    ind <- sum(st$individualCount, na.rm = TRUE)
+    nb  <- length(unique(st$collectDate)); np <- length(unique(st$plotID))
+    intro <- if (is_introduced(sp))
+      " This is an <b>introduced</b> European carabid here, not native fauna." else ""
+    cap <- sprintf("<b><i>%s</i></b> at %s: <b>%s</b> individuals across <b>%d</b> sampling bout%s and <b>%d</b> plot%s.%s",
+      htmltools::htmlEscape(sp), rv$siteCode %||% "this site", fmt_int(ind),
+      nb, if (nb == 1) "" else "s", np, if (np == 1) "" else "s", intro)
+    showModal(modalDialog(
+      title = HTML(sprintf("\U0001FAB2 Records for <i>%s</i>", htmltools::htmlEscape(sp))),
+      easyClose = TRUE, size = "l",
+      footer = tagList(
+        downloadButton("revealTaxonCsv", "Download (CSV)", class = "btn-outline-secondary btn-sm"),
+        modalButton("Close")),
+      records_table_ui(st, cap)))
+  })
+  output$revealTaxonCsv <- downloadHandler(
+    filename = function() sprintf("NEON-beetles_%s_%s_%s.csv",
+      gsub("[^A-Za-z0-9]+", "-", revealTaxon() %||% "species"),
+      rv$siteCode %||% "site", format(Sys.Date(), "%Y%m%d")),
+    content = function(file) {
+      d <- rv$data; sp <- revealTaxon(); req(!is.null(d), !is.null(sp))
+      st <- d[!is.na(d$scientificName) & d$scientificName == sp,
+              intersect(reveal_cols, names(d)), drop = FALSE]
+      utils::write.csv(st, file, row.names = FALSE, na = "")
+    }, contentType = "text/csv")
+
+  # (b) ORDINATION POINT -> that site x year community --------------------------
+  # The ordination is a NATIONAL precompute (x/y/sample/site only), so member taxa
+  # for an arbitrary site are not in-session. When the clicked sample is the LOADED
+  # site we show its top taxa for that year from rv$data (+ CSV); otherwise we honour
+  # the honesty rule and just label the site x year with a "load it to explore" note.
+  revealOrd <- reactiveVal(NULL)
+  observeEvent(event_data("plotly_click", source = "ordPlot"), {
+    ev <- event_data("plotly_click", source = "ordPlot")
+    samp <- ev$customdata
+    if (is.null(samp) || !length(samp) || is.na(samp)) return()
+    samp <- as.character(samp)[1]; revealOrd(samp)
+    parts <- strsplit(samp, "\\|")[[1]]
+    scode <- parts[1]; syear <- suppressWarnings(as.integer(parts[2]))
+    d <- rv$data
+    loaded <- !is.null(d) && identical(scode, rv$siteCode %||% "")
+    body <- if (loaded) {
+      st <- d[!is.na(d$year) & d$year == syear & d$species_level %in% TRUE, , drop = FALSE]
+      if (!nrow(st)) {
+        div(class = "reveal-intro",
+          HTML(sprintf("No species-level records for <b>%s</b> in <b>%d</b> in the loaded window.", scode, syear)))
+      } else {
+        ct <- stats::aggregate(individualCount ~ scientificName, st, sum)
+        ct <- ct[order(-ct$individualCount), , drop = FALSE]
+        cap <- sprintf("<b>%s \U00B7 %d</b> community: <b>%d</b> species-level taxa, <b>%s</b> individuals. Top taxa below.",
+          scode, syear, nrow(ct), fmt_int(sum(ct$individualCount)))
+        topn <- utils::head(ct, 25); names(topn) <- c("Species", "Individuals")
+        tagList(div(class = "reveal-intro", HTML(cap)),
+          div(class = "qc-cap-scroll", tags$table(class = "inspect-tbl",
+            tags$thead(tags$tr(tags$th("Species"), tags$th("Individuals"))),
+            tags$tbody(lapply(seq_len(nrow(topn)), function(i)
+              tags$tr(tags$td(tags$em(topn$Species[i])), tags$td(fmt_int(topn$Individuals[i]))))))))
+      }
+    } else {
+      div(class = "reveal-intro",
+        HTML(sprintf("This point is the <b>%s \U00B7 %d</b> community. It isn't the site you have loaded, so its member taxa aren't in this session.", scode, syear)),
+        div(class = "reveal-cta", bs_icon("hand-index-thumb"),
+          HTML(sprintf(" Load <b>%s</b> (tap it on the map, or pick it under 'change site') to explore its community.", scode))))
+    }
+    showModal(modalDialog(
+      title = HTML(sprintf("\U0001F4CD %s \U00B7 %s community", scode, parts[2])),
+      easyClose = TRUE, size = "l",
+      footer = tagList(
+        if (loaded) downloadButton("revealOrdCsv", "Download (CSV)", class = "btn-outline-secondary btn-sm"),
+        modalButton("Close")),
+      body))
+  })
+  output$revealOrdCsv <- downloadHandler(
+    filename = function() sprintf("NEON-beetles_community_%s_%s.csv",
+      gsub("\\|", "-", revealOrd() %||% "sample"), format(Sys.Date(), "%Y%m%d")),
+    content = function(file) {
+      d <- rv$data; samp <- revealOrd(); req(!is.null(d), !is.null(samp))
+      parts <- strsplit(samp, "\\|")[[1]]; syear <- suppressWarnings(as.integer(parts[2]))
+      st <- d[!is.na(d$year) & d$year == syear & d$species_level %in% TRUE,
+              intersect(reveal_cols, names(d)), drop = FALSE]
+      utils::write.csv(st, file, row.names = FALSE, na = "")
+    }, contentType = "text/csv")
+
   # "answer up front" banner for the Overview — the community-composition story
   output$overviewVerdict <- renderUI({
     d <- rv$data; req(d)
@@ -664,14 +778,18 @@ function(input, output, session) {
     ct <- ct[order(ct$individuals), ]   # plotly bars: bottom = first
     pal <- rv$pal
     cols <- unname(pal[ct$scientificName]); cols[is.na(cols)] <- DDL$forest
+    # source="commBar" + customdata=~scientificName arms a click stream the server
+    # observer below turns into a "records behind this species" modal + CSV.
     p <- plot_ly(ct, x = ~individuals, y = ~factor(scientificName, levels = scientificName),
             type = "bar", orientation = "h",
+            source = "commBar", customdata = ~scientificName,
             marker = list(color = cols),
             text = ~paste0(cpn, " /100TN"), textposition = "outside",
             hovertemplate = ~paste0("<b>", scientificName, "</b><br>",
               individuals, " individuals · ", bouts, " bouts<br>",
-              cpn, " per 100 trap-nights<extra></extra>")) %>%
+              cpn, " per 100 trap-nights<br><i>click to list this species' records</i><extra></extra>")) %>%
       plotly_theme(legend = FALSE) %>%
+      plotly::event_register("plotly_click") %>%
       plotly::layout(xaxis = list(title = "individuals"),
                      yaxis = list(title = "", automargin = TRUE),  # fits names; shrinks on phones
                      margin = list(l = 10, r = 70, b = if (n_more > 0) 56 else 40)) %>%
@@ -763,7 +881,15 @@ function(input, output, session) {
     ra <- if (is.null(ra)) NULL else ra[is.finite(ra$rel) & ra$rel > 0, , drop = FALSE]   # log axis drops 0/NA silently
     if (is.null(ra) || nrow(ra) < 2) return(note_plot("Too few species<br>for a rank-abundance curve"))
     col <- if (is_dark()) "#36d98a" else DDL$forest
+    # per-point pin card (tap-to-pin via pincards.js): the species at this rank +
+    # its share/abundance. data-tag keys the pin so duplicate taps just pulse it.
+    ra$tip <- pin_card_html(
+      title = ra$scientificName,
+      lines = sprintf("#%d most abundant \U00B7 %s%% of named individuals (%s)",
+                      ra$rank, ra$rel, fmt_int(ra$individuals)),
+      tag = ra$scientificName)
     plot_ly(ra, x = ~rank, y = ~rel, type = "scatter", mode = "lines+markers",
+            customdata = ~tip,
             line = list(color = col, width = 2), marker = list(color = col, size = 6),
             hovertemplate = ~paste0("#", rank, "  <b>", scientificName, "</b><br>",
               rel, "% of species-level individuals (", individuals, ")<extra></extra>")) %>%
@@ -941,8 +1067,10 @@ function(input, output, session) {
       return(note_plot("Need at least two years of data for a trend<br><span style='font-size:13px'>try a wider date window via change site</span>"))
     kind <- attr(t, "metric_kind") %||% "cpn"
     ytitle <- if (kind == "cpn") "catch per 100 trap-nights" else "individuals caught"
+    t_tip <- pin_card_html(title = paste0(t$year, " at ", input$site %||% "this site"),
+      lines = sprintf("%.1f %s", t$metric, ytitle), tag = paste0("year-", t$year))
     p <- plot_ly(x = ~t$year, y = ~t$metric, type = "scatter", mode = "lines+markers",
-      name = "observed", line = list(color = "#36d98a", width = 3),
+      name = "observed", customdata = t_tip, line = list(color = "#36d98a", width = 3),
       marker = list(size = 9, color = "#36d98a"),
       hovertemplate = paste0("%{x}: %{y:.1f} ", ytitle, "<extra></extra>"))
     pred <- attr(t, "pred")
@@ -1264,16 +1392,22 @@ function(input, output, session) {
       if ((is.null(sA) || !nrow(sA)) && (is.null(sB) || !nrow(sB)))
         return(note_plot("No seasonal data<br><span style='font-size:13px'>try a wider date window via change site</span>"))
       p <- plot_ly()
-      if (!is.null(sA) && nrow(sA))
+      if (!is.null(sA) && nrow(sA)) {
+        tipA <- pin_card_html(title = paste0(input$site, " \U00B7 ", month.name[sA$mon]),
+          lines = sprintf("%.1f per 100 trap-nights", sA$cpn), tag = paste0("A-", sA$mon))
         p <- p %>% add_trace(x = month.abb[sA$mon], y = sA$cpn, type = "scatter",
-          mode = "lines+markers", name = input$site,
+          mode = "lines+markers", name = input$site, customdata = tipA,
           line = list(color = "#36d98a", width = 3), marker = list(size = 7, color = "#36d98a"),
           hovertemplate = paste0("<b>", input$site, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
-      if (!is.null(sB) && nrow(sB))
+      }
+      if (!is.null(sB) && nrow(sB)) {
+        tipB <- pin_card_html(title = paste0(input$compareSite, " \U00B7 ", month.name[sB$mon]),
+          lines = sprintf("%.1f per 100 trap-nights", sB$cpn), tag = paste0("B-", sB$mon))
         p <- p %>% add_trace(x = month.abb[sB$mon], y = sB$cpn, type = "scatter",
-          mode = "lines+markers", name = input$compareSite,
+          mode = "lines+markers", name = input$compareSite, customdata = tipB,
           line = list(color = "#d98a3c", width = 3, dash = "dot"), marker = list(size = 7, color = "#d98a3c"),
           hovertemplate = paste0("<b>", input$compareSite, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
+      }
       return(plotly_theme(p) %>% plotly::layout(
         xaxis = list(title = "", categoryorder = "array", categoryarray = month.abb),
         yaxis = list(title = "catch per 100 trap-nights")))
@@ -1284,8 +1418,12 @@ function(input, output, session) {
       pal <- rv$pal; p <- plot_ly()
       for (sp in unique(s$scientificName)) {
         ss <- s[s$scientificName == sp, ]
+        ss_tip <- pin_card_html(
+          title = sp,
+          lines = sprintf("%s: %.1f per 100 trap-nights", month.name[ss$mon], ss$cpn),
+          tag = paste0(sp, "-", ss$mon))
         p <- p %>% add_trace(x = month.abb[ss$mon], y = ss$cpn, type = "scatter",
-          mode = "lines+markers", name = sp,
+          mode = "lines+markers", name = sp, customdata = ss_tip,
           line = list(color = pal[[sp]] %||% "#36d98a", width = 2),
           marker = list(size = 6, color = pal[[sp]] %||% "#36d98a"),
           hovertemplate = paste0("<b>", sp, "</b><br>%{x}: %{y:.1f} /100TN<extra></extra>"))
@@ -1296,8 +1434,14 @@ function(input, output, session) {
     }
     s <- seasonality(d, by_species = FALSE)
     if (is.null(s) || !nrow(s)) return(note_plot("No seasonal data<br><span style='font-size:13px'>try a wider date window via change site</span>"))
+    s_tip <- pin_card_html(
+      title = paste0(month.name[s$mon], " activity"),
+      lines = sprintf("%.1f beetles per 100 trap-nights, pooled across all ground beetles at %s",
+                      s$cpn, input$site %||% "this site"),
+      tag = paste0("season-", s$mon))
     p <- plot_ly(x = month.abb[s$mon], y = s$cpn, type = "scatter", mode = "lines+markers",
             name = "all ground beetles", fill = "tozeroy", fillcolor = "rgba(19,99,43,0.16)",
+            customdata = s_tip,
             line = list(color = "#36d98a", width = 3), marker = list(size = 7, color = "#36d98a"),
             hovertemplate = "%{x}: %{y:.1f} per 100 trap-nights<extra></extra>")
     # optional environmental overlay (calendar-month climatology) on a right axis
@@ -1536,15 +1680,18 @@ function(input, output, session) {
     o$biome <- site_biome(o$site)
     ve <- attr(o, "var_explained")
     classes <- intersect(names(BIOME_COLORS), unique(o$biome))   # legend in palette order
-    p <- plot_ly()
+    # source="ordPlot" + customdata=~sample (site|year): a point click opens that
+    # community's member-reveal modal (top taxa + CSV when it's the loaded site).
+    p <- plot_ly(source = "ordPlot")
     for (b in classes) {
       ob <- o[o$biome == b, ]
       p <- p %>% add_trace(data = ob, x = ~x, y = ~y, type = "scatter", mode = "markers",
-        name = b, marker = list(size = 9, color = unname(BIOME_COLORS[b]), opacity = 0.8,
+        name = b, customdata = ~sample,
+        marker = list(size = 9, color = unname(BIOME_COLORS[b]), opacity = 0.8,
                                 line = list(color = "#fff", width = 1)),
-        hovertemplate = paste0("<b>%{text}</b><br>", b, "<extra></extra>"), text = ~site)
+        hovertemplate = paste0("<b>%{text}</b><br>", b, "<br><i>click for this community</i><extra></extra>"), text = ~site)
     }
-    plotly_theme(p) %>% plotly::layout(
+    plotly_theme(p) %>% plotly::event_register("plotly_click") %>% plotly::layout(
       legend = list(title = list(text = "biome")),
       xaxis = list(title = if (!is.na(ve[1])) sprintf("PCoA 1 (%d%%)", ve[1]) else "PCoA 1"),
       yaxis = list(title = if (!is.na(ve[2])) sprintf("PCoA 2 (%d%%)", ve[2]) else "PCoA 2"))
