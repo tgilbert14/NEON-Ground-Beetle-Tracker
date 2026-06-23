@@ -379,7 +379,8 @@ SUITE_SIBLINGS <- list(
   list(name = "Plant Phenology",  emoji = "\U0001F331", url = "https://tgilbert14.github.io/NEON-Plant-Phenology-Explorer/",        blurb = "When leaves, flowers, and fruit appear through the seasons."),
   list(name = "Veg Structure",    emoji = "\U0001F333", url = "https://tgilbert14.github.io/NEON-Vegetation-Structure-Explorer/",   blurb = "How tall and how dense the vegetation stands at each site."),
   list(name = "Water Chemistry",  emoji = "\U0001F4A7", url = "https://tgilbert14.github.io/NEON-WaterChemistry-Analyte-Viewer-App/", blurb = "What's dissolved in the streams, analyte by analyte."),
-  list(name = "Mosquito Pulse",   emoji = "\U0001F99F", url = "https://tgilbert14.github.io/NEON-Mosquito-Pulse/",                  blurb = "When and where mosquitoes are active, by genus and sex.")
+  list(name = "Mosquito Pulse",   emoji = "\U0001F99F", url = "https://tgilbert14.github.io/NEON-Mosquito-Pulse/",                  blurb = "When and where mosquitoes are active, by genus and sex."),
+  list(name = "Little Inverts",   emoji = "\U0001F990", url = "https://tgilbert14.github.io/NEON-My-Little-Inverts/",              blurb = "The little animals on the bottom of NEON's streams, and the clean-water signal they carry.")
 )
 
 # Server-side PDF site report (sourced last — needs DDL + helpers + ENV_LAYERS).
