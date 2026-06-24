@@ -539,7 +539,10 @@ function(input, output, session) {
         "  total abundance keeps every beetle trapped.",
         "",
         "An educational data-exploration tool by Desert Data Labs. Not affiliated with",
-        "NEON, Battelle, or the NSF."
+        "NEON, Battelle, or the NSF.",
+        "",
+        "Source: NEON DP1.10022.001, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/);",
+        "aggregated and derived by this app."
       ), f_rm)
       zip_files <- c(f_data, f_cb, env_csv, env_cb_csv, f_rm)
       zip_files <- zip_files[!vapply(zip_files, is.null, logical(1))]
@@ -1785,7 +1788,11 @@ function(input, output, session) {
               div(class = "suite-card-body",
                 div(class = "suite-name", s$name, bs_icon("box-arrow-up-right")),
                 div(class = "suite-blurb", s$blurb)))))),
-      p(style = "margin-top:16px", "An educational data-exploration tool by Desert Data Labs. Not affiliated with NEON, Battelle, or the NSF.")
+      p(style = "margin-top:16px", "An educational data-exploration tool by Desert Data Labs. Not affiliated with NEON, Battelle, or the NSF."),
+      p(class = "qa-cite", style = "margin-top:6px",
+        "Built with data from the National Ecological Observatory Network (NEON), a U.S. National Science Foundation program operated by Battelle. NEON data are provided under a Creative Commons Attribution 4.0 International (CC BY 4.0) license (",
+        tags$a(href = "https://creativecommons.org/licenses/by/4.0/", target = "_blank", "creativecommons.org/licenses/by/4.0"),
+        "). This app aggregates and derives summary metrics from the raw NEON data products; the underlying measurements are unaltered. It is an independent, unofficial tool and is not endorsed by NEON, Battelle, or the NSF.")
     )
   })
 
