@@ -72,9 +72,13 @@ assert(all(beetle_effort_rows(d)$traps_sampled == 2L), "each valid plot-bout mus
 assert(any(d$scientificName == "Pterostichus melanarius", na.rm = TRUE), "expert name must override provisional name")
 assert(sum(beetle_catches(d)$individualCount) == sum(sorting$individualCount),
        "individual-level taxonomy reconciliation must conserve sorting totals")
-assert(d$individualCount[d$scientificName == "Pterostichus melanarius"] == 1,
+expert_count <- d$individualCount[d$record_type == "catch" &
+                                  d$scientificName %in% "Pterostichus melanarius"]
+residual_count <- d$individualCount[d$record_type == "catch" &
+                                    d$scientificName %in% "Pterostichus sp."]
+assert(length(expert_count) == 1L && expert_count == 1,
        "one expert specimen must not relabel the entire sorting count")
-assert(d$individualCount[d$scientificName == "Pterostichus sp."] == 2,
+assert(length(residual_count) == 1L && residual_count == 2,
        "unpinned residual count must retain sorting-level taxonomy")
 assert(any(d$record_type == "catch" & d$plotID == "P3" & d$effort_status == "missing"),
        "catch with no collected opportunity must remain visible but effort-ineligible")
