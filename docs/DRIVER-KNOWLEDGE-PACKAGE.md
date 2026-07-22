@@ -34,18 +34,19 @@ contract and pinned release gates pass.
 - Small-series trend gates and the explicit activity-density caveat are reusable
   scientific protections.
 
-## Blocking source gap
+## Candidate implementation (not yet promoted)
 
-Current `assemble_beetles()` starts from positive Carabidae sorting rows, groups
-those catches, and left-joins field effort onto them. `clean_beetle()` also removes
-zero-count rows. As a result, valid field bouts with no Carabidae are not emitted in
-the long bundle. `effort_trapnights()` then sees only effort attached to positive
-catch rows. The displayed denominator may therefore be catch-conditioned even
-though effort is deduplicated correctly among represented rows.
+The candidate `assemble_beetles()` now starts from the independent field-effort
+table and emits one explicit opportunity anchor per sampled plot-bout, including
+valid zero-carabid bouts. Taxonomy is reconciled at the documented individualID
+grain: expert overrides parataxonomist for one pinned specimen, while unpinned
+residual counts retain sorting taxonomy. Rate numerators accept only catches with a
+matching valid opportunity.
 
-This distinction invalidates the earlier assurance that a zero missingness rate in
-the catch table proves opportunity-complete effort. It proves only that positive
-catch rows have an effort value.
+Adversarial fixtures cover zero catch, duplicate and conflicting effort, missing
+effort, all-zero sites, expert override without count multiplication, and legacy
+fallback. This is implementation evidence only: the committed bundles and public
+app still represent the baseline until the pinned refresh/review/deploy loop passes.
 
 ## Eligible Driver join and grain
 

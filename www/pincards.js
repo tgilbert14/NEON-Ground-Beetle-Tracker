@@ -384,7 +384,7 @@
   (function registerReveal() {
     try {
       if (window.Shiny && Shiny.addCustomMessageHandler) {
-        Shiny.addCustomMessageHandler("smtRevealQc", function () { revealQcCard(); });
+        Shiny.addCustomMessageHandler("smtRevealQc", function (payload) { revealQcCard(); });
         Shiny.addCustomMessageHandler("beetleSite", function (msg) {
           if (msg && msg.site) window.__beetleSite = String(msg.site);
         });

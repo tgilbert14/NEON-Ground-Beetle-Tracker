@@ -1,80 +1,127 @@
-# ===========================================================================
-# write_manifest.R — (re)generate manifest.json for Posit Connect Cloud.
-#
-# RUN THIS after ANY change to runtime dependencies or the committed data set,
-# then COMMIT manifest.json — Connect Cloud reads the committed manifest, so a
-# stale manifest restores the OLD package set or serves yesterday's data.
-#
-#   Rscript scripts/write_manifest.R
-#
-# The appFiles set is scoped to the app sources only: global/ui/server + R/ +
-# www/ + data/*.rds (recursive: data/sites + data/env) + data-sample. scripts/
-# is DELIBERATELY excluded so neonUtilities (a refresh-only dependency, referenced
-# in global.R via a split string + requireNamespace) can never be scanned into the
-# manifest — the deployed app runs off the committed bundles, never a live fetch.
-#
-# HARD GATE: after writing, this parses manifest.json and stop()s with a non-zero
-# error if neonUtilities / arrow / data.table appears as a package key, so a
-# leaked (heavy) manifest can never commit silently.
-# ===========================================================================
-if (!requireNamespace("rsconnect", quietly = TRUE)) stop("install.packages('rsconnect') first")
-if (!requireNamespace("jsonlite", quietly = TRUE)) stop("install.packages('jsonlite') first")
+#!/usr/bin/env Rscript
+# Generate the lean, deterministic Connect manifest from the pinned validator.
+# This script verifies what is actually installed; it never fabricates a version.
+
+suppressMessages({
+  library(rsconnect)
+  library(jsonlite)
+})
+
+`%||%` <- function(a, b) if (is.null(a) || length(a) == 0L) b else a
+
+RSPM_SNAPSHOT <- "https://packagemanager.posit.co/cran/__linux__/jammy/2026-07-15"
+R_PLATFORM_PIN <- "4.5.2"
+RUNTIME_PKGS <- c(
+  "shiny", "bslib", "bsicons", "dplyr", "tidyr", "tibble", "plotly",
+  "leaflet", "DT", "shinyjs", "shinycssloaders", "RColorBrewer",
+  "htmltools", "ggplot2"
+)
+DROP_PKGS <- c("neonUtilities", "arrow")
+GEO_PINS <- c(
+  terra = "1.8-50", sf = "1.1-1", s2 = "1.1.11", units = "1.0-1",
+  wk = "0.9.5", classInt = "0.4-11", raster = "3.6-32", sp = "2.2-1"
+)
+GEO_URLS <- c(
+  terra = "https://cran.r-project.org/src/contrib/Archive/terra/terra_1.8-50.tar.gz",
+  sf = "https://cran.r-project.org/src/contrib/sf_1.1-1.tar.gz",
+  s2 = "https://cran.r-project.org/src/contrib/s2_1.1.11.tar.gz",
+  units = "https://cran.r-project.org/src/contrib/units_1.0-1.tar.gz",
+  wk = "https://cran.r-project.org/src/contrib/wk_0.9.5.tar.gz",
+  classInt = "https://cran.r-project.org/src/contrib/classInt_0.4-11.tar.gz",
+  raster = "https://cran.r-project.org/src/contrib/raster_3.6-32.tar.gz",
+  sp = "https://cran.r-project.org/src/contrib/sp_2.2-1.tar.gz"
+)
 
 app_files <- c(
   "global.R", "ui.R", "server.R",
-  list.files("R",           full.names = TRUE, recursive = TRUE),
-  list.files("www",         full.names = TRUE, recursive = TRUE),
-  list.files("data",        full.names = TRUE, recursive = TRUE),
-  list.files("data-sample", full.names = TRUE, recursive = TRUE)
+  list.files("R", pattern = "[.]R$", full.names = TRUE),
+  list.files("www", recursive = TRUE, full.names = TRUE),
+  list.files("data", recursive = TRUE, full.names = TRUE),
+  list.files("data-sample", recursive = TRUE, full.names = TRUE)
 )
-app_files <- app_files[file.exists(app_files)]
-
+app_files <- sort(unique(app_files[file.exists(app_files) & !dir.exists(app_files)]))
+cat(sprintf("Writing manifest for %d runtime files.\n", length(app_files)))
 rsconnect::writeManifest(appDir = ".", appFiles = app_files)
 
-# ---- pin terra to the last release before the GDAL-3.8 multidim code (1.8-54) ----
-# terra >= 1.8-54 ships gdal_multidimensional.cpp using a GDAL 3.8 call unguarded in
-# releases, so it FAILS to compile against Connect Cloud's GDAL 3.4.1. Connect compiles
-# from source regardless of repo. 1.8-50 is the last release before 1.8-54: it compiles
-# on 3.4.1 and still satisfies raster's terra (>= 1.8-5). terra/raster are install-only
-# (leaflet -> raster -> terra; app never calls terra) -> zero runtime impact. Also pin
-# the repo to the RSPM jammy binary mirror for suite consistency.
-local({
-  mm <- jsonlite::fromJSON("manifest.json", simplifyVector = FALSE)
-  if (!is.null(mm$packages$terra)) {
-    mm$packages$terra$description$Version <- "1.8-50"
-    if (!is.null(mm$packages$terra$description$RemoteSha)) mm$packages$terra$description$RemoteSha <- "1.8-50"
-    jsonlite::write_json(mm, "manifest.json", auto_unbox = TRUE, pretty = TRUE, null = "null")
+# Keep only the dependency closure reachable from actual runtime roots. The
+# optional live NEON client and its unique heavy dependencies are build-only.
+manifest <- jsonlite::fromJSON("manifest.json", simplifyVector = FALSE)
+packages <- manifest$packages
+dep_names <- function(info) {
+  description <- info$description
+  if (is.null(description)) return(character(0))
+  fields <- paste(c(description$Imports, description$Depends, description$LinkingTo), collapse = ",")
+  fields <- gsub("[\r\n]", " ", fields)
+  tokens <- trimws(unlist(strsplit(fields, ",")))
+  tokens <- trimws(sub("[ (].*$", "", tokens))
+  intersect(tokens[nzchar(tokens) & tokens != "R"], names(packages))
+}
+reachable <- character(0)
+frontier <- setdiff(intersect(RUNTIME_PKGS, names(packages)), DROP_PKGS)
+while (length(frontier)) {
+  reachable <- union(reachable, frontier)
+  next_names <- unique(unlist(lapply(frontier, function(pkg) dep_names(packages[[pkg]]))))
+  frontier <- setdiff(next_names, c(reachable, DROP_PKGS))
+}
+missing_roots <- setdiff(RUNTIME_PKGS, reachable)
+if (length(missing_roots)) stop("manifest missing runtime roots: ", paste(missing_roots, collapse = ", "))
+manifest$packages <- packages[reachable]
+jsonlite::write_json(manifest, "manifest.json", auto_unbox = TRUE, pretty = TRUE, null = "null")
+
+# Freeze ordinary packages to a dated snapshot without reserializing after the
+# canonical package edit below.
+text <- readLines("manifest.json", warn = FALSE)
+for (moving in c(
+  "https://packagemanager.posit.co/cran/latest",
+  "https://packagemanager.posit.co/cran/__linux__/jammy/latest",
+  "https://cloud.r-project.org"
+)) text <- gsub(moving, RSPM_SNAPSHOT, text, fixed = TRUE)
+writeLines(text, "manifest.json")
+
+# Exact URL builds have non-semantic wall-clock Built timestamps. Remove those
+# only for the pinned geospatial closure and put them on Connect's deployable CRAN
+# lane while retaining the exact tarball in RemotePkgRef.
+canonical <- jsonlite::fromJSON("manifest.json", simplifyVector = FALSE)
+for (pkg in names(GEO_PINS)) {
+  if (!is.null(canonical$packages[[pkg]]$description)) {
+    canonical$packages[[pkg]]$description$Built <- NULL
+    canonical$packages[[pkg]]$Source <- "CRAN"
+    canonical$packages[[pkg]]$Repository <- "https://cran.r-project.org"
   }
-  mtxt <- readLines("manifest.json", warn = FALSE)
-  mtxt <- gsub("https://cloud.r-project.org", "https://packagemanager.posit.co/cran/__linux__/jammy/latest", mtxt, fixed = TRUE)
-  mtxt <- gsub("https://packagemanager.posit.co/cran/latest", "https://packagemanager.posit.co/cran/__linux__/jammy/latest", mtxt, fixed = TRUE)
-  writeLines(mtxt, "manifest.json")
-  cat("Pinned terra to 1.8-50 + RSPM jammy repo.\n")
-})
-
-m    <- jsonlite::fromJSON("manifest.json")
-pkgs <- names(m$packages)
-cat(sprintf("manifest.json written: %d app files, %d packages.\n",
-            length(app_files), length(pkgs)))
-
-# HARD GATE. neonUtilities + arrow are the heavy refresh-only / fetch deps that
-# must NEVER reach a runtime deploy — their presence means the global.R guard
-# (split string + requireNamespace) failed or scripts/ leaked into appFiles.
-banned <- c("neonUtilities", "arrow", "data.table")
-hit    <- banned[tolower(banned) %in% tolower(pkgs)]
-
-# data.table is a GENUINE hard Imports dependency of plotly (a runtime package
-# here), so when plotly is in the manifest, data.table is legitimately required
-# and is NOT a leak. Only treat it as a leak when plotly is absent (i.e. it crept
-# in some other way). neonUtilities/arrow are never excused.
-if ("data.table" %in% tolower(hit) && "plotly" %in% tolower(pkgs)) {
-  hit <- setdiff(hit, "data.table")
-  cat("note: data.table is present as a runtime Imports dependency of plotly (expected, not a leak).\n")
 }
+jsonlite::write_json(canonical, "manifest.json", auto_unbox = TRUE, pretty = TRUE, null = "null")
 
-if (length(hit)) {
-  stop(sprintf(
-    "manifest.json leaked a heavy/refresh-only package: %s. A lean Connect deploy must NOT carry it. Check the global.R guard (neonUtilities must stay behind a split string + requireNamespace) and that scripts/ is excluded from appFiles.",
-    paste(hit, collapse = ", ")))
+check <- jsonlite::fromJSON("manifest.json", simplifyVector = FALSE)
+problems <- character(0)
+if (!identical(as.character(check$platform %||% ""), R_PLATFORM_PIN))
+  problems <- c(problems, sprintf("platform=%s", check$platform %||% "<missing>"))
+keys <- names(check$packages)
+leaked <- intersect(DROP_PKGS, keys)
+if (length(leaked)) problems <- c(problems, paste("live-only package leak", paste(leaked, collapse = ",")))
+
+for (pkg in keys) {
+  item <- check$packages[[pkg]]
+  version <- as.character(item$description$Version %||% "")
+  declared <- as.character(item$description$Package %||% "")
+  repo <- as.character(item$Repository %||% "")
+  source <- as.character(item$Source %||% "")
+  if (!nzchar(version) || !identical(declared, pkg) || !identical(source, "CRAN"))
+    problems <- c(problems, paste("invalid package identity", pkg))
+  if (pkg %in% names(GEO_PINS)) {
+    expected_ref <- paste0("url::", unname(GEO_URLS[[pkg]]))
+    if (!identical(version, unname(GEO_PINS[[pkg]])) ||
+        !identical(repo, "https://cran.r-project.org") ||
+        !identical(as.character(item$description$RemoteType %||% ""), "url") ||
+        !identical(as.character(item$description$RemotePkgRef %||% ""), expected_ref) ||
+        nzchar(as.character(item$description$Built %||% "")))
+      problems <- c(problems, paste("invalid geospatial provenance", pkg))
+  } else if (!identical(repo, RSPM_SNAPSHOT)) {
+    problems <- c(problems, paste("ordinary package outside dated snapshot", pkg))
+  }
 }
-cat("OK: manifest is lean (no neonUtilities / arrow; data.table only via plotly).\n")
+missing_geo <- setdiff(names(GEO_PINS), keys)
+if (length(missing_geo)) problems <- c(problems, paste("missing geospatial packages", paste(missing_geo, collapse = ",")))
+if (length(problems)) stop("MANIFEST GATE FAILED: ", paste(unique(problems), collapse = "; "), call. = FALSE)
+
+cat(sprintf("OK: manifest records %d files, %d packages, pinned R and exact geospatial provenance.\n",
+            length(check$files), length(keys)))

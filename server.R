@@ -451,9 +451,9 @@ function(input, output, session) {
   )
 
   # ---- tidy long-table export, bundled with a codebook + provenance --------
-  # The loaded site's records as one row per plot x bout x species, plus a derived
-  # catch-per-100-trap-nights so the effort-normalised metric travels with the raw
-  # counts. Loads straight into R/pandas. We ship it as a .zip carrying the data,
+  # The loaded site's taxon catches plus explicit sampled-opportunity anchors and
+  # a derived catch-per-100-trap-nights contribution. Loads straight into R/pandas.
+  # We ship it as a .zip carrying the data,
   # a column codebook, and a README provenance stamp so the download is
   # self-documenting (a researcher can use it cold). When no zip binary exists
   # (some minimal images), we fall back to the plain tidy CSV — never error.
@@ -466,13 +466,19 @@ function(input, output, session) {
       collectDate            = as.character(d$date),
       year                   = d$year,
       month                  = d$mon,
+      record_type            = d$record_type,
+      sampled_opportunity    = d$sampled_opportunity,
+      effort_status          = d$effort_status,
+      traps_sampled          = d$traps_sampled,
+      effort_records         = d$effort_records,
       taxonID                = d$taxonID,
       scientificName         = d$scientificName,
       taxonRank              = d$taxonRank,
       species_level          = d$species_level,
       individualCount        = d$individualCount,
       trapnights             = tn,
-      cpn_per_100_trapnights = ifelse(!is.na(tn) & tn > 0, round(100 * d$individualCount / tn, 3), NA_real_),
+      cpn_per_100_trapnights = ifelse(d$record_type == "catch" & !is.na(tn) & tn > 0,
+                                      round(100 * d$individualCount / tn, 3), NA_real_),
       source                 = attr(d, "source") %||% "neon",
       stringsAsFactors = FALSE)
     out[order(out$collectDate, -out$individualCount), , drop = FALSE]
@@ -524,15 +530,17 @@ function(input, output, session) {
         "",
         "Files",
         "-----",
-        sprintf("%s.csv          tidy data, one row per plot x bout x taxon", base),
+        sprintf("%s.csv          catch rows plus one explicit effort row per sampled plot x bout", base),
         sprintf("%s-codebook.csv column dictionary (name, type, units, definition)", base),
         if (!is.null(env_csv)) sprintf("%s-environment.csv          co-located monthly env (precip / temp / green-up), one row per month", base) else NULL,
         if (!is.null(env_csv)) sprintf("%s-environment-codebook.csv  column dictionary for the environment table", base) else NULL,
         "",
         "Method notes",
         "------------",
-        "- Effort-normalised catch (cpn_per_100_trapnights) absorbs NEON's 2018 trap-count",
-        "  and 2023 plot-count protocol changes, so years and sites compare fairly.",
+        "- Effort anchors come from distinct bet_fielddata trapID records with sampleCollected=Y,",
+        "  including sampled plot x bouts with zero Carabidae; they are never taxon observations.",
+        "- Effort-normalised catch uses all valid attempted trap-nights, absorbing NEON's 2018",
+        "  trap-count and 2023 plot-count protocol changes without conditioning on positive catch.",
         "- scientificName reconciles parataxonomist IDs with authoritative expert IDs;",
         "  species_level flags binomial resolution (Hoekman et al. 2017, Ecosphere 8(4):e01744).",
         "- Richness / diversity / ordination / indicators use species_level == TRUE only;",
@@ -827,11 +835,11 @@ function(input, output, session) {
     div(class = "meet-grid", cards)
   })
 
-  # ---- occupancy: how WIDESPREAD each species is (abundant != everywhere) ---
+  # ---- detection frequency: sampled bouts with a catch (not occupancy) -------
   output$occupancyPlot <- renderPlotly({
     d <- rv$data; req(d)
     oc <- occupancy_table(d)
-    if (is.null(oc) || !nrow(oc)) return(note_plot("Not enough plot×bout samples<br>to estimate occupancy here", "\U0001F4CD"))
+    if (is.null(oc) || !nrow(oc)) return(note_plot("Not enough sampled plot×bout opportunities<br>for detection frequency", "\U0001F4CD"))
     n_samp <- attr(oc, "n_samp")
     oc <- utils::head(oc, 12); oc <- oc[order(oc$occ), ]
     cols <- unname(rv$pal[oc$scientificName]); cols[is.na(cols)] <- DDL$forest
@@ -841,7 +849,7 @@ function(input, output, session) {
             hovertemplate = ~paste0("<b>", scientificName, "</b><br>caught in ", present,
               " of ", n_samp, " sampling bouts (", occ, "%)<extra></extra>")) %>%
       plotly_theme(legend = FALSE) %>%
-      plotly::layout(xaxis = list(title = "% of sampling bouts present", range = c(0, 100)),
+      plotly::layout(xaxis = list(title = "% of sampled bouts detected", range = c(0, 100)),
                      yaxis = list(title = "", automargin = TRUE), margin = list(l = 10, r = 55)) %>%
       plotly::add_annotations(text = rv$ctx, x = 1, y = 1.04, xref = "paper", yref = "paper",
         xanchor = "right", showarrow = FALSE,
@@ -1736,8 +1744,7 @@ function(input, output, session) {
       p("The ", tags$b("NEON Ground Beetle Tracker"), " explores carabid beetle biodiversity from ",
         tags$a(href = "https://data.neonscience.org/data-products/DP1.10022.001", target = "_blank",
                "NEON DP1.10022.001 · Ground beetles sampled from pitfall traps"), "."),
-      p("Ground beetles are a classic ", tags$b("bioindicator"),
-        ": they respond quickly to habitat, disturbance, and climate, so their richness, diversity, and seasonal activity tell a rich story about each NEON site."),
+      p("Pitfall catches describe carabid encounters and activity under a standardized protocol. They can provide community and disturbance context, but they are not a stand-alone measure of ecosystem or site health."),
       h4("What you can explore"),
       tags$ul(
         tags$li(tags$b("Community"), ": which species dominate, by abundance and per-trap-night effort."),
@@ -1747,8 +1754,8 @@ function(input, output, session) {
         tags$li(tags$b("Biogeography"), ": a richness/range map, a Bray–Curtis community ordination, and indicator species (IndVal) per site.")),
       h4("Methods"),
       tags$ul(
-        tags$li("Abundance is normalised to ", tags$b("catch per 100 trap-nights"),
-                " (effort = unique plot × bout trap-night totals) so sites compare fairly."),
+        tags$li("Catch is normalised to ", tags$b("catch per 100 trap-nights"),
+                ". Effort comes from every distinct collected trap record, including sampled plot × bouts with zero Carabidae. The result is an activity-density index, not population density."),
         tags$li(tags$b("Species vs. higher taxa (QA/QC)."),
                 " Not every beetle is named to species; some are left at genus (\"",
                 tags$em("Bembidion"), " sp.\") or family (\"Carabidae\"). Counting those as if each were its own species ",
@@ -1804,7 +1811,7 @@ function(input, output, session) {
       div(class = "about",
         h4("How the numbers are built"),
         tags$ul(
-          tags$li(tags$b("Effort-normalised catch."), " Counts are expressed as catch per 100 trap-nights (effort = the sum of unique plot x bout trap-night totals), so sites and windows with different sampling effort compare fairly. This also absorbs NEON's protocol changes (4 to 3 traps per plot in 2018; 10 to 6 plots per site in 2023)."),
+          tags$li(tags$b("Effort-normalised catch."), " Counts are expressed as catch per 100 trap-nights. Effort is resolved from distinct collected trapID records before taxon catches are joined, so sampled zero-carabid bouts stay in the denominator. This absorbs NEON's protocol changes (4 to 3 traps per plot in 2018; 10 to 6 plots per site in 2023) without conditioning on positive catch."),
           tags$li(tags$b("Species vs. higher taxa."), " Not every beetle is named to species. Records left at genus or family are kept in total abundance but excluded from every richness-type metric, so they can't inflate diversity. The split is driven by NEON's expert-taxonomist rank where present."),
           tags$li(tags$b("Diversity."), " Hill numbers (Hill 1973; Jost 2006); individual-based rarefaction with an approximate analytic SD (Hurlbert 1971; Heck et al. 1975); sample-based accumulation averaged over random bout orders (Gotelli & Colwell 2001)."),
           tags$li(tags$b("Biogeography."), " A Bray-Curtis PCoA places each site x year community, coloured by biome; indicator species use the Dufrene-Legendre IndVal (1997)."),

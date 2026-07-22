@@ -32,10 +32,13 @@ for (s in sites) {
   d <- load_site_bundle(s)
   if (is.null(d) || !nrow(d)) next
   tn <- effort_trapnights(d)                       # site total trap-night effort
+  catches <- beetle_catches(d)
+  eligible <- beetle_effort_eligible_catches(d)
+  if (is.null(catches) || !nrow(catches)) next
   meta <- neon_sites[neon_sites$site == s, , drop = FALSE]
 
   # one row per (taxon × site): sum individuals, earliest/latest year, rank.
-  agg <- d %>%
+  agg <- catches %>%
     dplyr::group_by(.data$scientificName, .data$taxonID) %>%
     dplyr::summarise(
       individuals   = sum(.data$individualCount, na.rm = TRUE),
@@ -51,9 +54,13 @@ for (s in sites) {
   agg$siteID    <- s
   agg$site_name <- if (nrow(meta)) meta$name  else s
   agg$state     <- if (nrow(meta)) meta$state else NA_character_
-  # activity-density = catch per 100 trap-nights (within-site index, NOT absolute)
+  # activity-density uses only catches with a matched sampled opportunity. Raw
+  # individuals remain visible, but an unmatched catch can never enter a rate.
+  eligible_ind <- if (!is.null(eligible) && nrow(eligible))
+    tapply(eligible$individualCount, eligible$scientificName, sum, na.rm = TRUE) else numeric(0)
+  numerator <- unname(eligible_ind[agg$scientificName])
   agg$activity_density <- if (is.finite(tn) && tn > 0)
-    round(100 * agg$individuals / tn, 2) else NA_real_
+    round(100 * numerator / tn, 2) else NA_real_
   agg$trapnights   <- tn
   agg$is_introduced <- is_introduced(agg$scientificName)
   taxa_rows[[s]] <- agg

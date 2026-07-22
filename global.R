@@ -328,15 +328,14 @@ info_pop <- function(title, ..., placement = "auto")
                  ..., title = title, placement = placement)
 
 # A small clickable "introduced" badge for non-native European carabids. Reuses
-# the bslib popover so the ecological caveat ("dominant ≠ intact native fauna")
-# lives behind a click, keeping the default verdict/card clean (see is_introduced).
+# the bslib popover so provenance and interpretation stay beside the label.
 introduced_marker <- function(scientificName, placement = "auto")
   bslib::popover(
     tags$span(class = "intro-badge", title = "introduced. Click for why this matters",
               bsicons::bs_icon("globe-americas"), " introduced"),
     tags$p(tags$b(tags$em(scientificName)), " is an ", tags$b("introduced European carabid"),
            ", not native here."),
-    tags$p("So a high rank or “dominant” label is the opposite of intact native fauna. It usually marks a disturbed or human-modified site, not a rich one."),
+    tags$p("“Dominant” describes this pitfall catch only. The record adds non-native context but does not, by itself, diagnose habitat condition or site health."),
     title = "Introduced (non-native) species", placement = placement)
 
 # state pickers reused from the mammal app's metadata

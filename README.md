@@ -4,9 +4,10 @@ An interactive R/Shiny app for exploring **ground beetle (Carabidae) biodiversit
 across the National Ecological Observatory Network, from NEON data product
 [**DP1.10022.001 — Ground beetles sampled from pitfall traps**](https://data.neonscience.org/data-products/DP1.10022.001).
 
-Ground beetles are a textbook **bioindicator** — they respond fast to habitat,
-disturbance, and climate — so their richness, diversity, and seasonal activity
-tell a rich story about each NEON site. This is the carabid sibling of the
+Ground beetles provide useful community and disturbance context, but pitfall catch
+is an activity-density index rather than population density or a site-health score.
+The app explores observed richness, composition, seasonality, and change while
+keeping those limits visible. This is the carabid sibling of the
 [NEON Small Mammal Tracker](https://github.com/tgilbert14/NEON-Small-Mammal-Tracker-App),
 sharing its Desert Data Labs house style and **bundle-first** data pattern.
 

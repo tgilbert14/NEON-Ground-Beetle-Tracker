@@ -34,6 +34,7 @@ ui <- bslib::page_fillable(
   fillable = FALSE,
 
   tags$head(
+    tags$meta(name = "ddl-app-ready", content = "ground-beetle-tracker-v1"),
     tags$link(rel = "stylesheet",
       href = "https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap"),
     tags$link(rel = "stylesheet", href = "styles.css"),
@@ -59,7 +60,7 @@ ui <- bslib::page_fillable(
       # site; Leaflet measured 0px while hidden, so nudge a window resize across
       # several frames so it re-fits the settled width instead of painting
       # half-width (flagship Small Mammal Tracker's kickMaps handler).
-      "Shiny.addCustomMessageHandler('kickMaps',function(){var kick=function(){try{window.dispatchEvent(new Event('resize'));}catch(e){}};if(window.requestAnimationFrame){requestAnimationFrame(kick);}[80,250,500,900].forEach(function(t){setTimeout(kick,t);});});",
+      "Shiny.addCustomMessageHandler('kickMaps',function(payload){var kick=function(){try{window.dispatchEvent(new Event('resize'));}catch(e){}};if(window.requestAnimationFrame){requestAnimationFrame(kick);}[80,250,500,900].forEach(function(t){setTimeout(kick,t);});});",
       "function hideOv(){var o=document.getElementById('bootOverlay');if(o){o.classList.add('is-hidden');setTimeout(function(){if(o&&o.parentNode){o.parentNode.removeChild(o);}},600);}} ",
       "function showWelcome(){try{if(!localStorage.getItem('gbt_seen')){localStorage.setItem('gbt_seen','1');Shiny.setInputValue('first_visit',1,{priority:'event'});}}catch(e){}}",
       # first-visit: the splash mascot waves hello once (mirrors the flagship's localStorage gate)
@@ -115,7 +116,7 @@ ui <- bslib::page_fillable(
     h1(class = "app-title", "NEON Ground Beetle Tracker",
        span(class = "title-tag", "unofficial")),
     p(class = "app-subtitle",
-      "Ground beetles (Carabidae) are a textbook bioindicator. Explore who lives where, how diverse each site is, and when beetles are active, across the National Ecological Observatory Network.")
+      "Explore which ground beetles NEON pitfall traps encountered, how the observed community changes, and when activity peaks. Catch per trap-night is an activity index, not a population head count or a site-health score.")
   ),
   uiOutput("heroStats"),
   # ---- splash: the national PICKER map is the front door (flagship pattern) ----
@@ -225,10 +226,10 @@ ui <- bslib::page_fillable(
           pinnable_chart("commBarBox", "community", "commBar", height = "460px",
             hint = "Tap a bar to list that species' records")),
         card(full_screen = TRUE,
-          card_head("pin-map-fill", "Most widespread species, frequency of occurrence",
-            info_pop("Frequency of occurrence (naive occupancy)",
-              p("The share of ", tags$b("sampling bouts"), " (a plot on a date) in which each species turned up at least once, that is how ", tags$b("widespread"), " it is, not how abundant. A beetle can be ", tags$em("abundant but patchy"), " (a long bar above, short here) or ", tags$em("sparse but everywhere"), "."),
-              p(tags$b("Two caveats."), " It's ", tags$b("naive"), ", not corrected for detection. And the denominator is bouts that caught ", tags$b("at least one ground beetle"), " (bouts with no carabids at all, rare in the active season, aren't in the data), so it slightly over-states how widespread a species is. Species-level IDs only."))),
+          card_head("pin-map-fill", "Most frequently detected species",
+            info_pop("Detection frequency (not occupancy)",
+              p("The share of sampled ", tags$b("plot × collection bouts"), " in which each species was caught at least once. The denominator comes from collected trap records, including valid bouts with zero Carabidae."),
+              p(tags$b("This is not occupancy."), " It is not corrected for imperfect detection, and a pitfall encounter depends on movement as well as presence. Species-level IDs only."))),
           spin(plotlyOutput("occupancyPlot", height = "420px"))),
         h4(class = "section-title", bs_icon("binoculars"), " Meet the beetles"),
         uiOutput("meetBeetles"),
@@ -434,7 +435,7 @@ ui <- bslib::page_fillable(
             uiOutput("searchThreshCount"),
             div(style = "width:100%;", DT::DTOutput("searchThreshTable")),
             p(class = "search-caption",
-              "Introduced carabids are established non-native European species (Bousquet 2012; Lindroth 1961-69); a high rank for one usually marks a disturbed or human-modified site, not a rich one. Activity-density is catch per 100 trap-nights, a within-site index, not an absolute density.")
+              "Introduced carabids are established non-native European species (Bousquet 2012; Lindroth 1961-69). Their rank adds provenance context but does not diagnose site health. Activity-density is catch per 100 trap-nights, a within-site index, not an absolute density.")
           )
         )
       ),
