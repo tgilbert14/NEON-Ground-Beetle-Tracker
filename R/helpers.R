@@ -905,8 +905,14 @@ assemble_beetles <- function(raw) {
     dplyr::mutate(
       record_type = "catch",
       sampled_opportunity = FALSE,
-      effort_status = ifelse(is.finite(.data$trapnights) & .data$trapnights > 0,
-                             "valid_sample_collected", "missing")
+      # Keep the output type stable when `counts` has zero rows. Base ifelse()
+      # returns logical(0) for an empty condition, which cannot bind to the
+      # character-valued effort anchors below.
+      effort_status = dplyr::if_else(
+        is.finite(.data$trapnights) & .data$trapnights > 0,
+        "valid_sample_collected",
+        "missing"
+      )
     )
   anchors <- eff %>%
     dplyr::mutate(
