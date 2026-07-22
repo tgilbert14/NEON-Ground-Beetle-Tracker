@@ -173,7 +173,7 @@ function(input, output, session) {
     updateSelectInput(session, "envLayer", choices = ch, selected = if (sel0 %in% ch) sel0 else "none")
     updateSliderInput(session, "envLag", value = lag0)
     prog$set(value = 1, detail = "done")
-    shinyjs::show("mainTabsWrap"); shinyjs::hide("splash"); shinyjs::hide("splashHome")
+    shinyjs::show("mainTabsWrap"); shinyjs::show("loadedHero"); shinyjs::hide("splash"); shinyjs::hide("splashHome")
     session$sendCustomMessage("gbt_remember", site)   # persist last site for next visit
     session$sendCustomMessage("beetleSite", list(site = site))  # name the site in pin-export filenames
   }
@@ -428,7 +428,7 @@ function(input, output, session) {
   # "Change site" (hero band) -> drop the loaded data and re-show the picker map.
   observeEvent(input$changeSite, {
     rv$data <- NULL; rv$pal <- NULL; rv$ctx <- NULL; rv$env <- NULL
-    shinyjs::hide("mainTabsWrap")
+    shinyjs::hide("mainTabsWrap"); shinyjs::hide("loadedHero")
     shinyjs::show("splashHome"); shinyjs::show("splash")
     # the picker map was hidden while a site was loaded; nudge it to recompute
     # size now that it's visible again so it never paints blank/half-width.

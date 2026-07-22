@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">What moves at ground level?</title>
+  <desc id="desc">Moss-and-copper editorial card for the NEON Ground Beetle Tracker, with a ground beetle above a pitfall trap.</desc>
+  <defs>
+    <radialGradient id="halo" cx="74%" cy="42%" r="44%"><stop offset="0" stop-color="#a8c46e" stop-opacity=".44"/><stop offset="1" stop-color="#a8c46e" stop-opacity="0"/></radialGradient>
+    <linearGradient id="elytra" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1b083"/><stop offset=".5" stop-color="#dc7f49"/><stop offset="1" stop-color="#8f452b"/></linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#314a35"/><stop offset="1" stop-color="#19241d"/></linearGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="15" stdDeviation="14" flood-color="#030705" flood-opacity=".55"/></filter>
+  </defs>
+  <rect width="1200" height="630" fill="#101914"/>
+  <circle cx="900" cy="260" r="360" fill="url(#halo)"/>
+  <circle cx="46" cy="44" r="15" fill="none" stroke="#a8c46e" stroke-opacity=".72"/>
+  <path d="M46 36v17m-4-12 4-5 4 5m-5 7h3" fill="none" stroke="#a8c46e" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="72" y="49" fill="#f1ead8" font-family="Aptos,Segoe UI,sans-serif" font-size="13" font-weight="800" letter-spacing="3">DESERT DATA LABS</text>
+  <path d="M28 77H1172" stroke="#f1ead8" stroke-opacity=".18"/>
+  <text x="42" y="147" fill="#a8c46e" font-family="Aptos,Segoe UI,sans-serif" font-size="13" font-weight="800" letter-spacing="3">NEON GROUND BEETLE TRACKER · UNOFFICIAL</text>
+  <text x="39" y="246" fill="#f1ead8" font-family="Iowan Old Style,Palatino,Georgia,serif" font-size="94" font-weight="600" letter-spacing="-5">What moves</text>
+  <text x="39" y="326" fill="#dc7f49" font-family="Iowan Old Style,Palatino,Georgia,serif" font-size="94" font-weight="600" letter-spacing="-5">at ground level?</text>
+  <text x="43" y="388" fill="#d7cfba" font-family="Aptos,Segoe UI,sans-serif" font-size="22">Explore NEON ground-beetle encounters,</text>
+  <text x="43" y="422" fill="#d7cfba" font-family="Aptos,Segoe UI,sans-serif" font-size="22">site by site and season by season.</text>
+  <rect x="42" y="468" width="160" height="52" rx="26" fill="#a8c46e"/>
+  <text x="72" y="501" fill="#101914" font-family="Aptos,Segoe UI,sans-serif" font-size="16" font-weight="800">Pick a place</text>
+  <path d="M169 494h13m-5-5 5 5-5 5" fill="none" stroke="#101914" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M560 492c130-43 232 10 350-20 113-29 197 6 290 32v126H560z" fill="url(#soil)"/>
+  <path d="M555 493c127-43 229 8 355-21 112-26 196 5 290 31" fill="none" stroke="#a8c46e" stroke-width="8" stroke-linecap="round"/>
+  <g opacity=".3" stroke="#a8c46e" stroke-width="4" fill="none"><path d="M622 477c10-38 25-68 45-88m36 92c-4-37 4-70 23-99m371 102c3-40 18-72 42-99"/></g>
+  <g filter="url(#shadow)">
+    <path d="M931 500h183l-27 118H958z" fill="#202f25" stroke="#dc7f49" stroke-width="9"/>
+    <path d="M921 495h203" stroke="#f1b083" stroke-width="15" stroke-linecap="round"/>
+    <path d="M961 537h133m-138 39h131" stroke="#a8c46e" stroke-opacity=".3" stroke-width="4"/>
+  </g>
+  <g filter="url(#shadow)" transform="translate(876 270) rotate(24)">
+    <g fill="none" stroke="#dc7f49" stroke-width="11" stroke-linecap="round"><path d="M-69-46c-54-34-81-65-91-102m99 138c-63-12-99-24-128-49m132 92c-63 20-100 42-126 77M69-46c54-34 81-65 91-102M61-10c63-12 99-24 128-49M57 33c63 20 100 42 126 77"/><path d="M-27-91c-42-54-57-96-52-130m106 130c42-54 57-96 52-130" stroke-width="7"/></g>
+    <ellipse cx="0" cy="36" rx="90" ry="139" fill="url(#elytra)" stroke="#f1b083" stroke-width="7"/>
+    <path d="M0-96v266" stroke="#783622" stroke-width="6" opacity=".9"/>
+    <path d="M-71-48c38-25 104-25 142 0" fill="#b75e36" stroke="#f1b083" stroke-width="6"/>
+    <ellipse cx="0" cy="-100" rx="53" ry="46" fill="#8f452b" stroke="#f1b083" stroke-width="6"/>
+    <path d="M-71 13c25 10 47 15 71 15s46-5 71-15M-72 66c26 11 49 16 72 16s46-5 72-16M-58 117c19 8 38 12 58 12s39-4 58-12" fill="none" stroke="#f7c39d" stroke-width="3.5" opacity=".48"/>
+    <circle cx="-21" cy="-113" r="6" fill="#f3e8cb"/><circle cx="21" cy="-113" r="6" fill="#f3e8cb"/>
+  </g>
+  <g fill="#f1b083" opacity=".7"><circle cx="947" cy="445" r="6"/><circle cx="975" cy="466" r="5"/><circle cx="1003" cy="482" r="4"/></g>
+  <text x="42" y="594" fill="#f1ead8" fill-opacity=".62" font-family="Aptos,Segoe UI,sans-serif" font-size="12" letter-spacing="1">PUBLIC NEON DP1.10022.001 · ACTIVITY INDEX, NOT POPULATION DENSITY OR SITE HEALTH</text>
+</svg>

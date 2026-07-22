@@ -31,9 +31,11 @@ available locally and no generated bundle has been promoted yet.
 - Committed site bundles, derived indexes, and manifest remain legacy bytes until
   the remote pinned builder produces and validates their replacements.
 
-The Pages cover is also pre-Living-Poster: it contains a dense feature/method
-ladder, a full suite constellation, external font/runtime dependencies, and the
-unsupported claim that beetles are a gauge of site health.
+The candidate now includes matching Pages and in-app Living Posters with a
+moss-and-copper editorial beetle/pitfall visual, one hook, one promise, one CTA,
+and one Driver route. The first-run app no longer fetches Google Fonts or the
+SweetAlert/html-to-image runtime from CDNs; exact vendored assets are pinned by
+the cover contract. Publication and in-app runtime evidence remain pending.
 
 ## Baseline release audit
 
@@ -165,3 +167,31 @@ adoption.
   pinned CI, generate and promote the opportunity-complete bundles via the
   restricted refresh workflow, resolve exact failures, then complete the Ground
   Beetle Living Poster and post-merge evidence loop.
+
+## 2026-07-22 MST - Living Poster implementation candidate / Codex
+
+- Replaced the dense Pages report cover with the final suite frame: “What moves
+  at ground level?”, the promise “Explore the ground beetles NEON pitfall traps
+  encountered, site by site and season by season.”, one “Pick a place” CTA, and
+  one Driver Cascade route.
+- Built a code-native moss-and-copper beetle/pitfall illustration rather than a
+  field photograph or data-like mark. The art boundary is disclosed on both
+  surfaces; the footer retains the activity-density, population/site-health,
+  detection-frequency/occupancy, and association/causality boundaries.
+- Ported the same hook, promise, CTA, claim boundary, and visual world into the
+  Shiny first-run screen. The former dashboard hero is now a loaded-site `h2` and
+  is shown only after a site loads, leaving exactly one first-run `h1`.
+- Removed the Google Fonts request and replaced the two export CDNs with the exact
+  SweetAlert 11.10.0 and html-to-image 1.11.11 bytes already used by the validated
+  Small Mammal suite pattern.
+- Added a cache-busted 1200x630 social card, its code-native SVG source, and a
+  hash/dimension/static contract wired into both CI and refresh validation.
+- Local Pages evidence: one `h1`, one CTA, one Driver route, no external runtime,
+  no horizontal overflow, and visually reviewed layouts at 1440x900, 390x844,
+  and 320x720. The 390 and 320 covers retain the full promise and 52 px CTA.
+- Local static evidence: cover contract, handler contract, JavaScript syntax,
+  shell syntax, and `git diff --check` pass. No local R parse/app-render result is
+  claimed; the pinned remote validator remains authoritative.
+- Next concrete action: push the poster candidate, resolve pinned CI and generated
+  bundle/manifest evidence, then verify the exact deployed Pages and Connect
+  identities before promotion.

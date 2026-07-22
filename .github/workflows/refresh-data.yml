@@ -135,6 +135,7 @@ jobs:
           Rscript --vanilla scripts/verify_bundle.R
           Rscript --vanilla -e 'Sys.setenv(GBT_LIVE="0"); source("global.R"); source("ui.R"); source("server.R"); stopifnot(inherits(ui, "shiny.tag.list") || inherits(ui, "shiny.tag"), is.function(server))'
           node scripts/check_custom_message_handlers.mjs
+          node scripts/check_cover.mjs
           bash -n scripts/post_deploy_smoke.sh
           git diff --check
 

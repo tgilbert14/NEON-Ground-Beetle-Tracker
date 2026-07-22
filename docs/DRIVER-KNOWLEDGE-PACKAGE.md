@@ -73,9 +73,11 @@ health, or causal response to a climate/plant driver.
   session/interaction. HTTP 200 and visible first paint are insufficient.
 - Connect manifests must match every runtime byte. A moving RSPM alias and eight
   file-checksum mismatches make the current manifest unreleasable.
-- The shared Living Poster family is structural, not palette-based; the Ground
-  Beetle cover should keep its own visual world while adopting the one-hook,
-  one-promise, one-CTA, one-Driver-route frame.
+- The shared Living Poster family is structural, not palette-based. The candidate
+  Ground Beetle Pages and in-app covers now use the one-hook, one-promise,
+  one-CTA, one-Driver-route frame while retaining their own moss-and-copper
+  beetle/pitfall visual world. This is candidate evidence until the exact review
+  head and both public surfaces pass.
 
 ## Promotion evidence required
 
