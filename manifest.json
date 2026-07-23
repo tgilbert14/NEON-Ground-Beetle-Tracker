@@ -3413,13 +3413,22 @@
       "checksum": "8ef2bf95b51862f46cf7fb214d7b7514"
     },
     "ui.R": {
-      "checksum": "6a17b0b432888ce33a62b6e0fde6cffd"
+      "checksum": "19b6c308b04b918542a7829e988480fc"
+    },
+    "www/assets/ground-beetle-living-poster-840.webp": {
+      "checksum": "a6f6ee5226fb85db35d1b850b44ee16e"
+    },
+    "www/assets/ground-beetle-living-poster.png": {
+      "checksum": "56e492e4af36322c8983729b46e8c154"
+    },
+    "www/assets/ground-beetle-living-poster.webp": {
+      "checksum": "5a93a5d1cf564d2d512048aafc3d17c6"
     },
     "www/pincards.js": {
       "checksum": "8067bcf56d41f0c9006b6ada0e82f6f4"
     },
     "www/styles.css": {
-      "checksum": "9b7f22105abe1848b300b01f81c6bf74"
+      "checksum": "857c7f713937ebc2c2c716325965e4c7"
     },
     "www/vendor/html-to-image-1.11.11.js": {
       "checksum": "1b01c7cd9fb375bd1fb395b3dfd31450"

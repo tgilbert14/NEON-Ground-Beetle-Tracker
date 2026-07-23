@@ -195,3 +195,23 @@ adoption.
 - Next concrete action: push the poster candidate, resolve pinned CI and generated
   bundle/manifest evidence, then verify the exact deployed Pages and Connect
   identities before promotion.
+
+## 2026-07-23 MST - Static artistic Living Poster refresh / Codex
+
+- Replaced the sparse code-native beetle diagram on both entry surfaces with one
+  static, production-grade editorial screenprint. The illustration shows a
+  recognizable carabid crossing moss and leaf litter beside a flush-buried
+  pitfall cup in a forest-floor cutaway.
+- Kept the approved hook, promise, one CTA, one Driver route, source attribution,
+  and activity-density/population/occupancy/causality boundaries unchanged.
+- Removed the hero halo, beetle drift, and trail animations. The main art is now
+  still at every motion preference; only ordinary CTA hover feedback remains.
+- Added identical PNG/WebP assets for Pages and Connect, a responsive 840 px
+  derivative, high-priority preload metadata, exact asset hashes, a dimension
+  assertion, and `docs/IMAGE-PROVENANCE.md`.
+- Local Pages evidence: the cover was visually reviewed at 1280 x 720, 390 x 844,
+  and 320 x 720. The beetle and trap remain legible, the full CTA remains at
+  least 52 px high, and no horizontal overflow appears at any reviewed width.
+- Local static evidence: the cover contract, custom-message-handler contract, and
+  `git diff --check` pass. No local R parse/app-render result is claimed because
+  this host does not expose an R runtime; pinned CI remains authoritative.

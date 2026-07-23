@@ -914,6 +914,8 @@ svg.smt-pin-lines {
   min-width: 0;
   min-height: 660px;
   margin: 0;
+  overflow: hidden;
+  background: #171d15;
 }
 .gbt-poster-art::after {
   content: "";
@@ -921,9 +923,20 @@ svg.smt-pin-lines {
   z-index: 2;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, var(--gbt-night) 0%, rgba(16, 25, 20, .72) 11%, transparent 39%);
+  background:
+    linear-gradient(90deg, var(--gbt-night) 0%, rgba(16, 25, 20, .76) 11%, transparent 39%),
+    linear-gradient(0deg, rgba(16, 25, 20, .36), transparent 28%);
 }
-.gbt-poster-art > svg { width: 100%; height: 100%; min-height: 660px; display: block; }
+.gbt-poster-art picture { width: 100%; height: 100%; display: block; }
+.gbt-poster-art img {
+  width: 100%;
+  height: 100%;
+  min-height: 660px;
+  display: block;
+  object-fit: cover;
+  object-position: 61% center;
+  filter: saturate(.98) contrast(1.03);
+}
 .gbt-poster-art figcaption {
   position: absolute;
   z-index: 3;
@@ -942,22 +955,16 @@ svg.smt-pin-lines {
   line-height: 1.3;
   letter-spacing: .025em;
 }
-.gbt-halo { animation: gbtPosterBreathe 6s ease-in-out infinite; transform-origin: 62% 43%; }
-.gbt-beetle { animation: gbtPosterDrift 6s ease-in-out infinite; transform-origin: 67% 39%; }
-.gbt-trail circle { animation: gbtPosterTrail 3.6s ease-in-out infinite; }
-.gbt-trail circle:nth-child(2) { animation-delay: -.9s; }
-.gbt-trail circle:nth-child(3) { animation-delay: -1.8s; }
-.gbt-trail circle:nth-child(4) { animation-delay: -2.7s; }
-@keyframes gbtPosterBreathe { 50% { opacity: .88; transform: scale(1.04); } }
-@keyframes gbtPosterDrift { 50% { transform: translate(-5px, 4px) rotate(-1deg); } }
-@keyframes gbtPosterTrail { 0%, 100% { opacity: .18; } 50% { opacity: .72; } }
-
 @media (max-width: 900px) {
   .gbt-poster { grid-template-columns: 1fr; min-height: 0; }
   .gbt-poster-copy { grid-row: 2; max-width: none; padding: 30px 26px 34px; }
   .gbt-poster-topline { margin-bottom: 22px; }
   .gbt-poster-art { grid-row: 1; min-height: 310px; height: 42svh; }
-  .gbt-poster-art > svg { min-height: 310px; height: 42svh; }
+  .gbt-poster-art img {
+    min-height: 310px;
+    height: 42svh;
+    object-position: 69% 54%;
+  }
   .gbt-poster-art::after { background: linear-gradient(0deg, var(--gbt-night) 0%, transparent 43%); }
   .gbt-poster h1 { font-size: clamp(54px, 13vw, 78px); }
 }
@@ -972,7 +979,7 @@ svg.smt-pin-lines {
   .gbt-poster .gbt-poster-promise { margin-top: 18px; font-size: 15px; }
   .gbt-poster-cta { width: 100%; margin-top: 21px; }
   .gbt-poster .gbt-poster-note { margin-top: 14px; font-size: 9.5px; }
-  .gbt-poster-art, .gbt-poster-art > svg { min-height: 270px; height: 38svh; }
+  .gbt-poster-art, .gbt-poster-art img { min-height: 270px; height: 38svh; }
   .gbt-poster-art figcaption { right: 12px; bottom: 9px; left: 12px; width: fit-content; font-size: 8.5px; }
 }
 @media (max-width: 340px) {
@@ -983,7 +990,6 @@ svg.smt-pin-lines {
   .gbt-poster h1 { font-size: 45px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gbt-halo, .gbt-beetle, .gbt-trail circle { animation: none !important; }
   .gbt-poster-cta { transition: none; }
   .gbt-poster-cta:hover { transform: none; }
 }
