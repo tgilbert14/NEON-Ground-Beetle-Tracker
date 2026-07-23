@@ -106,6 +106,44 @@ assert(all(occ$occ == 50), "each eligible species occurred in one of two sampled
 qc <- beetle_qc(d)
 assert("noeffort" %in% names(qc$sets), "unmatched positive catch must remain in QC")
 
+# Historical `other carabid` rows kept fine-scale enumerated individuals in the
+# parataxonomist table, including records with a blank placeholder sorting count.
+raw_historical <- raw
+raw_historical$bet_sorting <- sorting[1, , drop = FALSE]
+raw_historical$bet_sorting$sampleType <- "other carabid"
+raw_historical$bet_sorting$individualCount <- NA
+raw_historical$bet_parataxonomistID <- rbind(
+  para,
+  transform(para, individualID = "I2", taxonID = "T2P",
+            scientificName = "Pterostichus adstrictus")
+)
+raw_historical$bet_expertTaxonomistIDProcessed <- NULL
+historical <- resolve_beetle_catches(raw_historical)
+assert(sum(historical$individualCount) == 2,
+       "enumerated historical other-carabid individuals must supply the legacy count")
+
+# Modern sorting totals remain authoritative if child pin rows conflict.
+raw_overflow <- raw_historical
+raw_overflow$bet_sorting$sampleType <- "carabid"
+raw_overflow$bet_sorting$individualCount <- 1
+modern <- resolve_beetle_catches(raw_overflow)
+assert(nrow(modern) == 1L && modern$scientificName == "Pterostichus sp." &&
+         modern$individualCount == 1,
+       "modern pin/count conflicts must fall back to the authoritative sorting row")
+
+# Conflicting expert rows are ambiguous; retain the para determination instead
+# of allowing either expert row to relabel the specimen.
+raw_ambiguous_expert <- raw
+raw_ambiguous_expert$bet_expertTaxonomistIDProcessed <- rbind(
+  expert,
+  transform(expert, taxonID = "T1X", scientificName = "Pterostichus adstrictus")
+)
+ambiguous <- resolve_beetle_catches(raw_ambiguous_expert)
+assert(any(ambiguous$scientificName == "Pterostichus mutus"),
+       "ambiguous duplicate expert determinations must fall back to para taxonomy")
+assert(!any(ambiguous$scientificName %in% c("Pterostichus melanarius", "Pterostichus adstrictus")),
+       "ambiguous expert determinations must not override the specimen")
+
 raw_zero <- raw
 raw_zero$bet_sorting <- sorting[0, , drop = FALSE]
 raw_zero$bet_expertTaxonomistIDProcessed <- NULL

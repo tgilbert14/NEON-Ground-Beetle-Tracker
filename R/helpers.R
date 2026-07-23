@@ -767,6 +767,7 @@ resolve_beetle_catches <- function(raw) {
   srt$collectDate <- as.Date(substr(as.character(srt$collectDate), 1, 10))
   srt$individualCount <- suppressWarnings(as.numeric(as.character(srt$individualCount)))
   srt <- unique(srt)
+  historical_other <- tolower(trimws(as.character(srt$sampleType))) == "other carabid"
   real_subsample <- !is.na(srt$subsampleID) & nzchar(srt$subsampleID)
   if (anyDuplicated(srt$subsampleID[real_subsample]))
     stop("bet_sorting has conflicting duplicate subsampleID rows")
@@ -820,8 +821,12 @@ resolve_beetle_catches <- function(raw) {
     expert <- unique(as.data.frame(expert[, expert_cols, drop = FALSE], stringsAsFactors = FALSE))
     for (col in expert_cols) expert[[col]] <- as.character(expert[[col]])
     expert <- expert[!is.na(expert$individualID) & nzchar(expert$individualID), , drop = FALSE]
-    if (anyDuplicated(expert$individualID))
-      stop("bet_expertTaxonomistIDProcessed has conflicting duplicate individualID rows")
+    # The product contract expects at most one expert row per individual, but
+    # historical data contain a few conflicting duplicates. An ambiguous expert
+    # determination must not override the unambiguous parataxonomist record.
+    duplicate_expert <- duplicated(expert$individualID) |
+      duplicated(expert$individualID, fromLast = TRUE)
+    expert <- expert[!duplicate_expert, , drop = FALSE]
   }
 
   if (nrow(para)) {
@@ -841,10 +846,28 @@ resolve_beetle_catches <- function(raw) {
   }
 
   pinned_n <- tabulate(para$.sort_row, nbins = nrow(srt))
-  residual <- srt$individualCount - pinned_n
   invalid_count <- !is.finite(srt$individualCount) | srt$individualCount < 0
-  if (any(invalid_count)) stop("bet_sorting has invalid individualCount values")
-  if (any(residual < 0)) stop("pinned individual count exceeds sorting individualCount")
+
+  # Early `other carabid` records stored the fine-scale, individual-level result
+  # in bet_parataxonomistID. When those enumerated children exceed a blank or
+  # placeholder sorting count, their number is the only defensible count. For
+  # the modern workflow, bet_sorting remains authoritative: conflicting pinned
+  # children are ignored and the sorting taxonomy/count is retained.
+  historical_repair <- historical_other & pinned_n > 0 &
+    (invalid_count | pinned_n > srt$individualCount)
+  srt$individualCount[historical_repair] <- pinned_n[historical_repair]
+  invalid_count <- !is.finite(srt$individualCount) | srt$individualCount < 0
+  overflow <- !historical_other & !invalid_count & pinned_n > srt$individualCount
+  discard_para <- overflow | (!historical_other & invalid_count)
+  if (any(discard_para) && nrow(para)) {
+    para <- para[!(para$.sort_row %in% which(discard_para)), , drop = FALSE]
+    pinned_n <- tabulate(para$.sort_row, nbins = nrow(srt))
+  }
+  # Invalid rows with no enumerated historical individuals carry no usable
+  # abundance evidence. Set them to zero so they cannot fabricate a catch.
+  srt$individualCount[invalid_count] <- 0
+  residual <- srt$individualCount - pinned_n
+  if (any(residual < 0)) stop("unresolved pinned individual count exceeds sorting total")
 
   pinned <- if (nrow(para)) data.frame(
     siteID = srt$siteID[para$.sort_row],
