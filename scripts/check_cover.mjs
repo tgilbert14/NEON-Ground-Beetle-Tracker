@@ -47,7 +47,7 @@ requireText(/name="twitter:image:alt" content="[^"]+"/, "Twitter image needs alt
 requireText(/What moves at ground level\?/i, "poster hook is missing");
 requireText(/Explore the ground beetles NEON pitfall traps encountered, site by site and season by season\./i, "poster promise is missing");
 requireText(/Pick a place/i, "poster CTA must be contextual");
-requireText(/Code-native editorial illustration—not a field photograph or data record\./i, "poster must disclose the art/data boundary");
+requireText(/Editorial illustration—not a field photograph or data record\./i, "poster must disclose the art/data boundary");
 requireText(/activity as well as local abundance/i, "cover must state the activity-density boundary");
 requireText(/does not estimate population density or site health/i, "cover must reject unsupported population and health claims");
 requireText(/detection frequency is not detection-corrected occupancy/i, "cover must distinguish detection frequency from occupancy");
@@ -61,7 +61,7 @@ requireText(/What moves at ground level\?/i, "in-app poster hook diverges from P
 requireText(/Explore the ground beetles NEON pitfall traps encountered, site by site and season by season\./i, "in-app poster promise diverges from Pages", ui);
 requireText(/href = "#site-picker-start"/, "in-app poster CTA must route to the picker", ui);
 requireText(/id = "site-picker-start"[^\n]+tabindex = "-1"/, "in-app picker target must be focusable", ui);
-requireText(/Code-native editorial illustration—not a field photograph or data record\./i, "in-app poster must disclose the art/data boundary", ui);
+requireText(/Editorial illustration—not a field photograph or data record\./i, "in-app poster must disclose the art/data boundary", ui);
 requireText(/activity index—not population density or site health/i, "in-app poster must state the claim boundary", ui);
 if (count(/NEON-Driver-Cascade\//g, ui) !== 1) fail("in-app poster must contain exactly one Driver route");
 if (count(/\bh1\(/g, ui) !== 1) fail("in-app first-run surface must contain exactly one h1 constructor");
@@ -79,6 +79,12 @@ for (const forbidden of [
 }
 
 const pinnedAssets = [
+  ["docs/assets/ground-beetle-living-poster.png", "9d5fbbe03079f09c838b3d6c6221518d82c47c3c1dd2818e3c7f2a55afeee27a"],
+  ["docs/assets/ground-beetle-living-poster.webp", "287ee35f15454493b0858df70f47aa236c9a1671621d2f147899401a02800d82"],
+  ["docs/assets/ground-beetle-living-poster-840.webp", "f23c8781035b95b59c9eb019b644986e96674a7899f38ab300db3f223464a367"],
+  ["www/assets/ground-beetle-living-poster.png", "9d5fbbe03079f09c838b3d6c6221518d82c47c3c1dd2818e3c7f2a55afeee27a"],
+  ["www/assets/ground-beetle-living-poster.webp", "287ee35f15454493b0858df70f47aa236c9a1671621d2f147899401a02800d82"],
+  ["www/assets/ground-beetle-living-poster-840.webp", "f23c8781035b95b59c9eb019b644986e96674a7899f38ab300db3f223464a367"],
   ["docs/assets/ground-beetle-social-v1.svg", "0e72d8140ff48f94afafdf17bb0d12e7f93449936c7603fd67052bb56d5d6633"],
   ["docs/og-image-v2.png", "20d91cce9532ac8b7d597edb3f536054688ac33619bd2564f307118bcd4c8345"],
   ["www/vendor/sweetalert2-11.10.0.min.css", "6422b5d2cc17bfd08dd39f409997fd5335a9252df85ef8a50cc27bf4af963a07"],
@@ -93,6 +99,14 @@ for (const [file, expectedHash] of pinnedAssets) {
   } catch (error) {
     fail(`${file}: ${error.message}`);
   }
+}
+
+try {
+  const buffer = readFileSync(resolve(root, "docs/assets/ground-beetle-living-poster.png"));
+  const [width, height] = pngDimensions(buffer);
+  if (width !== 1672 || height !== 941) fail(`poster art is ${width}x${height}; expected 1672x941`);
+} catch (error) {
+  fail(`docs/assets/ground-beetle-living-poster.png: ${error.message}`);
 }
 
 try {
