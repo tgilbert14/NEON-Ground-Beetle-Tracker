@@ -245,12 +245,12 @@ render_beetle_report <- function(file, d, label, is_demo = FALSE, env = NULL) {
         if (is.na(o)) "-" else paste0(o, "%"))
     })
     rh <- function() { new_page(2, label); 0.5 }
-    y <- draw_table(c("Species", "Individuals", "/100 TN", "Occupancy"), rows,
+    y <- draw_table(c("Species", "Individuals", "/100 TN", "Detected"), rows,
                     colx = c(0.00, 0.50, 0.68, 0.85), yTop = y, faces = c(3, 1, 1, 1), repeat_header = rh)
     more_n <- nrow(spct) - nrow(sp_show)
     if (more_n > 0) y <- draw_para(sprintf("+ %d more species recorded", more_n), y, 9, PG$muted, 3)
-    y <- draw_para(paste("Catch per 100 trap-nights (/100 TN) makes effort comparable; occupancy is the share",
-      "of sampling bouts a species appears in (naive frequency of occurrence)."), y, 8.5, PG$muted)
+    y <- draw_para(paste("Catch per 100 trap-nights (/100 TN) uses every valid collected trap opportunity;",
+      "Detected is the share of sampled plot x bouts with a catch, not detection-corrected occupancy."), y, 8.5, PG$muted)
   } else y <- draw_para("No species-level identifications in this window.", y, 9.5, PG$muted)
 
   # seasonality + trend

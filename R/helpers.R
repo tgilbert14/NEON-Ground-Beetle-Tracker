@@ -2,8 +2,8 @@
 # helpers.R — the analytical engine for the NEON Ground Beetle Tracker
 #
 # Pure(ish) functions that turn a NEON ground-beetle (carabid) long table —
-# one row per site / plot / bout / species with an individualCount and the
-# trap-night effort — into the metrics that power the app: community
+# catch rows plus one explicit effort-opportunity row per site / plot / bout —
+# into the metrics that power the app: community
 # composition, Hill-number diversity, individual-based rarefaction, species
 # accumulation across bouts, and seasonal activity.
 #
@@ -59,25 +59,64 @@ species_only <- function(d) {
   d[flag %in% TRUE, , drop = FALSE]
 }
 
+# Outcome rows and effort-opportunity rows travel together in the bundle. Keeping
+# them visibly distinct lets denominators include sampled zero-carabid bouts without
+# inventing a taxon or letting the anchor row enter richness/composition.
+beetle_catches <- function(d) {
+  if (is.null(d) || !nrow(d)) return(d)
+  is_catch <- if ("record_type" %in% names(d)) d$record_type == "catch" else rep(TRUE, nrow(d))
+  d[is_catch %in% TRUE & !is.na(d$individualCount) & d$individualCount > 0 &
+      !is.na(d$scientificName) & nzchar(d$scientificName), , drop = FALSE]
+}
+
+beetle_effort_rows <- function(d) {
+  if (is.null(d) || !nrow(d) || !"record_type" %in% names(d)) return(d[0, , drop = FALSE])
+  d[d$record_type == "effort" & is.finite(d$trapnights) & d$trapnights > 0, , drop = FALSE]
+}
+
+effort_opportunity_complete <- function(d) {
+  !is.null(d) && nrow(d) > 0 && "record_type" %in% names(d) &&
+    any(d$record_type == "effort", na.rm = TRUE)
+}
+
+beetle_effort_eligible_catches <- function(d) {
+  complete <- effort_opportunity_complete(d)
+  out <- beetle_catches(d)
+  if (is.null(out) || !nrow(out)) return(out)
+  keep <- is.finite(out$trapnights) & out$trapnights > 0
+  if (complete && "effort_status" %in% names(out)) {
+    keep <- keep & out$effort_status == "valid_sample_collected"
+  }
+  out[keep %in% TRUE, , drop = FALSE]
+}
+
 # Normalise a raw/bundled beetle table into the columns the app leans on.
 clean_beetle <- function(d) {
   if (is.null(d) || nrow(d) == 0) return(NULL)
   d <- tibble::as_tibble(d)
   need <- c("siteID", "plotID", "collectDate", "taxonID", "scientificName",
-            "taxonRank", "individualCount", "trapnights")
+            "taxonRank", "individualCount", "trapnights", "record_type",
+            "traps_sampled", "effort_records", "effort_status")
   for (col in need) if (!col %in% names(d)) d[[col]] <- NA
+  if (all(is.na(d$record_type))) d$record_type <- "catch"  # legacy/demo bundle
   d$individualCount <- suppressWarnings(as.numeric(d$individualCount))
   d$trapnights      <- suppressWarnings(as.numeric(d$trapnights))
+  d$traps_sampled   <- suppressWarnings(as.integer(d$traps_sampled))
+  d$effort_records  <- suppressWarnings(as.integer(d$effort_records))
   d$date <- as.Date(substr(as.character(d$collectDate), 1, 10))
   d$year <- as.integer(format(d$date, "%Y"))
   d$ym   <- substr(as.character(d$date), 1, 7)
   d$mon  <- as.integer(format(d$date, "%m"))
-  # drop rows with no count or no name; keep genus/morphospecies for ABUNDANCE
-  # but tag whether each is resolved to species so richness metrics can exclude
-  # the higher-taxon rows (see is_species_level).
-  d <- d[!is.na(d$individualCount) & d$individualCount > 0 &
-         !is.na(d$scientificName) & d$scientificName != "", , drop = FALSE]
+  # Catch rows require a positive count and a taxon. Effort anchors require valid
+  # positive trap-nights but deliberately carry no taxon and a zero outcome.
+  keep_catch <- d$record_type == "catch" & !is.na(d$individualCount) &
+    d$individualCount > 0 & !is.na(d$scientificName) & nzchar(d$scientificName)
+  keep_effort <- d$record_type == "effort" & is.finite(d$trapnights) &
+    d$trapnights > 0 & !is.na(d$plotID) & !is.na(d$date)
+  d <- d[(keep_catch | keep_effort) %in% TRUE, , drop = FALSE]
   d$species_level <- resolved_to_species(d$taxonRank, d$scientificName)
+  d$species_level[d$record_type == "effort"] <- FALSE
+  d$sampled_opportunity <- d$record_type == "effort"
   d
 }
 
@@ -86,21 +125,27 @@ clean_beetle <- function(d) {
 community_table <- function(d) {
   if (is.null(d) || nrow(d) == 0) return(NULL)
   tn <- effort_trapnights(d)
-  out <- d %>%
+  catches <- beetle_catches(d)
+  if (is.null(catches) || !nrow(catches)) return(NULL)
+  out <- catches %>%
     dplyr::group_by(.data$scientificName) %>%
     dplyr::summarise(individuals = sum(.data$individualCount, na.rm = TRUE),
                      bouts = dplyr::n_distinct(.data$collectDate),
                      .groups = "drop") %>%
     dplyr::arrange(dplyr::desc(.data$individuals))
-  out$cpn <- if (tn > 0) round(100 * out$individuals / tn, 2) else NA_real_
+  eligible <- beetle_effort_eligible_catches(d)
+  eligible_ind <- if (!is.null(eligible) && nrow(eligible))
+    tapply(eligible$individualCount, eligible$scientificName, sum, na.rm = TRUE) else numeric(0)
+  cpn_num <- unname(eligible_ind[out$scientificName])
+  out$cpn <- if (is.finite(tn) && tn > 0) round(100 * cpn_num / tn, 2) else NA_real_
   # species-level flag must match the rest of the app (rank-aware): prefer the
   # per-row flag clean_beetle() set from NEON's authoritative taxonRank, and fall
   # back to the name heuristic only when rank is absent (e.g. the demo CSV).
   # Using is_species_level(name) here alone made the Overview/Diversity species
   # set disagree with the QA note, ordination and indicators once a real bundle
   # (which carries taxonRank) is loaded.
-  out$species_level <- if ("species_level" %in% names(d)) {
-    unname(tapply(d$species_level %in% TRUE, d$scientificName, any)[out$scientificName])
+  out$species_level <- if ("species_level" %in% names(catches)) {
+    unname(tapply(catches$species_level %in% TRUE, catches$scientificName, any)[out$scientificName])
   } else is_species_level(out$scientificName)
   attr(out, "qa") <- taxon_qa(d)
   out
@@ -110,6 +155,8 @@ community_table <- function(d) {
 # species vs. left at genus/family. Richness uses species-level only; abundance
 # (total individuals) keeps everything actually trapped.
 taxon_qa <- function(d) {
+  if (is.null(d) || !nrow(d)) return(NULL)
+  d <- beetle_catches(d)
   if (is.null(d) || !nrow(d)) return(NULL)
   sl <- if ("species_level" %in% names(d)) d$species_level
         else resolved_to_species(if ("taxonRank" %in% names(d)) d$taxonRank else NULL, d$scientificName)
@@ -125,12 +172,17 @@ taxon_qa <- function(d) {
     })
 }
 
-# Total trap-night effort = sum of unique (plot, bout) trap-night values, so a
-# species count isn't multiplied by however many species shared that sample.
+# Total trap-night effort = sum of unique (plot, bout) opportunity values. New
+# bundles use explicit effort anchors, including valid zero-carabid bouts. Legacy
+# bundles fall back to deduplicating effort copied onto positive catch rows and are
+# therefore marked incomplete by effort_opportunity_complete().
 effort_trapnights <- function(d) {
   if (is.null(d) || !"trapnights" %in% names(d)) return(NA_real_)
-  u <- unique(d[, c("plotID", "collectDate", "trapnights"), drop = FALSE])
-  sum(u$trapnights, na.rm = TRUE)
+  e <- if (effort_opportunity_complete(d)) beetle_effort_rows(d) else d
+  u <- unique(e[, c("siteID", "plotID", "collectDate", "trapnights"), drop = FALSE])
+  u <- u[is.finite(u$trapnights) & u$trapnights > 0, , drop = FALSE]
+  if (!nrow(u)) return(NA_real_)
+  sum(u$trapnights)
 }
 
 # ---- diversity: Hill numbers ----------------------------------------------
@@ -210,14 +262,18 @@ seasonality <- function(d, by_species = FALSE, top_n = 6) {
   eff <- unique(d[, c("plotID", "collectDate", "trapnights")])
   eff$mon <- as.integer(format(as.Date(eff$collectDate), "%m"))
   mon_eff <- stats::aggregate(trapnights ~ mon, eff, sum)
+  eligible <- beetle_effort_eligible_catches(d)
   if (!by_species) {
-    cap <- stats::aggregate(individualCount ~ mon, d, sum)
-    m <- merge(cap, mon_eff, by = "mon")
+    cap <- if (!is.null(eligible) && nrow(eligible))
+      stats::aggregate(individualCount ~ mon, eligible, sum) else
+      data.frame(mon = integer(0), individualCount = numeric(0))
+    m <- merge(mon_eff, cap, by = "mon", all.x = TRUE)
+    m$individualCount[is.na(m$individualCount)] <- 0
     m$cpn <- 100 * m$individualCount / m$trapnights
     return(tibble::as_tibble(m[order(m$mon), c("mon", "cpn")]))
   }
-  ds <- species_only(d)             # name real species in the per-species split
-  if (is.null(ds) || !nrow(ds)) ds <- d
+  ds <- species_only(eligible)      # named species with matched effort only
+  if (is.null(ds) || !nrow(ds)) return(NULL)
   keep <- names(sort(tapply(ds$individualCount, ds$scientificName, sum),
                      decreasing = TRUE))[seq_len(min(top_n, length(unique(ds$scientificName))))]
   sub <- ds[ds$scientificName %in% keep, ]
@@ -235,7 +291,7 @@ seasonality <- function(d, by_species = FALSE, top_n = 6) {
 # species has its OWN activity window, which a pooled curve hides.
 phenology_matrix <- function(d, top = 10) {
   if (is.null(d) || !nrow(d)) return(NULL)
-  sp_d <- species_only(d); if (!nrow(sp_d)) return(NULL)
+  sp_d <- species_only(beetle_effort_eligible_catches(d)); if (!nrow(sp_d)) return(NULL)
   eff <- unique(d[, c("plotID", "collectDate", "trapnights")])
   eff$mon <- as.integer(format(as.Date(eff$collectDate), "%m"))
   mon_tn <- tapply(eff$trapnights, eff$mon, sum, na.rm = TRUE)   # named vector, month -> trap-nights
@@ -256,18 +312,16 @@ phenology_matrix <- function(d, top = 10) {
   list(z = z, species = tops, months = month.abb)
 }
 
-# ---- frequency of occurrence (naive occupancy) ----------------------------
-# The share of CARABID-POSITIVE plot x bout samples in which each species was
-# caught at least once. The count-data analogue of "how widespread": a beetle can
-# be abundant but patchy, or sparse but everywhere. Two honest caveats baked into
-# the UI copy: (1) NAIVE — not detection-corrected; (2) the denominator is bouts
-# that caught >=1 ground beetle, because the bundle drops zero-catch bouts at
-# clean_beetle() (so a true deployment denominator isn't reconstructable here);
-# zero-carabid bouts are rare in the active season, so the bias is small but real.
+# ---- frequency of occurrence (naive detection) ----------------------------
+# The share of sampled plot x bout opportunities in which each species was caught
+# at least once. This is not detection-corrected occupancy. New bundles enumerate
+# zero-carabid opportunities from bet_fielddata; legacy bundles remain explicitly
+# catch-conditioned and cannot claim opportunity-complete detection frequency.
 occupancy_table <- function(d, min_samples = 6) {
   if (is.null(d) || !nrow(d)) return(NULL)
-  sp_d <- species_only(d); if (!nrow(sp_d)) return(NULL)
-  n_samp <- nrow(unique(d[, c("plotID", "collectDate"), drop = FALSE]))
+  sp_d <- species_only(beetle_effort_eligible_catches(d)); if (!nrow(sp_d)) return(NULL)
+  opp <- if (effort_opportunity_complete(d)) beetle_effort_rows(d) else d
+  n_samp <- nrow(unique(opp[, c("siteID", "plotID", "collectDate"), drop = FALSE]))
   if (n_samp < min_samples) return(NULL)
   occ <- sp_d %>%
     dplyr::distinct(.data$scientificName, .data$plotID, .data$collectDate) %>%
@@ -276,6 +330,7 @@ occupancy_table <- function(d, min_samples = 6) {
     dplyr::mutate(occ = round(100 * .data$present / n_samp, 1)) %>%
     dplyr::arrange(dplyr::desc(.data$occ))
   attr(occ, "n_samp") <- n_samp
+  attr(occ, "opportunity_complete") <- effort_opportunity_complete(d)
   occ
 }
 
@@ -301,15 +356,27 @@ rank_abundance <- function(d) {
 # Falls back to raw counts when a bundle carries no effort data.
 annual_trend <- function(d) {
   if (is.null(d) || nrow(d) == 0) return(NULL)
-  yr <- if ("year" %in% names(d)) d$year else as.integer(format(as.Date(d$collectDate), "%Y"))
-  cap <- stats::aggregate(list(individuals = d$individualCount), list(year = yr), sum, na.rm = TRUE)
-  eff <- unique(d[, c("plotID", "collectDate", "trapnights"), drop = FALSE])
+  catches <- beetle_catches(d)
+  eligible <- beetle_effort_eligible_catches(d)
+  eff_source <- if (effort_opportunity_complete(d)) beetle_effort_rows(d) else d
+  eff <- unique(eff_source[, c("siteID", "plotID", "collectDate", "trapnights"), drop = FALSE])
   eff$year <- as.integer(format(as.Date(eff$collectDate), "%Y"))
   te <- stats::aggregate(list(trapnights = eff$trapnights), list(year = eff$year),
                          function(x) sum(x, na.rm = TRUE))
-  m <- merge(cap, te, by = "year", all.x = TRUE)
+  has_eff <- sum(te$trapnights, na.rm = TRUE) > 0
+  cap_source <- if (has_eff) eligible else catches
+  if (is.null(cap_source) || !nrow(cap_source)) {
+    cap <- data.frame(year = integer(0), individuals = numeric(0))
+  } else {
+    cap_year <- if ("year" %in% names(cap_source)) cap_source$year else
+      as.integer(format(as.Date(cap_source$collectDate), "%Y"))
+    cap <- stats::aggregate(list(individuals = cap_source$individualCount),
+                            list(year = cap_year), sum, na.rm = TRUE)
+  }
+  m <- if (has_eff) merge(te, cap, by = "year", all.x = TRUE) else cap
+  if (!"trapnights" %in% names(m)) m$trapnights <- NA_real_
+  m$individuals[is.na(m$individuals)] <- 0
   m <- m[order(m$year), , drop = FALSE]
-  has_eff <- sum(m$trapnights, na.rm = TRUE) > 0
   m$cpn <- if (has_eff) ifelse(m$trapnights > 0, 100 * m$individuals / m$trapnights, NA_real_) else NA_real_
   m$metric <- if (has_eff) m$cpn else as.numeric(m$individuals)
   m <- m[is.finite(m$metric), , drop = FALSE]
@@ -348,7 +415,7 @@ beetle_blurb <- function(scientificName) {
   g <- sub(" .*$", "", scientificName %||% "")
   lut <- c(
     Pterostichus = "Glossy black woodland predators, fast night hunters of soft-bodied prey and a classic forest-floor carabid.",
-    Carabus      = "Big, sculptured 'caterpillar hunters' that can't fly; flagship beetles of healthy forest soils.",
+    Carabus      = "Big, sculptured 'caterpillar hunters' that can't fly; conspicuous forest-floor predators.",
     Calosoma     = "Iridescent 'searchers' that climb plants to hunt caterpillars, voracious agricultural allies.",
     Harpalus     = "Stout seed-eating ground beetles (granivores) common in open prairies and fields.",
     Poecilus     = "Metallic-green active hunters of grasslands, abundant through the warm season.",
@@ -364,14 +431,14 @@ beetle_blurb <- function(scientificName) {
     Agonum       = "Slender, often metallic beetles of damp ground and wetland margins.",
     Cychrus      = "Snail-specialist forest beetles with elongate snouts."
   )
-  unname(lut[g]) %||% "A NEON-sampled ground beetle (Carabidae), a sensitive bioindicator of habitat and climate."
+  unname(lut[g]) %||% "A ground beetle (Carabidae) encountered by NEON's standardized pitfall-trapping protocol."
 }
 
 # Introduced (non-native, established European) carabids -----------------------
 # Several NEON sites are numerically DOMINATED by an introduced European species
 # (Pterostichus melanarius #1 at STEI/UNDE/WOOD; Carabus nemoralis at TREE), so a
 # "most abundant / dominant" verdict reads backwards — a dominant European beetle
-# is the opposite of intact native fauna. Keyed on the exact binomial (not genus:
+# requires non-native context. Keyed on the exact binomial (not genus:
 # most Pterostichus/Carabus are native) so only the established invaders flag.
 # Refs: Bousquet 2012 (Carabidae of America N of Mexico); Lindroth 1961-69.
 INTRODUCED_CARABIDS <- c(
@@ -442,13 +509,18 @@ beetle_export_codebook <- function() {
     "collectDate",            "date",     "ISO 8601 (YYYY-MM-DD)",         "Date the pitfall bout was collected.",
     "year",                   "integer",  "",                              "Calendar year of collectDate.",
     "month",                  "integer",  "1-12",                          "Calendar month of collectDate.",
+    "record_type",            "string",   "",                              "'catch' is a taxon outcome row; 'effort' is the explicit sampled plot x bout opportunity anchor.",
+    "sampled_opportunity",    "boolean",  "TRUE/FALSE",                    "TRUE only on an effort anchor representing collected traps, including zero-carabid bouts.",
+    "effort_status",          "string",   "",                              "Whether field effort was resolved from a valid collected sample or is missing.",
+    "traps_sampled",          "integer",  "traps",                         "Distinct collected trapID records contributing to this plot x bout effort value.",
+    "effort_records",         "integer",  "records",                       "Deduplicated physical field-opportunity records contributing to this plot x bout.",
     "taxonID",                "string",   "",                              "NEON taxon code for the identification.",
     "scientificName",         "string",   "",                              "Scientific name - expert-taxonomist call where available, otherwise parataxonomist; may be a genus or family for unresolved IDs.",
     "taxonRank",              "string",   "",                              "Taxonomic rank of scientificName (species, genus, family, ...), from NEON's expert table where available.",
     "species_level",          "boolean",  "TRUE/FALSE",                    "TRUE when resolved to species/subspecies. Richness, diversity, ordination and indicator metrics use TRUE rows only; total abundance uses all rows.",
-    "individualCount",        "integer",  "individuals",                   "Number of individuals of this taxon in this plot x bout sample.",
-    "trapnights",             "numeric",  "trap-nights",                   "Trap-night effort for this plot x bout (sum of daysOfTrapping over traps set). Empty when NEON effort data is absent.",
-    "cpn_per_100_trapnights", "numeric",  "individuals / 100 trap-nights", "Effort-normalised catch = 100 x individualCount / trapnights. Empty when trapnights is missing or zero.",
+    "individualCount",        "integer",  "individuals",                   "Number of individuals on a catch row; zero on an effort anchor and not itself a taxon observation.",
+    "trapnights",             "numeric",  "trap-nights",                   "Opportunity-complete plot x bout effort: sum of trappingDays over distinct collected trapID records.",
+    "cpn_per_100_trapnights", "numeric",  "individuals / 100 trap-nights", "On catch rows, effort-normalised contribution = 100 x individualCount / trapnights. Empty on effort anchors or missing effort.",
     "source",                 "string",   "",                              "'neon' = real NEON records; 'demo' = illustrative sample data."
   )
 }
@@ -521,6 +593,8 @@ beetle_env_codebook <- function(env_df) {
 beetle_qc <- function(d) {
   out <- list(flags = list(), sets = list())
   if (is.null(d) || !nrow(d)) return(out)
+  d <- beetle_catches(d)
+  if (is.null(d) || !nrow(d)) return(out)
   cols <- intersect(c("siteID", "plotID", "collectDate", "year", "taxonID",
                       "scientificName", "taxonRank", "species_level",
                       "individualCount", "trapnights"), names(d))
@@ -541,14 +615,14 @@ beetle_qc <- function(d) {
 
   # 1 (HIGH) — the most-abundant SPECIES is an introduced European carabid.
   # A "dominant" or "#1" label then reads backwards: a numerically dominant
-  # non-native is the opposite of intact native fauna (see is_introduced).
+  # non-native status changes how a simple "dominant species" label is read.
   sp_ind <- tapply(ind[sl], d$scientificName[sl], sum, na.rm = TRUE)
   if (length(sp_ind)) {
     dom <- names(sp_ind)[which.max(sp_ind)]
     if (length(dom) && is_introduced(dom))
       add("high", sprintf("Dominant species is introduced (%s)", dom), "introduced",
           which(sl & is_introduced(d$scientificName)),
-          sprintf("%s, the most abundant named beetle here, is an introduced European carabid, not native. A 'dominant/top species' verdict reads backwards: a numerically dominant non-native usually marks a disturbed or human-modified site, not a rich native fauna. The rows behind this flag are every catch of an introduced species at this site.", dom))
+          sprintf("%s, the most abundant named beetle here, is an introduced European carabid, not native. Dominance describes this pitfall catch only; it does not diagnose habitat condition or site health. The rows behind this flag are every catch of an introduced species at this site.", dom))
   }
 
   # 2 (WARN) — high coarse-ID share. When a large share of INDIVIDUALS is left at
@@ -618,15 +692,223 @@ beetle_qc_report <- function(d) {
 }
 
 # ---------------------------------------------------------------------------
+# build_beetle_effort() resolves the field table at its physical trap grain before
+# aggregating to plot x collection bout. NEON documents one expected bet_fielddata
+# record per trapID x plotID x collectDate; sampleCollected == "Y" distinguishes
+# a collected sample from an impractical/missed scheduled record. Exact duplicate
+# trap records collapse; conflicting effort for the same physical key fails closed.
+# ---------------------------------------------------------------------------
+build_beetle_effort <- function(raw) {
+  fd <- raw$bet_fielddata
+  if (is.null(fd) || !nrow(fd)) stop("no bet_fielddata table in result")
+  fd <- tibble::as_tibble(fd)
+  required <- c("siteID", "plotID", "trapID", "collectDate", "sampleCollected")
+  missing <- setdiff(required, names(fd))
+  if (length(missing)) stop("bet_fielddata missing required columns: ", paste(missing, collapse = ", "))
+  dcol <- intersect(c("trappingDays", "daysOfTrapping"), names(fd))
+  if (!length(dcol)) stop("bet_fielddata has no trappingDays/daysOfTrapping effort column")
+
+  fd$siteID <- as.character(fd$siteID)
+  fd$plotID <- as.character(fd$plotID)
+  fd$trapID <- as.character(fd$trapID)
+  fd$collectDate <- as.Date(substr(as.character(fd$collectDate), 1, 10))
+  fd$.days <- suppressWarnings(as.numeric(as.character(fd[[dcol[1]]])))
+  collected <- toupper(trimws(as.character(fd$sampleCollected))) == "Y"
+  fd <- fd[collected %in% TRUE & is.finite(fd$.days) & fd$.days > 0 &
+             !is.na(fd$collectDate) & nzchar(fd$siteID) & nzchar(fd$plotID) &
+             nzchar(fd$trapID), , drop = FALSE]
+  if (!nrow(fd)) stop("bet_fielddata has no valid collected trap opportunities")
+
+  fd$.trap_key <- paste(fd$siteID, fd$plotID, fd$trapID, fd$collectDate, sep = "|")
+  days_by_key <- split(fd$.days, fd$.trap_key)
+  conflicting <- names(days_by_key)[vapply(days_by_key, function(x) {
+    length(unique(x[is.finite(x)])) > 1L
+  }, logical(1))]
+  if (length(conflicting)) {
+    stop(sprintf("%d physical trap opportunities have conflicting effort", length(conflicting)))
+  }
+  fd <- fd[!duplicated(fd$.trap_key), , drop = FALSE]
+
+  fd %>%
+    dplyr::group_by(.data$siteID, .data$plotID, .data$collectDate) %>%
+    dplyr::summarise(
+      trapnights = sum(.data$.days),
+      traps_sampled = dplyr::n_distinct(.data$trapID),
+      effort_records = dplyr::n(),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(.data$siteID, .data$collectDate, .data$plotID)
+}
+
+# resolve_beetle_catches() follows the published table relationships and preserves
+# the sorting total. A sorting row is a bulk count for one subsample. Pinned
+# individuals override that row one specimen at a time with parataxonomist IDs;
+# an expert determination may then override only the matching individualID. The
+# residual unpinned count stays at sorting-level taxonomy. This prevents one
+# expert specimen from silently relabelling an entire bulk count.
+resolve_beetle_catches <- function(raw) {
+  if (is.null(raw) || is.null(raw$bet_sorting)) stop("no bet_sorting table in result")
+  srt <- tibble::as_tibble(raw$bet_sorting)
+  required <- c("sampleID", "subsampleID", "sampleType", "siteID", "plotID",
+                "collectDate", "taxonID", "scientificName", "taxonRank",
+                "individualCount")
+  for (col in required) if (!col %in% names(srt)) srt[[col]] <- NA
+  sample_type <- tolower(trimws(as.character(srt$sampleType)))
+  srt <- srt[!is.na(sample_type) & grepl("carabid", sample_type), required, drop = FALSE]
+  if (!nrow(srt)) {
+    return(tibble::tibble(
+      siteID = character(), plotID = character(), collectDate = as.Date(character()),
+      taxonID = character(), scientificName = character(), taxonRank = character(),
+      individualCount = numeric()
+    ))
+  }
+  for (col in c("sampleID", "subsampleID", "siteID", "plotID", "taxonID",
+                "scientificName", "taxonRank")) srt[[col]] <- as.character(srt[[col]])
+  srt$collectDate <- as.Date(substr(as.character(srt$collectDate), 1, 10))
+  srt$individualCount <- suppressWarnings(as.numeric(as.character(srt$individualCount)))
+  srt <- unique(srt)
+  historical_other <- tolower(trimws(as.character(srt$sampleType))) == "other carabid"
+  real_subsample <- !is.na(srt$subsampleID) & nzchar(srt$subsampleID)
+  if (anyDuplicated(srt$subsampleID[real_subsample]))
+    stop("bet_sorting has conflicting duplicate subsampleID rows")
+  srt$.sort_row <- seq_len(nrow(srt))
+
+  # Field sampleID is the authoritative bridge to site / plot / collection date.
+  fd <- raw$bet_fielddata
+  if (!is.null(fd) && nrow(fd) && "sampleID" %in% names(fd)) {
+    fd <- tibble::as_tibble(fd)
+    for (col in c("siteID", "plotID", "collectDate")) if (!col %in% names(fd)) fd[[col]] <- NA
+    field <- unique(data.frame(
+      sampleID = as.character(fd$sampleID),
+      siteID = as.character(fd$siteID),
+      plotID = as.character(fd$plotID),
+      collectDate = as.Date(substr(as.character(fd$collectDate), 1, 10)),
+      stringsAsFactors = FALSE
+    ))
+    real_sample <- !is.na(field$sampleID) & nzchar(field$sampleID)
+    if (anyDuplicated(field$sampleID[real_sample]))
+      stop("bet_fielddata has conflicting duplicate sampleID metadata")
+    hit <- match(srt$sampleID, field$sampleID)
+    use <- !is.na(hit)
+    srt$siteID[use] <- field$siteID[hit[use]]
+    srt$plotID[use] <- field$plotID[hit[use]]
+    srt$collectDate[use] <- field$collectDate[hit[use]]
+  }
+
+  para <- raw$bet_parataxonomistID
+  para_cols <- c("subsampleID", "individualID", "taxonID", "scientificName", "taxonRank")
+  if (is.null(para) || !nrow(para)) {
+    para <- as.data.frame(stats::setNames(replicate(length(para_cols), character(), simplify = FALSE),
+                                          para_cols), stringsAsFactors = FALSE)
+  } else {
+    para <- tibble::as_tibble(para)
+    for (col in para_cols) if (!col %in% names(para)) para[[col]] <- NA
+    para <- unique(as.data.frame(para[, para_cols, drop = FALSE], stringsAsFactors = FALSE))
+    for (col in para_cols) para[[col]] <- as.character(para[[col]])
+    para <- para[!is.na(para$individualID) & nzchar(para$individualID), , drop = FALSE]
+    if (anyDuplicated(para$individualID))
+      stop("bet_parataxonomistID has conflicting duplicate individualID rows")
+  }
+
+  expert <- raw$bet_expertTaxonomistIDProcessed
+  expert_cols <- c("individualID", "taxonID", "scientificName", "taxonRank")
+  if (is.null(expert) || !nrow(expert)) {
+    expert <- as.data.frame(stats::setNames(replicate(length(expert_cols), character(), simplify = FALSE),
+                                            expert_cols), stringsAsFactors = FALSE)
+  } else {
+    expert <- tibble::as_tibble(expert)
+    for (col in expert_cols) if (!col %in% names(expert)) expert[[col]] <- NA
+    expert <- unique(as.data.frame(expert[, expert_cols, drop = FALSE], stringsAsFactors = FALSE))
+    for (col in expert_cols) expert[[col]] <- as.character(expert[[col]])
+    expert <- expert[!is.na(expert$individualID) & nzchar(expert$individualID), , drop = FALSE]
+    # The product contract expects at most one expert row per individual, but
+    # historical data contain a few conflicting duplicates. An ambiguous expert
+    # determination must not override the unambiguous parataxonomist record.
+    duplicate_expert <- duplicated(expert$individualID) |
+      duplicated(expert$individualID, fromLast = TRUE)
+    expert <- expert[!duplicate_expert, , drop = FALSE]
+  }
+
+  if (nrow(para)) {
+    para$.sort_row <- match(para$subsampleID, srt$subsampleID)
+    para <- para[!is.na(para$.sort_row), , drop = FALSE]
+  } else para$.sort_row <- integer(0)
+  if (nrow(para)) {
+    hit <- match(para$individualID, expert$individualID)
+    for (col in c("taxonID", "scientificName", "taxonRank")) {
+      replacement <- expert[[col]][hit]
+      use <- !is.na(replacement) & nzchar(replacement)
+      para[[col]][use] <- replacement[use]
+      fallback <- srt[[col]][para$.sort_row]
+      missing <- is.na(para[[col]]) | !nzchar(para[[col]])
+      para[[col]][missing] <- fallback[missing]
+    }
+  }
+
+  pinned_n <- tabulate(para$.sort_row, nbins = nrow(srt))
+  invalid_count <- !is.finite(srt$individualCount) | srt$individualCount < 0
+
+  # Early `other carabid` records stored the fine-scale, individual-level result
+  # in bet_parataxonomistID. When those enumerated children exceed a blank or
+  # placeholder sorting count, their number is the only defensible count. For
+  # the modern workflow, bet_sorting remains authoritative: conflicting pinned
+  # children are ignored and the sorting taxonomy/count is retained.
+  historical_repair <- historical_other & pinned_n > 0 &
+    (invalid_count | pinned_n > srt$individualCount)
+  srt$individualCount[historical_repair] <- pinned_n[historical_repair]
+  invalid_count <- !is.finite(srt$individualCount) | srt$individualCount < 0
+  overflow <- !historical_other & !invalid_count & pinned_n > srt$individualCount
+  discard_para <- overflow | (!historical_other & invalid_count)
+  if (any(discard_para) && nrow(para)) {
+    para <- para[!(para$.sort_row %in% which(discard_para)), , drop = FALSE]
+    pinned_n <- tabulate(para$.sort_row, nbins = nrow(srt))
+  }
+  # Invalid rows with no enumerated historical individuals carry no usable
+  # abundance evidence. Set them to zero so they cannot fabricate a catch.
+  srt$individualCount[invalid_count] <- 0
+  residual <- srt$individualCount - pinned_n
+  if (any(residual < 0)) stop("unresolved pinned individual count exceeds sorting total")
+
+  pinned <- if (nrow(para)) data.frame(
+    siteID = srt$siteID[para$.sort_row],
+    plotID = srt$plotID[para$.sort_row],
+    collectDate = srt$collectDate[para$.sort_row],
+    taxonID = para$taxonID,
+    scientificName = para$scientificName,
+    taxonRank = para$taxonRank,
+    individualCount = 1,
+    stringsAsFactors = FALSE
+  ) else NULL
+  unpinned <- data.frame(
+    siteID = srt$siteID,
+    plotID = srt$plotID,
+    collectDate = srt$collectDate,
+    taxonID = srt$taxonID,
+    scientificName = srt$scientificName,
+    taxonRank = srt$taxonRank,
+    individualCount = residual,
+    stringsAsFactors = FALSE
+  )
+  rows <- dplyr::bind_rows(pinned, unpinned) %>%
+    dplyr::filter(is.finite(.data$individualCount), .data$individualCount > 0,
+                  !is.na(.data$scientificName), nzchar(.data$scientificName)) %>%
+    dplyr::group_by(.data$siteID, .data$plotID, .data$collectDate,
+                    .data$taxonID, .data$scientificName, .data$taxonRank) %>%
+    dplyr::summarise(individualCount = sum(.data$individualCount), .groups = "drop")
+  tibble::as_tibble(rows)
+}
+
 # assemble_beetles() — turn a neonUtilities loadByProduct() result for
-# DP1.10022.001 into the app's tidy long schema:
-#   siteID, plotID, collectDate, taxonID, scientificName, taxonRank,
-#   individualCount, trapnights
+# DP1.10022.001 into a tidy bundle with two explicit row types:
+#   catch  = one plot x bout x taxon outcome row
+#   effort = one plot x bout opportunity anchor, including zero-carabid bouts
+# Both carry plot-bout trap-night effort; only effort rows enter the denominator
+# roster, and only catch rows enter taxonomic metrics.
 #
 # Steps (the canonical EFI/neonDivData recipe, kept pragmatic for a scaffold):
-#  1. carabid counts from bet_sorting (sampleType == "carabid")
-#  2. reconcile taxonomy: override the parataxonomist call with the authoritative
-#     EXPERT call where one exists for that taxonID
+#  1. carabid counts from bet_sorting (all historical carabid sampleType values)
+#  2. reconcile pinned individuals through parataxonomist -> expert individualID,
+#     conserving the residual unpinned sorting count at sorting taxonomy
 #  3. effort: trap-nights per plot × bout from bet_fielddata$daysOfTrapping,
 #     summed over the traps actually set — this absorbs the 2018 trap-count and
 #     2023 plot-count protocol changes, so abundance stays per-trap-night.
@@ -636,55 +918,43 @@ beetle_qc_report <- function(d) {
 # live-fetch path (global.R) and the bundle builder (scripts/refresh_data.R).
 # ---------------------------------------------------------------------------
 assemble_beetles <- function(raw) {
-  if (is.null(raw) || is.null(raw$bet_sorting)) stop("no bet_sorting table in result")
-  srt <- tibble::as_tibble(raw$bet_sorting)
-  if ("sampleType" %in% names(srt))
-    srt <- srt[!is.na(srt$sampleType) & srt$sampleType == "carabid", , drop = FALSE]
-  if (!nrow(srt)) return(NULL)
-  for (col in c("individualCount", "taxonID", "scientificName", "taxonRank",
-                "plotID", "collectDate", "siteID"))
-    if (!col %in% names(srt)) srt[[col]] <- NA
-  srt$individualCount <- suppressWarnings(as.numeric(srt$individualCount))
+  counts <- resolve_beetle_catches(raw)
 
-  # 2) expert-ID override (authoritative). Build a taxonID -> expert name/rank
-  #    lookup; the expert's taxonRank is what lets richness exclude genus/family
-  #    records cleanly (see is_species_level / species_only).
-  exp <- raw$bet_expertTaxonomistIDProcessed
-  if (!is.null(exp) && nrow(exp)) {
-    exp <- tibble::as_tibble(exp)
-    if (!"taxonRank" %in% names(exp)) exp$taxonRank <- NA
-    if (all(c("taxonID", "scientificName") %in% names(exp))) {
-      lut <- unique(exp[!is.na(exp$taxonID) & !is.na(exp$scientificName),
-                        c("taxonID", "scientificName", "taxonRank")])
-      lut <- lut[!duplicated(lut$taxonID), , drop = FALSE]
-      hit <- match(srt$taxonID, lut$taxonID)
-      srt$scientificName <- ifelse(is.na(hit), srt$scientificName, lut$scientificName[hit])
-      srt$taxonRank      <- ifelse(is.na(hit), srt$taxonRank,      lut$taxonRank[hit])
-    }
-  }
-
-  counts <- srt %>%
-    dplyr::filter(!is.na(.data$individualCount), .data$individualCount > 0,
-                  !is.na(.data$scientificName)) %>%
-    dplyr::group_by(.data$siteID, .data$plotID, .data$collectDate,
-                    .data$taxonID, .data$scientificName, .data$taxonRank) %>%
-    dplyr::summarise(individualCount = sum(.data$individualCount), .groups = "drop")
-
-  # 3) trap-night effort per plot × bout from field data
-  fd <- raw$bet_fielddata
-  eff <- NULL
-  if (!is.null(fd) && nrow(fd)) {
-    fd <- tibble::as_tibble(fd)
-    dcol <- intersect(c("daysOfTrapping", "trappingDays"), names(fd))
-    if (length(dcol) && all(c("plotID", "collectDate") %in% names(fd))) {
-      fd$.days <- suppressWarnings(as.numeric(fd[[dcol[1]]]))
-      eff <- fd %>% dplyr::filter(!is.na(.data$.days)) %>%
-        dplyr::group_by(.data$plotID, .data$collectDate) %>%
-        dplyr::summarise(trapnights = sum(.data$.days), .groups = "drop")
-    }
-  }
-  out <- if (is.null(eff)) dplyr::mutate(counts, trapnights = NA_real_)
-         else dplyr::left_join(counts, eff, by = c("plotID", "collectDate"))
+  # Resolve effort independently of catch so collected traps with no Carabidae
+  # remain in the opportunity roster.
+  eff <- build_beetle_effort(raw)
+  keys <- c("siteID", "plotID", "collectDate")
+  catches <- dplyr::left_join(counts, eff, by = keys) %>%
+    dplyr::mutate(
+      record_type = "catch",
+      sampled_opportunity = FALSE,
+      # Keep the output type stable when `counts` has zero rows. Base ifelse()
+      # returns logical(0) for an empty condition, which cannot bind to the
+      # character-valued effort anchors below.
+      effort_status = dplyr::if_else(
+        is.finite(.data$trapnights) & .data$trapnights > 0,
+        "valid_sample_collected",
+        "missing"
+      )
+    )
+  anchors <- eff %>%
+    dplyr::mutate(
+      taxonID = NA_character_,
+      scientificName = NA_character_,
+      taxonRank = NA_character_,
+      individualCount = 0,
+      record_type = "effort",
+      sampled_opportunity = TRUE,
+      effort_status = "valid_sample_collected"
+    )
+  out <- dplyr::bind_rows(catches, anchors) %>%
+    dplyr::select(dplyr::all_of(c(
+      "siteID", "plotID", "collectDate", "taxonID", "scientificName",
+      "taxonRank", "individualCount", "trapnights", "traps_sampled",
+      "effort_records", "record_type", "sampled_opportunity", "effort_status"
+    ))) %>%
+    dplyr::arrange(.data$siteID, .data$collectDate, .data$plotID,
+                   dplyr::desc(.data$record_type), .data$scientificName)
   out$source <- "neon"
   tibble::as_tibble(out)
 }
@@ -805,11 +1075,16 @@ shift_env <- function(env, lag = 0) {
 .beetle_cpn_series <- function(d) {
   if (is.null(d) || !nrow(d) || !"ym" %in% names(d)) return(NULL)
   dd <- d[!is.na(d$ym), , drop = FALSE]
-  if (!nrow(dd)) return(NULL)
-  cap <- stats::aggregate(individualCount ~ ym, dd, sum, na.rm = TRUE)
-  eff <- unique(dd[, c("plotID", "collectDate", "ym", "trapnights")])
+  eligible <- beetle_effort_eligible_catches(dd)
+  eff_source <- if (effort_opportunity_complete(dd)) beetle_effort_rows(dd) else dd
+  if (!nrow(eff_source)) return(NULL)
+  cap <- if (!is.null(eligible) && nrow(eligible))
+    stats::aggregate(individualCount ~ ym, eligible, sum, na.rm = TRUE) else
+    data.frame(ym = character(0), individualCount = numeric(0))
+  eff <- unique(eff_source[, c("siteID", "plotID", "collectDate", "ym", "trapnights")])
   eff <- stats::aggregate(trapnights ~ ym, eff, sum, na.rm = TRUE)
-  m <- merge(cap, eff, by = "ym")
+  m <- merge(eff, cap, by = "ym", all.x = TRUE)
+  m$individualCount[is.na(m$individualCount)] <- 0
   m <- m[m$trapnights > 0, , drop = FALSE]
   if (!nrow(m)) return(NULL)
   m$cpue <- 100 * m$individualCount / m$trapnights   # name 'cpue' to match the ported code

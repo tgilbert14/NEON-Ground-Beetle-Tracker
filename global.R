@@ -300,15 +300,9 @@ DDL <- list(
 
 # Light "desert-day" base (DEFAULT). styles.css [data-bs-theme="dark"] carries the
 # full desert-night system; the toggle defaults to light, so this is what shows.
-# Rubik is named as a PLAIN CSS font-family here (a bslib font_collection of bare
-# strings), NOT font_google("Rubik"). font_google() defaults to local = TRUE, which
-# makes bslib DOWNLOAD the font from Google and compile it into the theme AT APP
-# STARTUP. On Connect Cloud that live fetch runs on every cold start against an empty
-# cache; when Google Fonts is slow/unreachable the Sass compile blocks/fails during
-# boot -> black screen / "start-up error" (republish only re-primes the cache until the
-# next recycle). Naming the family as a string does ZERO network at boot; the real
-# Rubik glyphs are still delivered client-side by the <link> in ui.R (display=swap),
-# with a system-sans fallback. See docs/neonize-playbook.md §4.
+# Rubik is named as a plain CSS family, never as font_google("Rubik"). The app does
+# not fetch web fonts: a visitor with Rubik installed can use it, while every other
+# client and every offline/restricted host falls through to the local UI stack.
 rubik_stack <- bslib::font_collection(
   "Rubik", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif")
 app_theme <- bs_theme(
@@ -328,15 +322,14 @@ info_pop <- function(title, ..., placement = "auto")
                  ..., title = title, placement = placement)
 
 # A small clickable "introduced" badge for non-native European carabids. Reuses
-# the bslib popover so the ecological caveat ("dominant ≠ intact native fauna")
-# lives behind a click, keeping the default verdict/card clean (see is_introduced).
+# the bslib popover so provenance and interpretation stay beside the label.
 introduced_marker <- function(scientificName, placement = "auto")
   bslib::popover(
     tags$span(class = "intro-badge", title = "introduced. Click for why this matters",
               bsicons::bs_icon("globe-americas"), " introduced"),
     tags$p(tags$b(tags$em(scientificName)), " is an ", tags$b("introduced European carabid"),
            ", not native here."),
-    tags$p("So a high rank or “dominant” label is the opposite of intact native fauna. It usually marks a disturbed or human-modified site, not a rich one."),
+    tags$p("“Dominant” describes this pitfall catch only. The record adds non-native context but does not, by itself, diagnose habitat condition or site health."),
     title = "Introduced (non-native) species", placement = placement)
 
 # state pickers reused from the mammal app's metadata

@@ -1,39 +1,41 @@
-name: Refresh NEON data bundle
+name: Propose NEON data refresh
 
-# Monthly rebuild of the per-site ground-beetle .rds bundles (data/sites/*.rds),
-# the cross-site precompute cache (data/precomputed.rds), and the deploy manifest,
-# then a direct push to main. Runs late on the FIRST SATURDAY NIGHT of each month
-# (~11pm Arizona time) so any republish lands off-peak. NEON publishes on a lag, so
-# a monthly pull keeps the bundled data current. Posit Connect Cloud auto-republishes
-# on every push to main.
-#
-# REQUIRES one repo secret (Settings → Secrets and variables → Actions):
-#   NEON_TOKEN   your NEON API token (optional but recommended; speeds the pull)
-# Trigger manually from the Actions tab (workflow_dispatch); tick "skip_download"
-# to just rebuild the precompute cache from the committed bundles (fast, no pull).
+# Producer -> validator -> restricted publisher. Downloads land in an empty
+# staging directory; the committed known-good bundle is replaced only after the
+# exact canonical site roster exists. The validator rebuilds every derived index
+# and the manifest, verifies the complete candidate, and uploads immutable bytes.
+# Only the final job can write, and it publishes a review PR — never main.
 
 on:
   schedule:
-    # Every Sunday 06:00 UTC == Saturday 23:00 America/Phoenix (Arizona, no DST).
-    # Cron can't express "first Saturday of the month", so we fire every Saturday
-    # night and let the `gate` job below proceed only on the first one.
+    # Every Sunday 06:00 UTC == Saturday 23:00 America/Phoenix (no DST).
+    # The gate below allows only the first Saturday night of each month.
     - cron: "0 6 * * 0"
   workflow_dispatch:
     inputs:
       skip_download:
-        description: "Skip the NEON re-pull; just rebuild the precompute cache from committed bundles (fast test)"
+        description: "Skip the NEON re-pull; rebuild derived data from committed bundles"
         type: boolean
         default: false
 
 permissions:
-  contents: write          # commit the refreshed bundle to the PR branch
-  pull-requests: write     # open/update the data-refresh PR
+  contents: read
+
+concurrency:
+  group: ground-beetle-refresh
+  cancel-in-progress: false
+
+env:
+  RSPM: https://packagemanager.posit.co/cran/__linux__/jammy/2026-07-15
+  RENV_CONFIG_REPOS_OVERRIDE: https://packagemanager.posit.co/cran/__linux__/jammy/2026-07-15
+  OPENBLAS_CORETYPE: Haswell
+  OPENBLAS_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
+  GBT_LIVE: "0"
 
 jobs:
-  # Gate: only the FIRST Saturday night (Arizona time) runs the heavy refresh.
-  # Manual runs (workflow_dispatch) always proceed.
   gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       run: ${{ steps.check.outputs.run }}
     steps:
@@ -41,10 +43,11 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Manual run — proceeding."
-            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          dow=$(TZ='America/Phoenix' date +%u)    # 6 = Saturday
-          day=$(TZ='America/Phoenix' date +%-d)   # day-of-month, no leading zero
+          dow=$(TZ='America/Phoenix' date +%u)
+          day=$(TZ='America/Phoenix' date +%-d)
           if [ "$dow" = "6" ] && [ "$day" -le 7 ]; then
             echo "First Saturday in Arizona (day $day) — proceeding."
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -53,74 +56,154 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
-  refresh:
+  build_candidate:
     needs: gate
     if: needs.gate.outputs.run == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      NEON_TOKEN: ${{ secrets.NEON_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout the immutable source revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}   # push to main -> Connect Cloud auto-redeploys
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
 
-      - uses: r-lib/actions/setup-r@v2
+      - name: Set up pinned R
+        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
-          use-public-rspm: true
+          r-version: "4.5.2"
+          use-public-rspm: false
 
-      # refresh_data.R pulls + bundles, then sources precompute.R which sources
-      # global.R — so the runner needs the full app runtime (else precompute fails
-      # and a STALE precomputed.rds would ship), plus neonUtilities + rsconnect.
-      - name: Install R packages
-        uses: r-lib/actions/setup-r-dependencies@v2
+      - name: Install build and verification dependencies
+        uses: r-lib/actions/setup-r-dependencies@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
           packages: >
-            neonUtilities, dplyr, tibble, tidyr, DT, RColorBrewer, bsicons, bslib,
-            htmltools, leaflet, plotly, shiny, shinycssloaders, shinyjs, ggplot2, rsconnect
+            neonUtilities, shiny, bslib, bsicons, dplyr, tidyr, tibble, plotly@4.12.0,
+            leaflet, DT, shinyjs, shinycssloaders, RColorBrewer, htmltools,
+            ggplot2, jsonlite, rsconnect, cpp11,
+            url::https://cran.r-project.org/src/contrib/Archive/terra/terra_1.8-50.tar.gz,
+            url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/sf_1.1-1.tar.gz,
+            url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/s2_1.1.11.tar.gz,
+            url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/units_1.0-1.tar.gz,
+            url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/wk_0.9.5.tar.gz,
+            url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/classInt_0.4-11.tar.gz,
+            url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/raster_3.6-32.tar.gz,
+            url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/sp_2.2-1.tar.gz
+          pak-version: stable
+          dependencies: '"hard"'
+          cache-version: ground-beetle-refresh-geo-closure-v1
+          install-pandoc: "false"
+          install-quarto: "false"
 
-      # Full re-pull. The script is RESUMABLE (skips existing data/sites/*.rds), so
-      # delete them first to force a fresh pull; refresh_data.R then re-bundles,
-      # rebuilds data/precomputed.rds, regenerates manifest.json, and a mass-failure
-      # guard inside it stop()s before any of that if too few sites pulled.
-      - name: Rebuild the per-site bundles (full NEON re-pull)
+      - name: Run scientific helper contracts before network fetch
+        run: Rscript --vanilla scripts/test_helpers.R
+
+      - name: Build the full site bundle in an empty staging directory
         if: ${{ github.event.inputs.skip_download != 'true' }}
         env:
-          NEON_TOKEN: ${{ secrets.NEON_TOKEN }}
+          GBT_SITE_OUT_DIR: ${{ runner.temp }}/ground-beetle-sites
+          GBT_REFRESH_BUILD_ONLY: "1"
         run: |
+          set -euo pipefail
+          mkdir -p "$GBT_SITE_OUT_DIR"
+          Rscript --vanilla scripts/refresh_data.R
+
+      - name: Promote the complete staged roster into the worktree
+        if: ${{ github.event.inputs.skip_download != 'true' }}
+        env:
+          GBT_SITE_OUT_DIR: ${{ runner.temp }}/ground-beetle-sites
+        run: |
+          set -euo pipefail
           rm -f data/sites/*.rds
-          Rscript scripts/refresh_data.R
+          cp -- "$GBT_SITE_OUT_DIR"/*.rds data/sites/
 
-      - name: Rebuild the precompute cache only (skip-download fast path)
-        if: ${{ github.event.inputs.skip_download == 'true' }}
+      - name: Rebuild derived indexes
         run: |
-          Rscript scripts/precompute.R
+          set -euo pipefail
+          Rscript --vanilla scripts/precompute.R
+          Rscript --vanilla scripts/build_search_index.R
 
-      # Rebuild the bundled "Search the network" index (data/search_index.rds) from
-      # the freshly-rebuilt site bundles so it can never drift from the committed data.
-      # Runs on BOTH paths (full re-pull and skip-download), before the manifest +
-      # before the commit, so the index ships with the deploy.
-      - name: Rebuild the search index
-        run: |
-          Rscript scripts/build_search_index.R
+      - name: Regenerate the deploy manifest
+        run: Rscript --vanilla scripts/write_manifest.R
 
-      # Finalize the lean deploy manifest AFTER the index is on disk (so manifest.json
-      # reflects the rebuilt files) and run the lean hard-gate. Idempotent: refresh_data.R
-      # already regenerates it on the full path; re-running keeps the skip path honest.
-      - name: Regenerate + gate the deploy manifest
+      - name: Verify the complete release candidate
         run: |
-          Rscript scripts/write_manifest.R
+          set -euo pipefail
+          Rscript --vanilla scripts/test_helpers.R
+          Rscript --vanilla scripts/verify_bundle.R
+          Rscript --vanilla -e 'Sys.setenv(GBT_LIVE="0"); source("global.R"); source("ui.R"); server_candidate <- source("server.R")$value; stopifnot(inherits(ui, "shiny.tag.list") || inherits(ui, "shiny.tag"), is.function(server_candidate))'
+          node scripts/check_custom_message_handlers.mjs
+          node scripts/check_cover.mjs
+          bash -n scripts/post_deploy_smoke.sh
+          git diff --check
 
-      # Commit + push refreshed data DIRECTLY to main. THIS is the deploy: the push
-      # makes Connect Cloud auto-republish (matching the SM / Veg / Plant siblings,
-      # and the suite standard of auto-push to the watched branch, not PR-merge).
-      # Guarded so it no-ops cleanly when nothing changed.
-      - name: Commit & push refreshed data to main
+      - name: Package the immutable validated candidate
         run: |
-          git config user.name  "neon-data-bot"
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/ground-beetle-refresh.tgz" data manifest.json
+
+      - name: Upload validated candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ground-beetle-refresh-${{ github.sha }}
+          path: ${{ runner.temp }}/ground-beetle-refresh.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish_candidate:
+    needs: [gate, build_candidate]
+    if: needs.gate.outputs.run == 'true' && needs.build_candidate.result == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout the validated source revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Download the validated candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ground-beetle-refresh-${{ github.sha }}
+          path: ${{ runner.temp }}/refresh-candidate
+
+      - name: Publish or update the review branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tar -xzf "$RUNNER_TEMP/refresh-candidate/ground-beetle-refresh.tgz"
+          if git diff --quiet -- data manifest.json; then
+            echo "No validated data change; no review branch created."
+            exit 0
+          fi
+          branch="automation/ground-beetle-data-refresh"
+          remote_head=$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')
+          git switch -C "$branch"
+          git config user.name "neon-data-bot"
           git config user.email "neon-data-bot@users.noreply.github.com"
           git add -A data manifest.json
-          if git diff --cached --quiet; then
-            echo "No data changes - nothing to commit or deploy."
+          git commit -m "data: propose validated ground-beetle refresh [bot]" \
+                     -m "Produced from ${GITHUB_SHA}; opportunity-complete site roster, helper contracts, indexes, manifest, and offline app source passed before publication."
+          if [ -n "$remote_head" ]; then
+            git push --force-with-lease="refs/heads/$branch:$remote_head" \
+              origin "$branch:refs/heads/$branch"
           else
-            git commit -m "data: monthly NEON ground-beetle refresh [bot]"
-            git push origin HEAD:main
-            echo "Pushed refreshed data to main - Connect Cloud will redeploy."
+            git push origin "$branch:refs/heads/$branch"
+          fi
+          pr_url=$(gh pr list --head "$branch" --state open --json url --jq '.[0].url')
+          if [ -z "$pr_url" ]; then
+            gh pr create --base main --head "$branch" \
+              --title "data: validated NEON ground-beetle refresh" \
+              --body "Validated refresh candidate from run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Merging this PR is the explicit production and Connect Cloud deployment decision."
+          else
+            gh pr comment "$pr_url" --body "Updated with validated candidate from run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
           fi

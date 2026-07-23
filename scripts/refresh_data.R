@@ -7,7 +7,9 @@
 # — taxonRank lets richness cleanly exclude genus/family-only IDs — and
 # xz-compresses one .rds per site into data/sites/<SITE>.rds.
 #
-# RESUMABLE: skips sites whose .rds already exists. Delete a file to re-pull it.
+# RESUMABLE: skips sites whose .rds already exists. The release workflow points
+# GBT_SITE_OUT_DIR at an EMPTY staging directory so an incomplete download can
+# never replace the committed known-good bundle.
 # Run from the project root:   Rscript scripts/refresh_data.R
 #
 # Verify table/column names once before a full run:
@@ -25,7 +27,8 @@ suppressMessages({
 source("R/site_metadata.R")  # canonical site list
 source("R/helpers.R")        # assemble_beetles()
 
-out_dir <- "data/sites"
+out_dir <- Sys.getenv("GBT_SITE_OUT_DIR", unset = "data/sites")
+build_only <- identical(Sys.getenv("GBT_REFRESH_BUILD_ONLY", unset = "0"), "1")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 start_d <- "2013-01"
@@ -61,7 +64,8 @@ for (s in sites) {
   # realizes the count/effort columns. saveRDS(version = 2) keeps the bundle readable
   # by the broadest set of R installs.
   date_cols <- "collectDate"
-  num_cols  <- intersect(c("individualCount", "trapnights"), names(d))
+  num_cols  <- intersect(c("individualCount", "trapnights", "traps_sampled",
+                           "effort_records"), names(d))
   for (nm in names(d)) {
     col <- d[[nm]]
     d[[nm]] <-
@@ -78,16 +82,22 @@ for (s in sites) {
 n_ok <- length(list.files(out_dir, pattern = "\\.rds$"))
 cat(sprintf("\nDone. Bundle now has %d site files.\n", n_ok))
 
-# Mass-failure guard: the auto-refresh workflow `rm -f data/sites/*.rds` BEFORE
-# this runs, then opens a data PR after. If a bad NEON-pull day left far too few
-# bundles, stop() now — before rebuilding the precompute cache/manifest and before
-# the PR — so a mass failure can't commit a shrunken dataset (which would delete
-# dozens of sites). Per-site failures are already skipped above; this trips only
-# on a mass failure.
-floor_n <- max(30L, as.integer(ceiling(0.75 * length(sites))))
-if (n_ok < floor_n)
-  stop(sprintf("Only %d/%d site bundles built (< %d) — aborting before precompute/manifest/PR so a mass NEON-pull failure can't commit a shrunken dataset.",
-               n_ok, length(sites), floor_n))
+# Fail closed on the canonical roster. A partial refresh is not a release
+# candidate, even if most sites downloaded successfully.
+built_sites <- sort(sub("[.]rds$", "", list.files(out_dir, pattern = "[.]rds$")))
+expected_sites <- sort(unique(as.character(sites)))
+if (!identical(built_sites, expected_sites)) {
+  stop(sprintf(
+    "Site roster incomplete — missing=[%s] extra=[%s]; keeping the committed bundle untouched.",
+    paste(setdiff(expected_sites, built_sites), collapse = ","),
+    paste(setdiff(built_sites, expected_sites), collapse = ",")
+  ))
+}
+
+if (build_only) {
+  cat("Validated staged site roster; derived indexes and manifest are rebuilt after promotion.\n")
+  quit(save = "no", status = 0L)
+}
 
 # ---- rebuild cross-site cache + deploy manifest ---------------------------
 # A data refresh that stopped here would ship a STALE precomputed.rds (wrong
@@ -106,7 +116,4 @@ if (requireNamespace("rsconnect", quietly = TRUE)) {
   cat("rsconnect not installed — skipping manifest regen (run scripts/write_manifest.R yourself).\n")
 }
 
-cat("\nNext steps:\n")
-cat("  git add data/sites data/precomputed.rds manifest.json\n")
-cat("  git commit -m \"chore(beetle): refresh NEON bundles + rebuild precompute/manifest\"\n")
-cat("  git push\n")
+cat("\nLocal refresh complete. Review generated data and manifest changes before publishing.\n")
