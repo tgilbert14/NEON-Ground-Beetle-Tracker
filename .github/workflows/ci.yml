@@ -104,7 +104,7 @@ jobs:
           retention-days: 1
 
       - name: Source the complete app offline
-        run: Rscript --vanilla -e 'Sys.setenv(GBT_LIVE="0"); source("global.R"); source("ui.R"); source("server.R"); stopifnot(inherits(ui, "shiny.tag.list") || inherits(ui, "shiny.tag"), is.function(server))'
+        run: Rscript --vanilla -e 'Sys.setenv(GBT_LIVE="0"); source("global.R"); source("ui.R"); server_candidate <- source("server.R")$value; stopifnot(inherits(ui, "shiny.tag.list") || inherits(ui, "shiny.tag"), is.function(server_candidate))'
 
       - name: Upload validated manifest candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
