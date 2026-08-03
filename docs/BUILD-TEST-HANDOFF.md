@@ -215,3 +215,26 @@ adoption.
 - Local static evidence: the cover contract, custom-message-handler contract, and
   `git diff --check` pass. No local R parse/app-render result is claimed because
   this host does not expose an R runtime; pinned CI remains authoritative.
+
+## 2026-08-03 EDT - restricted publisher repair candidate / Codex
+
+- Audited scheduled refresh run `30736780782`. Producer and validator jobs
+  passed and published exact candidate `3010bef7f02199fe093635c72baeea2bfdbc76fc`
+  to `automation/ground-beetle-data-refresh`; only workflow-authored PR creation
+  failed because the repository correctly forbids Actions from creating or
+  approving pull requests.
+- Replaced that prohibited final action with a reviewer-authenticated handoff.
+  The publisher now rejects a stale `main`, requires the promotion commit to be a
+  direct child of the validated producer revision, force-pushes only with a lease,
+  polls the remote branch to its exact SHA, and refuses ambiguous or mismatched
+  PR identity.
+- When no PR exists, the successful run summary exposes the exact branch, head,
+  validator run, and GitHub compare link for a repository write user. When one
+  exact PR exists, the workflow comments the exact-head approval requirement; it
+  never creates or merges a PR and never writes `main`.
+- Local evidence: the workflow parses as YAML, all 10 embedded shell blocks pass
+  `bash -n`, and `git diff --check` passes. This is a workflow-only repair; no
+  scientific helper, bundle, data, manifest, app, or Pages byte changed.
+- Next concrete action: publish this repair through exact-head review CI, merge it,
+  then open and validate the already-produced refresh candidate with a
+  reviewer-authenticated PR before any production promotion.
