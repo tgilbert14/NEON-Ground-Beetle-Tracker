@@ -185,6 +185,8 @@ jobs:
             echo "Producer revision does not contain current main; refusing stale publication."
             exit 1
           fi
+          [[ -d data && ! -L data ]]
+          find data -mindepth 1 -delete
           tar -xzf "$RUNNER_TEMP/refresh-candidate/ground-beetle-refresh.tgz"
           if git diff --quiet -- data manifest.json; then
             echo "No validated data change; no review branch created."
