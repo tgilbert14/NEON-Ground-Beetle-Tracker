@@ -81,7 +81,10 @@ idx <- list(
   taxa        = tibble::as_tibble(taxa),
   sites       = tibble::as_tibble(site_tab),
   fingerprint = precompute_fingerprint(),
-  built       = as.character(Sys.time()))
+  # A wall-clock build time makes identical committed bundles produce different
+  # release bytes on every refresh.  The source fingerprint is the authority;
+  # no reviewed upstream build-time receipt exists for this legacy family.
+  built       = NA_character_)
 
 out <- file.path("data", "search_index.rds")
 saveRDS(idx, out, compress = "xz")
