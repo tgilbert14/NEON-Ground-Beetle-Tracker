@@ -292,6 +292,11 @@ adoption.
   `5735600639`. Content-aware production run `30864227265` then returned HTTP 200
   plus the required semantic bodies for both Pages and Connect on its first
   attempt, with no Startup Error text.
+- Signed-in Connect deployment history binds publication #72 at 2026-08-03
+  20:01 EDT to exact `main` commit `a615d6c`. It reports “Successfully published”
+  with primary `ui.R`, R 4.5.2, 8 GB memory, 2 CPUs, and a five-second publish;
+  the deployment log explicitly fetched the full merge SHA and supplied all 91
+  required packages.
 - Fresh live Connect QA at
   <https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/>
   selected and loaded the default `DCFS` bundle. The rendered release showed 2,717
