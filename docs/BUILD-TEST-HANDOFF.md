@@ -9,38 +9,46 @@ re-read the latest entry immediately before revising it.
 - Repository: `tgilbert14/NEON-Ground-Beetle-Tracker`
 - Watched branch: `main`
 - Data product: NEON `DP1.10022.001`, Ground beetles sampled from pitfall traps
-- Baseline source: `ff82104db2fb944af897df9c12dc2cff108ce52e`
+- Production source: `a615d6cdf550ea19ea13448bd234004f94de312e`
+- Historical audit source: `ff82104db2fb944af897df9c12dc2cff108ce52e`
 - Pages: <https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/>
 - Connect: <https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/>
 - Connect content ID: `019ec8ff-2a4b-e0e9-871d-07a047a571d3`
 
 ## Current release state
 
-**`IMPLEMENTED LOCALLY / PINNED VALIDATION PENDING / METRICS HELD`** as of
-2026-07-22. The public Connect app still represents the baseline release; the
-candidate worktree now contains the release/science foundation, but no R runtime is
-available locally and no generated bundle has been promoted yet.
+**`PASS 5 COMPLETE / PRODUCTION VERIFIED / DRIVER INGESTION HELD`** as of
+2026-08-03 EDT. Production authority is exact `main` merge
+`a615d6cdf550ea19ea13448bd234004f94de312e`.
 
-- Both zero-argument handlers are repaired and statically asserted.
-- The app-specific semantic marker and content-aware production smoke exist.
-- A pinned, read-only validator and deterministic manifest generator exist.
-- Refresh now stages an exact site roster, validates immutable candidate bytes,
-  and publishes only a review PR from a restricted writer job.
-- The resolver now emits explicit field-effort anchors, including valid
-  zero-carabid opportunities, and reconciles taxonomy through individualID.
-- Committed site bundles, derived indexes, and manifest remain legacy bytes until
-  the remote pinned builder produces and validates their replacements.
+- The deployed family contains 46 opportunity-complete bundles, 100,163 rows,
+  33,012 independent field-effort anchors, and 67,151 catch rows. Valid
+  zero-Carabidae bouts and individualID expert reconciliation are release-tested.
+- The R 4.5.2 manifest covers 112 runtime files and 91 packages. Its deterministic
+  search index records `built = NA_character_`; two independent R processes must
+  reproduce identical bytes before a refresh candidate can publish.
+- Reviewer-authenticated exact-head CI `30864009177` and merged-main validation
+  `30864227238` passed. Pages run `30864226376` published deployment
+  `5735600639`, and semantic-production run `30864227265` passed both public
+  surfaces on the exact merge.
+- Connect publication #72 fetched exact `a615d6c`, supplied all 91 packages, and
+  successfully published under R 4.5.2. Fresh live QA loaded `DCFS`, exposed the
+  expected charts, QC, and downloads, and found no Shiny output error, Startup
+  Error, or root horizontal overflow.
+- Pages and Connect serve the matching static moss-and-copper Living Poster with
+  one hook, one promise, one CTA, one Driver route, local pinned assets, and the
+  registered activity-density claim boundaries.
 
-The candidate now includes matching Pages and in-app Living Posters with a
-moss-and-copper editorial beetle/pitfall visual, one hook, one promise, one CTA,
-and one Driver route. The first-run app no longer fetches Google Fonts or the
-SweetAlert/html-to-image runtime from CDNs; exact vendored assets are pinned by
-the cover contract. Publication and in-app runtime evidence remain pending.
+The remaining hold applies only to a separately reviewed Driver adapter and a
+measured eligible join/support analysis; it does not qualify the released app or
+its opportunity-complete metric. No Driver artifact byte changed. The July audit
+below is retained as historical starting evidence, not current release state.
 
-## Baseline release audit
+## Historical baseline release audit (2026-07-22)
 
-The tracked manifest declares R 4.5.2, 91 packages, 104 files, `terra 1.8-50`, and
-a moving `jammy/latest` repository. Eight tracked-file checksums disagree:
+At that baseline, the tracked manifest declared R 4.5.2, 91 packages, 104 files,
+`terra 1.8-50`, and a moving `jammy/latest` repository. Eight tracked-file
+checksums disagreed:
 
 - `data-sample/env_demo.csv`
 - `global.R`
@@ -51,29 +59,28 @@ a moving `jammy/latest` repository. Eight tracked-file checksums disagree:
 - `ui.R`
 - `www/styles.css`
 
-`.github/workflows/refresh-data.yml` uses moving action tags and runner/package
-inputs, combines refresh/build/write/deploy authority, directly pushes to `main`,
-and lets a watched-branch push trigger Connect publication. It has no separate
-immutable read-only validator, exact artifact-promotion boundary, or semantic
-post-deploy gate.
+At that baseline, `.github/workflows/refresh-data.yml` used moving action tags and
+runner/package inputs, combined refresh/build/write/deploy authority, directly
+pushed to `main`, and let a watched-branch push trigger Connect publication. It had
+no separate immutable read-only validator, exact artifact-promotion boundary, or
+semantic post-deploy gate.
 
-## Baseline scientific audit
+## Historical baseline scientific audit (2026-07-22)
 
-The current source preserves several valuable protections: expert-ID override,
-species-rank richness filtering, introduced-carabid context, activity-density
-language, support floors, a circular-shift/permutation null for best-of-scan
-environmental relationships, and trend small-sample gates.
+The source at that baseline preserved several valuable protections: expert-ID
+override, species-rank richness filtering, introduced-carabid context,
+activity-density language, support floors, a circular-shift/permutation null for
+best-of-scan environmental relationships, and trend small-sample gates.
 
-The primary blocker is upstream of those estimators. `assemble_beetles()` starts
-from positive Carabidae sorting records, drops non-positive counts, groups catch,
-then left-joins `bet_fielddata` effort onto that outcome table. Valid field bouts
-with zero Carabidae are not emitted into the bundle. Downstream effort and
-occupancy-like denominators are therefore catch-conditioned unless proven otherwise
-from an independent opportunity table. The contract and fixtures in
-`docs/SCIENCE-CONTRACT.md` must be implemented before metric claims or Driver
-adoption.
+The primary blocker at that baseline was upstream of those estimators.
+`assemble_beetles()` started from positive Carabidae sorting records, dropped
+non-positive counts, grouped catch, then left-joined `bet_fielddata` effort onto
+that outcome table. Valid field bouts with zero Carabidae were not emitted into the
+bundle, so downstream effort and occupancy-like denominators were catch-conditioned.
+The production release recorded above closed this blocker with an independent
+opportunity table and adversarial contract fixtures.
 
-## Required release gates
+## Release gates satisfied by production authority
 
 1. Static R/JavaScript/workflow parsing and assertion-based scientific fixtures.
 2. Opportunity-complete field-effort resolution, including valid zero-catch bouts,
@@ -238,3 +245,77 @@ adoption.
 - Next concrete action: publish this repair through exact-head review CI, merge it,
   then open and validate the already-produced refresh candidate with a
   reviewer-authenticated PR before any production promotion.
+
+## 2026-08-03 EDT - deterministic scheduled-refresh repair production closeout / Codex
+
+- Scope was limited to closing the derived-refresh determinism defect and binding
+  the repaired candidate to review, merge, and production evidence. The source
+  family remains NEON `DP1.10022.001`; the scientific opportunity, taxonomy, zero,
+  support, and claim contracts did not change.
+- Controlled derived-only run `30863099574` checked out exact `main`
+  `43b6b5175f77a0da802c05ebbb4ba5c2a7a13cce` with the network fetch skipped.
+  Expected: unchanged committed bundles would rebuild to identical derived bytes
+  and produce no review branch. Actual: all science/release gates passed, but
+  `scripts/build_search_index.R` embedded `Sys.time()`, so the run published
+  superseded direct-child candidate
+  `92bbb2effb397cdc280b161f0cbc0431fa88f9bd`. It changed only
+  `data/search_index.rds` and that file's manifest checksum despite unchanged
+  source data. Artifact `8875112150` was 722,514 bytes with digest
+  `sha256:9d98ec6cbef5dc3b43e139d5f2befc2f29d37f37390194da00ef5380de79413a`;
+  it was not reviewed or merged and was replaced with a lease by the repaired
+  candidate.
+- Fix source `1a65342e83e7a5c763dff88ef00511c4d2459af0` removes the wall clock by
+  recording `built = NA_character_`, makes the verifier reject any other value,
+  and runs `Rscript --vanilla scripts/build_search_index.R` twice in separate R
+  processes with an intervening copy and byte-for-byte `cmp --silent`. This turns
+  determinism into an executable producer gate rather than a semantic assumption.
+- Repaired derived-only producer/validator/publisher run `30863698398` passed on
+  exact source `1a65342`. Its artifact `8875330379` was 722,500 bytes with digest
+  `sha256:03d2c1abdb1e8c4f4dcfd409cd7f1de2b742faecdf7a8b2dae5fb1824686cd02`.
+  The restricted publisher produced exact direct child
+  `226a45934ecfc6e1a51207344787b6837a5cfaab`, changing only
+  `data/search_index.rds` and `manifest.json` after the three-file fix source.
+- Reviewer-authenticated PR #17, `main <- automation/ground-beetle-data-refresh`,
+  reviewed literal head `226a459`; exact-head run `30864009177` passed before the
+  PR merged as `a615d6cdf550ea19ea13448bd234004f94de312e`. Merged-main validation
+  `30864227238` passed the pinned OpenBLAS, source/static, scientific-helper,
+  manifest, complete-bundle/index, offline-source, and exact-generated-byte gates.
+- The released family remains exactly 46 site bundles, 100,163 rows, 33,012
+  independent opportunity anchors, and 67,151 catch rows. The deterministic search
+  index contains 2,630 taxon-by-site rows, 816 distinct taxa, 46 sites, and 41
+  introduced taxon-by-site rows representing 10 introduced species. Its `built`
+  field is exactly `NA_character_`; the 32,032-byte file has SHA-256
+  `1360ecc3559a978268647ef969af21ac8459da933edbb0a1694e48ef5a0a4a17`.
+  No site-bundle byte changed.
+- The R 4.5.2 manifest still records 112 runtime files and 91 packages. Its
+  `data/search_index.rds` checksum is now
+  `27c2c412ad0546971103b1de603b60c4`; the complete committed manifest SHA-256 is
+  `9dc3b0ff85b42ffada7ee0b7388027f796d08931a6fe398134433ccbff2aa2d2`.
+  Merged-main run `30864227238` uploaded exact manifest artifact `8875517238`
+  (61,350 bytes; digest
+  `sha256:a6dadd095f04f752673a200d57e50d11f0a4f718ee67fad00df9036b889af9c0`).
+  Downloaded artifact content was byte-identical to the committed manifest.
+- Pages run `30864226376` published exact merge `a615d6c` as deployment
+  `5735600639`. Content-aware production run `30864227265` then returned HTTP 200
+  plus the required semantic bodies for both Pages and Connect on its first
+  attempt, with no Startup Error text.
+- Signed-in Connect deployment history binds publication #72 at 2026-08-03
+  20:01 EDT to exact `main` commit `a615d6c`. It reports “Successfully published”
+  with primary `ui.R`, R 4.5.2, 8 GB memory, 2 CPUs, and a five-second publish;
+  the deployment log explicitly fetched the full merge SHA and supplied all 91
+  required packages.
+- Fresh live Connect QA at
+  <https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/>
+  selected and loaded the default `DCFS` bundle. The rendered release showed 2,717
+  individuals, 90 species-level taxa, 543 trap bouts, and 22,644 trap-nights;
+  charts, QC, and downloads were present; the app-specific semantic marker was
+  true; there were zero `.shiny-output-error` nodes, zero root horizontal overflow,
+  and no Startup Error.
+- Classification: `suite-platform` and app-local release integrity. Driver
+  disposition remains `CONTEXT / HOLD DRIVER INGESTION / NO DRIVER BYTE CHANGE`;
+  no ecological Driver decision, adapter, or data byte changed.
+- Residual risk: these runs deliberately skipped the live NEON download, so they
+  prove deterministic derivation and the restricted review/publish path, not a new
+  upstream fetch. Next concrete action: let the next controlled full refresh run
+  with download enabled, independently review its source/data delta, and promote it
+  only through the same exact-head reviewer PR and production gates.
