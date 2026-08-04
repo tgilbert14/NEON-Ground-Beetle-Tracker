@@ -127,6 +127,9 @@ jobs:
           set -euo pipefail
           Rscript --vanilla scripts/precompute.R
           Rscript --vanilla scripts/build_search_index.R
+          cp data/search_index.rds "$RUNNER_TEMP/search-index-first.rds"
+          Rscript --vanilla scripts/build_search_index.R
+          cmp --silent "$RUNNER_TEMP/search-index-first.rds" data/search_index.rds
 
       - name: Regenerate the deploy manifest
         run: Rscript --vanilla scripts/write_manifest.R

@@ -94,6 +94,9 @@ search <- tryCatch(readRDS("data/search_index.rds"), error = function(e) e)
 if (inherits(search, "error") || !is.list(search) ||
     is.null(search$taxa) || !is.data.frame(search$taxa) || !nrow(search$taxa))
   note("data/search_index.rds is missing, unreadable, or has no taxa table")
+if (!inherits(search, "error") && is.list(search) &&
+    !identical(search$built, NA_character_))
+  note("data/search_index.rds embeds an unreviewed or nondeterministic build time")
 
 R_PLATFORM <- "4.5.2"
 RSPM <- "https://packagemanager.posit.co/cran/__linux__/jammy/2026-07-15"
