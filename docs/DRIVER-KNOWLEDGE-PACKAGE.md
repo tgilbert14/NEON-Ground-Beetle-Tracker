@@ -91,3 +91,40 @@ health, or causal response to a climate/plant driver.
 6. Pages and in-app Living Poster pass desktop and 390/320 px verification.
 7. Driver register/backlog is updated with the final evidence and an explicit
    `ADOPT`, `COMPLEMENT`, `CONTEXT`, `HOLD`, or `REJECT` disposition.
+
+## 2026-08-03 EDT - deterministic derived-release addendum
+
+Reviewer-authenticated PR #17 promoted fix source
+`1a65342e83e7a5c763dff88ef00511c4d2459af0` and its exact direct-child candidate
+`226a45934ecfc6e1a51207344787b6837a5cfaab`; production authority is merge
+`a615d6cdf550ea19ea13448bd234004f94de312e`. Exact-head run `30864009177`,
+merged-main run `30864227238`, Pages run `30864226376`, and semantic-production
+run `30864227265` passed. Merged-main manifest artifact `8875517238` has digest
+`sha256:a6dadd095f04f752673a200d57e50d11f0a4f718ee67fad00df9036b889af9c0`.
+
+The reusable engineering lesson is stricter than “rebuild the index.” A derived
+artifact must be a pure function of immutable reviewed inputs. Do not embed
+`Sys.time()`, a CI run time, or another wall clock in published bytes. A time may
+travel only when it is itself part of a reviewed upstream receipt; when no such
+authority exists, record an explicit unavailable value. Then invoke the producer
+twice as two independent processes in the pinned runtime and require byte equality
+with `cmp`, before manifest generation and candidate publication. Semantic equality
+inside one process is not a substitute for this two-process byte proof.
+
+The Ground Beetle repair applies that rule to `data/search_index.rds`: the index
+now carries `built = NA_character_`, its verifier fails closed on any other value,
+and the workflow compares two independent builds. Controlled no-download run
+`30863099574` exposed the defect by producing superseded candidate `92bbb2e` from
+unchanged bundles; repaired run `30863698398` produced the reviewed deterministic
+candidate. The release still contains 46 bundles, 100,163 rows, 33,012 opportunity
+anchors, and 67,151 catch rows; only the derived search-index byte and its manifest
+checksum changed.
+
+Driver decision for this addendum is **`NONE`** for ecological integration, layered
+on the existing **`CONTEXT / HOLD DRIVER INGESTION`** disposition. The repair does
+not alter the activity-density estimand, opportunity denominator, zero rule,
+eligible Driver join, mechanism status, or scientific claim boundary. No Driver
+artifact or ecological data byte changed. The next dependency remains a separately
+reviewed, pinned Driver adapter with measured join/support at suite synthesis; the
+next app-release check is a full-download refresh through the same exact-head
+review path.
