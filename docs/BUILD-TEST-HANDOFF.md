@@ -44,6 +44,37 @@ measured eligible join/support analysis; it does not qualify the released app or
 its opportunity-complete metric. No Driver artifact byte changed. The July audit
 below is retained as historical starting evidence, not current release state.
 
+## 2026-08-05 20:31 MST - exact manifest candidate accepted for promotion / [Codex]
+
+- **Exact reviewed source:** PR #19 head
+  `830297004c9028032c3daa4b31d8490b80088627`. This head contains the cover-label
+  removal, exact `bslib@0.11.0` workflow closure, corrected superseded-run receipt,
+  and an explicit separation between prior production authority `a615d6c` and the
+  current candidate.
+- **Validator evidence:** run `31067737268`, job `92508958760`, passed checkout
+  identity, the deterministic OpenBLAS guard, static and scientific contracts,
+  pinned-runtime manifest generation, bundle/index verification, complete offline
+  app source, and validated-artifact upload. It then failed only at the intentional
+  committed-generated-byte comparison because the reviewed cover runtime had not
+  yet promoted its new manifest checksums.
+- **Accepted artifact:** the run retained exactly one artifact,
+  `ground-beetle-manifest-830297004c9028032c3daa4b31d8490b80088627`, ID
+  `8954748741`, ZIP digest
+  `sha256:ade5eeeebec5e89a4695cae84dc3a73cc2dde74adb1a44cf5d2514ea8de19dd1`.
+  The ZIP contains only `manifest.json`; the extracted byte has SHA-256
+  `beb75aa363da707e04f4d19f223fcd7b88f4ef7f29edef6916e3e3bb8e8ccc59`.
+- **Scoped manifest delta:** only `ui.R` changes from
+  `19b6c308b04b918542a7829e988480fc` to
+  `9281ef451428219b3f379866c0e34c3e`, and `www/styles.css` changes from
+  `857c7f713937ebc2c2c716325965e4c7` to
+  `8401332cee063caa03a418eb5f494373`. R `4.5.2`, 91 packages, 112 files,
+  `bslib` `0.11.0`, and the dated 2026-07-15 repository remain unchanged.
+- **Decision/next gate:** accept this exact manifest byte for a direct-child
+  promotion commit. Do not merge or claim Pages/Connect authority until the
+  resulting literal head passes the complete PR validator including committed-byte
+  equality, followed by exact-main CI, Pages, and production checks. Decision:
+  **SUITE-PLATFORM / NONE / NO DRIVER BYTE CHANGE**.
+
 ## 2026-08-05 19:53 MST - bslib manifest-producer drift hardening / [Codex]
 
 - **Trigger/evidence:** the reviewed Ground Beetle manifest records exact
