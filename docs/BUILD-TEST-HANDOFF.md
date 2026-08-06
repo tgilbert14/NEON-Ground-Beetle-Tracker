@@ -57,9 +57,11 @@ below is retained as historical starting evidence, not current release state.
   namespaces to `ground-beetle-geo-closure-bslib-0.11.0-v2` and
   `ground-beetle-refresh-geo-closure-bslib-0.11.0-v2`; no fetch-only or
   post-deploy lane changed.
-- **Withheld pre-fix run:** refresh run `31066412418` started from pre-fix source
+- **Withheld pre-fix run:** PR validation run `31066412418`, job `92504945802`
+  (`Validate Ground Beetle Tracker` / `contracts`), started from pre-fix source
   `6a52737f84a64f46ed6984dbc1484c8fb29ad063`. It is diagnostic evidence only and
-  must not be published as the final candidate even if every job finishes.
+  must not be published as the final candidate even though its manifest artifact
+  passed every gate before the intentional committed-byte comparison.
 - **Validation/scope:** Ruby safe-loaded both workflow files; static assertions
   proved an exact `bslib@0.11.0` pin and fresh cache in each manifest producer,
   no remaining versionless manifest lane, and the retained manifest's exact
