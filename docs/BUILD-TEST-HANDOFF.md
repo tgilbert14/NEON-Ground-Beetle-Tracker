@@ -44,6 +44,39 @@ measured eligible join/support analysis; it does not qualify the released app or
 its opportunity-complete metric. No Driver artifact byte changed. The July audit
 below is retained as historical starting evidence, not current release state.
 
+## 2026-08-05 20:58 MST - production Plotly click lifecycle repair / [Codex]
+
+- **Exact production trigger:** cover PR #19 passed exact-head validation
+  `31068718372` at candidate `746f909a35e1aa99a739dc4cbed4111d036d2d81`
+  and merged as `1be09b7bd287b8206fdef5347d8e40ecebf0659c`. Pages run
+  `31069631437` and production run `31069632097` passed. Signed-in Connect
+  evidence independently binds content `019ec8ff-2a4b-e0e9-871d-07a047a571d3`
+  to exact `1be09b7` under R 4.5.2 with all 91 packages.
+- **Fresh-worker finding:** the app started and served normally, but its worker log
+  emitted repeated Plotly 4.12 warnings that `plotly_click` was not registered for
+  `commBar`, `ordPlot`, and `envrank`. Each widget already called
+  `event_register("plotly_click")`; the warning occurred because the corresponding
+  observer called `event_data()` as its trigger before `renderPlotly()` had recorded
+  that registration for the session.
+- **Repair:** each handler now observes the raw event-priority Shiny input
+  `plotly_click-<source>` and reads `plotly::event_data(..., priority = "event")`
+  only after an actual browser click. This preserves identical repeated clicks and
+  the existing species-record, ordination-member, and environmental-overlay
+  behavior while removing the startup race. The executable handler contract now
+  requires this lifecycle for all three sources.
+- **Local evidence:** JavaScript syntax, the four-message-handler contract, the new
+  three-source Plotly lifecycle contract, both cover contracts, complete `server.R`
+  parsing, and `git diff --check` pass. The local library lacks `dplyr`, so
+  `scripts/test_helpers.R` could not start; the pinned validator owns that gate and
+  the identical scientific/helper bytes already passed on PR #19. No bundle,
+  opportunity denominator, taxonomy, estimator, search-index, visual-cover, asset,
+  or Driver byte changed.
+- **Publication boundary:** this focused runtime source is not yet a release. Push
+  it to a non-production review branch, run the immutable validator, promote only
+  its exact manifest artifact as a direct child, require green exact-head CI, and
+  then re-verify Connect logs plus real chart clicks after merge. Decision:
+  **SUITE-PLATFORM RUNTIME REPAIR / NONE / NO DRIVER BYTE CHANGE**.
+
 ## 2026-08-05 20:31 MST - exact manifest candidate accepted for promotion / [Codex]
 
 - **Exact reviewed source:** PR #19 head

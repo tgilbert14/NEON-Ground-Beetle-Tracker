@@ -27,3 +27,17 @@ if (invalid.length) {
 }
 
 console.log(`OK: ${seen} Shiny custom message handlers accept exactly one payload argument.`);
+
+const server = fs.readFileSync("server.R", "utf8");
+for (const source of ["commBar", "ordPlot", "envrank"]) {
+  const safeLifecycle = new RegExp(
+    String.raw`observeEvent\(\s*session\$rootScope\(\)\$input\[\["plotly_click-${source}"\]\],\s*\{[\s\S]{0,320}?plotly::event_data\("plotly_click",\s*source\s*=\s*"${source}",\s*priority\s*=\s*"event"\)`,
+  );
+  if (!safeLifecycle.test(server)) {
+    throw new Error(
+      `${source} must wait for its raw Plotly click before reading event_data(priority = "event")`,
+    );
+  }
+}
+
+console.log("OK: 3 Plotly click handlers wait for registered raw browser events.");

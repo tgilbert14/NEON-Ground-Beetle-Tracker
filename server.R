@@ -664,8 +664,11 @@ function(input, output, session) {
 
   # (a) COMMUNITY BAR -> that species' records ------------------------------
   revealTaxon <- reactiveVal(NULL)
-  observeEvent(event_data("plotly_click", source = "commBar"), {
-    ev <- event_data("plotly_click", source = "commBar")
+  # Wait for the raw browser event before reading event_data(). Calling
+  # event_data() as the observer trigger runs before renderPlotly() has recorded
+  # event_register(), which emits a misleading not-registered warning at startup.
+  observeEvent(session$rootScope()$input[["plotly_click-commBar"]], {
+    ev <- plotly::event_data("plotly_click", source = "commBar", priority = "event")
     sp <- ev$customdata
     d <- rv$data
     if (is.null(sp) || !length(sp) || is.na(sp) || is.null(d)) return()
@@ -705,8 +708,8 @@ function(input, output, session) {
   # site we show its top taxa for that year from rv$data (+ CSV); otherwise we honour
   # the honesty rule and just label the site x year with a "load it to explore" note.
   revealOrd <- reactiveVal(NULL)
-  observeEvent(event_data("plotly_click", source = "ordPlot"), {
-    ev <- event_data("plotly_click", source = "ordPlot")
+  observeEvent(session$rootScope()$input[["plotly_click-ordPlot"]], {
+    ev <- plotly::event_data("plotly_click", source = "ordPlot", priority = "event")
     samp <- ev$customdata
     if (is.null(samp) || !length(samp) || is.na(samp)) return()
     samp <- as.character(samp)[1]; revealOrd(samp)
@@ -1134,8 +1137,8 @@ function(input, output, session) {
   # Clicking a driver bar drives the headline + overlay to THAT driver (BE2). The
   # envLayer cascade above (ignoreInit) then snaps envLag to its best lag, and we
   # pop open the advanced overlay <details> so the user sees the curve appear.
-  observeEvent(event_data("plotly_click", source = "envrank"), {
-    ev <- event_data("plotly_click", source = "envrank")
+  observeEvent(session$rootScope()$input[["plotly_click-envrank"]], {
+    ev <- plotly::event_data("plotly_click", source = "envrank", priority = "event")
     k <- ev$customdata
     if (!is.null(k) && length(k) && !is.na(k) && nzchar(k)) {
       updateSelectInput(session, "envLayer", selected = k)
