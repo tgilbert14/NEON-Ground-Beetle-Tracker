@@ -47,7 +47,10 @@ requireText(/name="twitter:image:alt" content="[^"]+"/, "Twitter image needs alt
 requireText(/What moves at ground level\?/i, "poster hook is missing");
 requireText(/Explore the ground beetles NEON pitfall traps encountered, site by site and season by season\./i, "poster promise is missing");
 requireText(/Pick a place/i, "poster CTA must be contextual");
-requireText(/Editorial illustration—not a field photograph or data record\./i, "poster must disclose the art/data boundary");
+if (/Editorial illustration—not a field photograph or data record\./i.test(html) ||
+    /<figcaption\b[^>]*class="art-note"/i.test(html) || /\.art-note\b/.test(html)) {
+  fail("Pages poster must omit redundant illustration-badge markup and CSS");
+}
 requireText(/activity as well as local abundance/i, "cover must state the activity-density boundary");
 requireText(/does not estimate population density or site health/i, "cover must reject unsupported population and health claims");
 requireText(/detection frequency is not detection-corrected occupancy/i, "cover must distinguish detection frequency from occupancy");
@@ -61,7 +64,10 @@ requireText(/What moves at ground level\?/i, "in-app poster hook diverges from P
 requireText(/Explore the ground beetles NEON pitfall traps encountered, site by site and season by season\./i, "in-app poster promise diverges from Pages", ui);
 requireText(/href = "#site-picker-start"/, "in-app poster CTA must route to the picker", ui);
 requireText(/id = "site-picker-start"[^\n]+tabindex = "-1"/, "in-app picker target must be focusable", ui);
-requireText(/Editorial illustration—not a field photograph or data record\./i, "in-app poster must disclose the art/data boundary", ui);
+if (/Editorial illustration—not a field photograph or data record\./i.test(ui) ||
+    /tags\$figcaption\s*\(/.test(ui) || /\.gbt-poster-art\s+figcaption\b/.test(css)) {
+  fail("in-app poster must omit the redundant illustration badge and its dead CSS");
+}
 requireText(/activity index—not population density or site health/i, "in-app poster must state the claim boundary", ui);
 if (count(/NEON-Driver-Cascade\//g, ui) !== 1) fail("in-app poster must contain exactly one Driver route");
 if (count(/\bh1\(/g, ui) !== 1) fail("in-app first-run surface must contain exactly one h1 constructor");

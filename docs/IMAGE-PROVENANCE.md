@@ -18,8 +18,8 @@ observation, specimen record, or data visualization.
 - Use: lossless fallback and source for responsive derivatives
 - Alt text: “Editorial screenprint of a ground beetle crossing moss and leaf
   litter beside a pitfall trap embedded in a forest-floor cutaway.”
-- Visible disclosure: “Editorial illustration—not a field photograph or data
-  record.”
+- Surface policy: meaningful alt text and this durable receipt carry the image's
+  editorial-art status; the cover intentionally has no separate illustration badge.
 
 Generation brief:
 
@@ -59,6 +59,7 @@ below 600 KB and the compact version is the first-choice mobile download.
 ## Release contract
 
 `scripts/check_cover.mjs` pins all six delivery assets, verifies the 1672 x 941
-source dimensions, and requires the same hook, promise, CTA, image disclosure,
-and scientific claim boundary on Pages and in the app. The main illustration
+source dimensions, and requires the same hook, promise, CTA, meaningful alt text,
+absence of a redundant illustration badge, and scientific claim boundary on Pages
+and in the app. The main illustration
 has no CSS or JavaScript animation.

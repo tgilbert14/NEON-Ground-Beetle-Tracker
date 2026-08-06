@@ -319,3 +319,68 @@ opportunity table and adversarial contract fixtures.
   upstream fetch. Next concrete action: let the next controlled full refresh run
   with download enabled, independently review its source/data delta, and promote it
   only through the same exact-head reviewer PR and production gates.
+
+## 2026-08-05 19:31 MST - visible illustration-badge removal candidate / [Codex]
+
+- **Outcome/source:** implemented on isolated branch `codex/remove-visible-art-badge`
+  from GitHub-verified default `main`
+  `1a768b4ae676e44dcc171ee756ae2595b04d26cb`. Classification is `product/UI` plus
+  `suite-platform`; scientific and Driver disposition remains
+  `CONTEXT / HOLD DRIVER INGESTION / NO DRIVER BYTE CHANGE`.
+- **Scope:** removed only the visible Pages and in-app illustration `figcaption`
+  and the dead `.art-note` / `.gbt-poster-art figcaption` styling. The exact static
+  art and hashes, descriptive alt text, provenance, hook, promise, one CTA, one
+  Driver route, DPID, activity-density/population/site-health/occupancy/causality
+  limits, bundles, estimators, and exports are unchanged. No historical receipt was
+  rewritten.
+- **Executable/normative policy:** `scripts/check_cover.mjs` now fails if the badge
+  sentence, markup, or CSS returns on either entry surface. Current AGENTS,
+  provenance, and Driver package put illustration status in meaningful alt text and
+  durable provenance without an ornamental badge while retaining visible scientific
+  claim limits.
+- **Static/local results (PASS):** all R files parsed under local R 4.5.3; Node
+  syntax, the four-handler contract, `check_cover.mjs`, shell syntax for
+  `post_deploy_smoke.sh`, and `git diff --check` passed. `test_helpers.R` and the
+  complete bundle verifier cannot run in this local library because `dplyr`/`tibble`
+  are absent; pinned Ubuntu 22.04/R 4.5.2 remains authoritative.
+- **Focused visual/accessibility result (PASS):** read-only local Pages renders at
+  1280×900, 390×844, and 320×720 retained the approved beetle/trap crop, art-first
+  compact order, unchanged alt, zero badge nodes, 52 px CTA inside the first
+  viewport, root client/scroll equality of 375/375 and 305/305, and no console
+  warning/error. Keyboard order is Skip → Driver → CTA with a 3 px visible outline.
+  This is local Pages evidence, not an in-app or production receipt.
+- **Expected manifest gate (BLOCKED pending pinned regeneration):** manifest file
+  comparison shows only intended runtime drift: `ui.R`
+  `19b6c308b04b918542a7829e988480fc` →
+  `9281ef451428219b3f379866c0e34c3e` and `www/styles.css`
+  `857c7f713937ebc2c2c716325965e4c7` →
+  `8401332cee063caa03a418eb5f494373`. `verify_bundle.R` stopped earlier on the
+  missing local `tibble` package; do not hand-edit the manifest or treat this
+  noncanonical runtime as a release producer.
+- **Exact derived-byte route:** this repository has no dedicated manual manifest
+  workflow. After the source commit is pushed to a review branch, literal-head
+  **`Validate Ground Beetle Tracker`** PR CI regenerates and validates the pinned
+  manifest, uploading `ground-beetle-manifest-<source-sha>` after the preceding
+  gates pass (`ground-beetle-manifest-UNVALIDATED-<source-sha>` is diagnostic only
+  and must never be promoted). Commit the validated artifact byte-for-byte in the
+  same review branch and require the next exact head to pass. The broader
+  **`Propose NEON data refresh`** dispatch with `skip_download=true` is available
+  for controlled derived-data rebuilds, but is not required for this focused code
+  change.
+- **Post-merge publication/health route:** Connect content
+  `019ec8ff-2a4b-e0e9-871d-07a047a571d3` is git-backed to watched `main`; a reviewed
+  main merge automatically triggers Connect publication. Main push also runs
+  **`Verify production after main publication`** / job `semantic_health` after a
+  45-second delay. `scripts/post_deploy_smoke.sh` rejects host error text and
+  requires exact marker `ground-beetle-tracker-v1`, emitted as the content of the
+  UI meta named `ddl-app-ready`, while separately checking Pages. Confirm the exact
+  Connect deployment identity; the marker alone is not revision proof.
+- **Writes/cleanup/residual risk:** no push, PR, dispatch, manifest edit, Connect
+  action, Pages deployment, production probe, bundle/science change, or Driver write
+  occurred. Temporary preview server and browser tab were closed. Exact pinned
+  manifest bytes, complete science/bundle/offline boot, in-app runtime geometry,
+  merge identity, Connect restore, and semantic production health remain unclaimed.
+- **Next action:** commit this source candidate locally. When authorized, push it to
+  review, promote only `ground-beetle-manifest-<exact-source-sha>`, require green
+  literal-head CI, merge intentionally, confirm the exact Connect-deployed revision,
+  and close with public Pages/Connect 1280/390/320 plus representative-site QA.

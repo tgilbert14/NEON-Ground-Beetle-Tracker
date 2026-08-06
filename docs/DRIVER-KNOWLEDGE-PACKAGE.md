@@ -89,8 +89,9 @@ health, or causal response to a climate/plant driver.
 - The shared Living Poster family is structural, not palette-based. The released
   Ground Beetle Pages and in-app covers use the one-hook, one-promise,
   one-CTA, one-Driver-route frame while retaining their own moss-and-copper
-  beetle/pitfall visual world. Exact Pages and Connect surfaces passed production
-  verification.
+  beetle/pitfall visual world. Illustration status belongs in meaningful alt text
+  and durable provenance rather than an ornamental badge; scientific limits remain
+  visible. Exact Pages and Connect surfaces passed production verification.
 
 ## App promotion evidence satisfied
 
