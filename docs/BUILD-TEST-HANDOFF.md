@@ -9,7 +9,7 @@ re-read the latest entry immediately before revising it.
 - Repository: `tgilbert14/NEON-Ground-Beetle-Tracker`
 - Watched branch: `main`
 - Data product: NEON `DP1.10022.001`, Ground beetles sampled from pitfall traps
-- Production source: `1be09b7bd287b8206fdef5347d8e40ecebf0659c`
+- Production source: `a5d3e0efe0aada84ccbaf7f2e3fb6c38d13ec54c`
 - Audited data/science authority: `a615d6cdf550ea19ea13448bd234004f94de312e`
 - Historical audit source: `ff82104db2fb944af897df9c12dc2cff108ce52e`
 - Pages: <https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/>
@@ -19,8 +19,8 @@ re-read the latest entry immediately before revising it.
 ## Current release state
 
 **`PASS 5 COMPLETE / PRODUCTION VERIFIED / DRIVER INGESTION HELD`** as of
-2026-08-05 MST. Current production authority is exact `main` cover merge
-`1be09b7bd287b8206fdef5347d8e40ecebf0659c`; audited data/science authority
+2026-08-05 MST. Current runtime authority is exact `main` lifecycle-repair merge
+`a5d3e0efe0aada84ccbaf7f2e3fb6c38d13ec54c`; audited data/science authority
 remains `a615d6cdf550ea19ea13448bd234004f94de312e`.
 
 - The deployed family contains 46 opportunity-complete bundles, 100,163 rows,
@@ -29,16 +29,15 @@ remains `a615d6cdf550ea19ea13448bd234004f94de312e`.
 - The R 4.5.2 manifest covers 112 runtime files and 91 packages. Its deterministic
   search index records `built = NA_character_`; two independent R processes must
   reproduce identical bytes before a refresh candidate can publish.
-- Reviewer-authenticated cover-head CI `31068718372`, merged-main validation
-  `31069632109`, Pages run `31069631437`, and semantic-production run
-  `31069632097` passed on the exact current cover release. The earlier science/data
+- Reviewer-authenticated lifecycle PR #20 head CI `31071059592`, merged-main
+  validation `31071173398`, Pages run `31071172870`, and semantic-production run
+  `31071173390` passed on the exact current runtime family. The earlier science/data
   family remains independently anchored by exact-head CI `30864009177` and
   merged-main validation `30864227238`.
-- Signed-in Connect evidence bound the current content to exact `1be09b7` under
-  R 4.5.2 with all 91 packages. Fresh live QA loaded `DCFS`, exposed the expected
-  charts, QC, and downloads, and found no Shiny output error, Startup Error, or
-  root horizontal overflow; the later non-fatal Plotly warning and its held repair
-  are recorded immediately below.
+- Signed-in Connect deployment #75 bound the current content to exact `a5d3e0e`
+  under R 4.5.2 with all 91 packages. Fresh live QA loaded `DCFS`, exposed the
+  expected charts, QC, and downloads, and found no Shiny output error, Startup
+  Error, root horizontal overflow, or Plotly unregistered-event warning.
 - Pages and Connect serve the matching static moss-and-copper Living Poster with
   one hook, one promise, one CTA, one Driver route, local pinned assets, and the
   registered activity-density claim boundaries.
@@ -47,6 +46,50 @@ The remaining hold applies only to a separately reviewed Driver adapter and a
 measured eligible join/support analysis; it does not qualify the released app or
 its opportunity-complete metric. No Driver artifact byte changed. The July audit
 below is retained as historical starting evidence, not current release state.
+
+## 2026-08-05 21:31 MST - Plotly lifecycle repair production closeout / [Codex]
+
+- **Validated source and promotion:** implementation source
+  `1f600ef729e21f690542ecc65072874583711d36` moved all three handlers to raw
+  event-priority Shiny triggers. Independent review confirmed Plotly 4.12 semantics
+  and produced correction source
+  `76459ec4c17cea668507f64175cbaec1af49e69f`, which also corrected the current
+  release header and strengthened the executable gate to require one registered
+  renderer, one raw-event observer, and no eager `event_data()` trigger per source.
+  Exact run `31070700866` passed every runtime, scientific, bundle, and offline-source
+  gate before the intentional stale-manifest stop. Validated artifact `8955558168`
+  has ZIP digest
+  `sha256:65cf82b845ca1a47507d952ed7d1b69b0330ee3f8de59eaf6fcdaaf8da3fcfe4`;
+  its only manifest delta is `server.R` checksum
+  `8ef2bf95b51862f46cf7fb214d7b7514` to
+  `6b9765788fa67e8282af2a17638a5cf5`.
+  The exact artifact byte (SHA-256 `5575c63d0889fcf5591b7347b542bf6c687866349e547697d01995dfba119e10`)
+  was promoted as direct-child head
+  `832991e273d971c78c820cbfd40537b24f8e620c`.
+- **Reviewed release:** PR #20 exact head `832991e...` passed run `31071059592`
+  including committed manifest/data equality and merged only that reviewed head as
+  `a5d3e0efe0aada84ccbaf7f2e3fb6c38d13ec54c`. Exact-main run `31071173398`
+  passed all contracts and retained artifact `8955707659` with digest
+  `sha256:cdda04b031590dfcd80ae95d88f178de6e18d70a453441249c83e045566f084b`.
+  Pages run `31071172870` deployed that exact merge with artifact `8955687366` /
+  digest `sha256:0d260a01003fa8a40fa374e3871a0d7617c82bbffacc26f23d111f66dbee1890`;
+  semantic-production run `31071173390` passed both public surfaces.
+- **Exact Connect and live interaction evidence:** Connect deployment #75 fetched
+  exact `a5d3e0e`, publish request `c8e163f6-de4f-44d9-9a06-ee1ec00603db`, and
+  started under R 4.5.2 with all 91 packages. Startup logs contain only the known
+  package-built-under-R-4.5.3 warnings for `plotly` and `shinyjs`; the prior
+  `commBar`, `ordPlot`, and `envrank` registration warnings are absent. Live DCFS
+  rendered 2,717 individuals, 90 species, 24.51 effective species, 543 bouts, and
+  22,644 trap-nights. A `commBar` click opened the 542-individual
+  *Syntomus americanus* reveal twice from the same point; `ordPlot` opened the
+  honest unloaded BART-2014 community boundary; `envrank` selected `temp` and
+  opened the advanced overlay. No Shiny output error appeared.
+- **Authority and non-impact:** runtime authority advances from cover merge
+  `1be09b7...` to lifecycle merge `a5d3e0e...`; audited data/science authority
+  remains `a615d6c...`. No bundle, opportunity denominator, taxonomy, estimator,
+  index, Living Poster, asset, ecological claim, or Driver byte changed. This
+  append-only closeout is documentation only and does not replace the runtime
+  authority it records.
 
 ## 2026-08-05 20:58 MST - production Plotly click lifecycle repair / [Codex]
 
