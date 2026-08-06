@@ -9,7 +9,8 @@ re-read the latest entry immediately before revising it.
 - Repository: `tgilbert14/NEON-Ground-Beetle-Tracker`
 - Watched branch: `main`
 - Data product: NEON `DP1.10022.001`, Ground beetles sampled from pitfall traps
-- Production source: `a615d6cdf550ea19ea13448bd234004f94de312e`
+- Production source: `1be09b7bd287b8206fdef5347d8e40ecebf0659c`
+- Audited data/science authority: `a615d6cdf550ea19ea13448bd234004f94de312e`
 - Historical audit source: `ff82104db2fb944af897df9c12dc2cff108ce52e`
 - Pages: <https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/>
 - Connect: <https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/>
@@ -18,8 +19,9 @@ re-read the latest entry immediately before revising it.
 ## Current release state
 
 **`PASS 5 COMPLETE / PRODUCTION VERIFIED / DRIVER INGESTION HELD`** as of
-2026-08-03 EDT. Production authority is exact `main` merge
-`a615d6cdf550ea19ea13448bd234004f94de312e`.
+2026-08-05 MST. Current production authority is exact `main` cover merge
+`1be09b7bd287b8206fdef5347d8e40ecebf0659c`; audited data/science authority
+remains `a615d6cdf550ea19ea13448bd234004f94de312e`.
 
 - The deployed family contains 46 opportunity-complete bundles, 100,163 rows,
   33,012 independent field-effort anchors, and 67,151 catch rows. Valid
@@ -27,14 +29,16 @@ re-read the latest entry immediately before revising it.
 - The R 4.5.2 manifest covers 112 runtime files and 91 packages. Its deterministic
   search index records `built = NA_character_`; two independent R processes must
   reproduce identical bytes before a refresh candidate can publish.
-- Reviewer-authenticated exact-head CI `30864009177` and merged-main validation
-  `30864227238` passed. Pages run `30864226376` published deployment
-  `5735600639`, and semantic-production run `30864227265` passed both public
-  surfaces on the exact merge.
-- Connect publication #72 fetched exact `a615d6c`, supplied all 91 packages, and
-  successfully published under R 4.5.2. Fresh live QA loaded `DCFS`, exposed the
-  expected charts, QC, and downloads, and found no Shiny output error, Startup
-  Error, or root horizontal overflow.
+- Reviewer-authenticated cover-head CI `31068718372`, merged-main validation
+  `31069632109`, Pages run `31069631437`, and semantic-production run
+  `31069632097` passed on the exact current cover release. The earlier science/data
+  family remains independently anchored by exact-head CI `30864009177` and
+  merged-main validation `30864227238`.
+- Signed-in Connect evidence bound the current content to exact `1be09b7` under
+  R 4.5.2 with all 91 packages. Fresh live QA loaded `DCFS`, exposed the expected
+  charts, QC, and downloads, and found no Shiny output error, Startup Error, or
+  root horizontal overflow; the later non-fatal Plotly warning and its held repair
+  are recorded immediately below.
 - Pages and Connect serve the matching static moss-and-copper Living Poster with
   one hook, one promise, one CTA, one Driver route, local pinned assets, and the
   registered activity-density claim boundaries.
@@ -71,6 +75,14 @@ below is retained as historical starting evidence, not current release state.
   the identical scientific/helper bytes already passed on PR #19. No bundle,
   opportunity denominator, taxonomy, estimator, search-index, visual-cover, asset,
   or Driver byte changed.
+- **Independent review correction:** a fresh read-only review confirmed the handler
+  implementation and Plotly 4.12 event semantics, then found that this handoff's
+  current-release header still named the older data/science merge and that the first
+  regression check did not explicitly require widget registration or reject an eager
+  `observeEvent(event_data(...))` path. The header now separates current production
+  from audited data/science authority; the executable contract pairs all three
+  renderers with `event_register()`, requires exactly one raw-event observer, and
+  rejects eager reads. Identical repeated clicks remain a required live-browser gate.
 - **Publication boundary:** this focused runtime source is not yet a release. Push
   it to a non-production review branch, run the immutable validator, promote only
   its exact manifest artifact as a direct child, require green exact-head CI, and
