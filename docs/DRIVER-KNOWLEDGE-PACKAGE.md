@@ -86,12 +86,14 @@ health, or causal response to a climate/plant driver.
 - Connect manifests must match every runtime byte. The promoted R 4.5.2 manifest
   now covers 112 runtime files and 91 packages; merged-main validation and Connect
   publication #72 passed on exact `a615d6c`.
-- The shared Living Poster family is structural, not palette-based. The released
-  Ground Beetle Pages and in-app covers use the one-hook, one-promise,
-  one-CTA, one-Driver-route frame while retaining their own moss-and-copper
-  beetle/pitfall visual world. Illustration status belongs in meaningful alt text
-  and durable provenance rather than an ornamental badge; scientific limits remain
-  visible. Exact Pages and Connect surfaces passed production verification.
+- The shared Living Poster family is structural, not palette-based. Production
+  authority `a615d6c` established the one-hook, one-promise, one-CTA,
+  one-Driver-route frame in the Ground Beetle moss-and-copper beetle/pitfall visual
+  world and passed exact Pages and Connect verification. The current cover source
+  keeps that frame while placing illustration status in meaningful alt text and
+  durable provenance rather than an ornamental badge; scientific limits remain
+  visible. It becomes production authority only after its own exact-head,
+  default-branch, Pages, and Connect receipts; never inherit `a615d6c`'s receipt.
 
 ## App promotion evidence satisfied
 
