@@ -83,7 +83,7 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
         with:
           packages: >
-            neonUtilities, shiny, bslib, bsicons, dplyr, tidyr, tibble, plotly@4.12.0,
+            neonUtilities, shiny, bslib@0.11.0, bsicons, dplyr, tidyr, tibble, plotly@4.12.0,
             leaflet, DT, shinyjs, shinycssloaders, RColorBrewer, htmltools,
             ggplot2, jsonlite, rsconnect, cpp11,
             url::https://cran.r-project.org/src/contrib/Archive/terra/terra_1.8-50.tar.gz,
@@ -96,7 +96,7 @@ jobs:
             url::https://packagemanager.posit.co/cran/2026-07-15/src/contrib/sp_2.2-1.tar.gz
           pak-version: stable
           dependencies: '"hard"'
-          cache-version: ground-beetle-refresh-geo-closure-v1
+          cache-version: ground-beetle-refresh-geo-closure-bslib-0.11.0-v2
           install-pandoc: "false"
           install-quarto: "false"
 

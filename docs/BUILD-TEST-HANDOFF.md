@@ -44,6 +44,34 @@ measured eligible join/support analysis; it does not qualify the released app or
 its opportunity-complete metric. No Driver artifact byte changed. The July audit
 below is retained as historical starting evidence, not current release state.
 
+## 2026-08-05 19:53 MST - bslib manifest-producer drift hardening / [Codex]
+
+- **Trigger/evidence:** the reviewed Ground Beetle manifest records exact
+  `bslib` `0.11.0` from the dated 2026-07-15 RSPM lane. Confirmed Small Mammal
+  and Vegetation Structure runs proved that a versionless `bslib` request now
+  resolves `0.12.0` from moving `https://cran.rstudio.com`; that same drift would
+  make Ground Beetle's exact generated-byte gate fail closed.
+- **Repair:** pinned `bslib@0.11.0` in both jobs that generate a manifest:
+  `Validate Ground Beetle Tracker` in `.github/workflows/ci.yml` and the candidate
+  builder in `Propose NEON data refresh`. Rolled only their dependency-cache
+  namespaces to `ground-beetle-geo-closure-bslib-0.11.0-v2` and
+  `ground-beetle-refresh-geo-closure-bslib-0.11.0-v2`; no fetch-only or
+  post-deploy lane changed.
+- **Withheld pre-fix run:** refresh run `31066412418` started from pre-fix source
+  `6a52737f84a64f46ed6984dbc1484c8fb29ad063`. It is diagnostic evidence only and
+  must not be published as the final candidate even if every job finishes.
+- **Validation/scope:** Ruby safe-loaded both workflow files; static assertions
+  proved an exact `bslib@0.11.0` pin and fresh cache in each manifest producer,
+  no remaining versionless manifest lane, and the retained manifest's exact
+  `bslib` `0.11.0`. `scripts/write_manifest.R` parsed and `git diff --check`
+  passed. No gate, science, data, runtime, manifest, Pages, Connect, or Driver
+  artifact byte changed. Decision: **SUITE-PLATFORM / NONE / NO DRIVER BYTE
+  CHANGE**.
+- **Next action:** validate from the corrected exact head, promote only its
+  `ground-beetle-manifest-<corrected-source-sha>` artifact, require green checks
+  on the resulting literal head, and keep every artifact from `31066412418`
+  superseded.
+
 ## Historical baseline release audit (2026-07-22)
 
 At that baseline, the tracked manifest declared R 4.5.2, 91 packages, 104 files,
