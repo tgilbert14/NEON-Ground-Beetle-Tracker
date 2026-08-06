@@ -937,24 +937,6 @@ svg.smt-pin-lines {
   object-position: 61% center;
   filter: saturate(.98) contrast(1.03);
 }
-.gbt-poster-art figcaption {
-  position: absolute;
-  z-index: 3;
-  right: 22px;
-  bottom: 20px;
-  min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  max-width: calc(100% - 44px);
-  padding: 5px 9px;
-  border: 1px solid rgba(241, 234, 216, .18);
-  border-radius: 999px;
-  color: var(--gbt-paper);
-  background: rgba(16, 25, 20, .87);
-  font-size: 9px;
-  line-height: 1.3;
-  letter-spacing: .025em;
-}
 @media (max-width: 900px) {
   .gbt-poster { grid-template-columns: 1fr; min-height: 0; }
   .gbt-poster-copy { grid-row: 2; max-width: none; padding: 30px 26px 34px; }
@@ -980,7 +962,6 @@ svg.smt-pin-lines {
   .gbt-poster-cta { width: 100%; margin-top: 21px; }
   .gbt-poster .gbt-poster-note { margin-top: 14px; font-size: 9.5px; }
   .gbt-poster-art, .gbt-poster-art img { min-height: 270px; height: 38svh; }
-  .gbt-poster-art figcaption { right: 12px; bottom: 9px; left: 12px; width: fit-content; font-size: 8.5px; }
 }
 @media (max-width: 340px) {
   .gbt-poster-copy { padding-right: 12px; padding-left: 12px; }
@@ -995,10 +976,9 @@ svg.smt-pin-lines {
 }
 @media (prefers-contrast: more) {
   .gbt-poster .gbt-poster-promise { color: var(--gbt-paper); }
-  .gbt-poster-art figcaption { border-color: var(--gbt-paper); background: var(--gbt-night); }
 }
 @media (forced-colors: active) {
-  .gbt-poster-brand::before, .gbt-poster-cta, .gbt-poster-art figcaption { border: 2px solid ButtonText; }
+  .gbt-poster-brand::before, .gbt-poster-cta { border: 2px solid ButtonText; }
 }
 .smt-pin .smt-open:hover { background: #d8ab2a; }
 .smt-pin-close {

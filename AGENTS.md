@@ -56,7 +56,8 @@ rewrite, normalize, or discard it without explicit owner direction.
    marker, and desktop/mobile Pages verification. HTTP 200 is not health.
 7. The Pages and in-app cover must use the suite Living Poster frame: one hook, one
    promise, one contextual CTA, one Driver route, locally served responsive art,
-   an explicit illustration/data boundary, and documented image provenance.
+   meaningful art-status alt text, no ornamental illustration badge, visible
+   scientific claim limits, and documented image provenance.
 
 ## Durable closeout
 
