@@ -1630,8 +1630,8 @@ function(input, output, session) {
     # match the basemap to the theme — every plotly chart re-themes, so a blinding
     # white map in dark mode is the one surface that fought the toggle. The gold
     # "you are here" ring reads clearly on both tiles.
-    tiles <- if (is_dark()) "CartoDB.DarkMatter" else "CartoDB.Positron"
-    base <- leaflet() %>% addProviderTiles(tiles) %>% setView(-98, 39, zoom = 3)
+    tiles <- if (is_dark()) "dark_all" else "light_all"
+    base <- leaflet() %>% add_suite_basemap(tiles) %>% setView(-98, 39, zoom = 3)
     if (is.null(si)) return(base)
     si <- si[!is.na(si$lat), ]
     sp <- input$rangeSpecies %||% ""

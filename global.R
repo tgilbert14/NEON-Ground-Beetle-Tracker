@@ -22,6 +22,35 @@ suppressPackageStartupMessages({
   library(htmltools)
 })
 
+# ---- basemap --------------------------------------------------------------
+# CARTO watermarks unauthenticated basemaps.cartocdn.com raster tiles ("API KEY
+# REQUIRED", since 2026-08-26; suite record: NEON-Driver-Cascade
+# docs/SUITE-BASEMAP-INCIDENT-2026-08.md). The key rides in the tile URL, so it
+# is a public rate-limited identifier, not a credential; Sys.getenv keeps it out
+# of git and makes rotation a Connect Cloud setting. addProviderTiles() cannot
+# carry it (the bundled CartoDB template has no {apikey} slot), hence addTiles().
+# Without the key this falls back to Esri's keyless grey canvas — clean, but
+# content-free past z16 at rural sites, so the cap keeps the zoom control honest.
+add_suite_basemap <- function(map, variant = "light_all", noWrap = FALSE) {
+  key <- Sys.getenv("CARTO_BASEMAP_KEY", "")
+  if (nzchar(key)) {
+    leaflet::addTiles(map,
+      urlTemplate = sprintf(
+        "https://{s}.basemaps.cartocdn.com/%s/{z}/{x}/{y}{r}.png?key=%s", variant, key),
+      attribution = paste(
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        '&copy; <a href="https://carto.com/attributions">CARTO</a>'),
+      options = leaflet::tileOptions(subdomains = "abcd", maxZoom = 20, noWrap = noWrap))
+  } else {
+    leaflet::addTiles(map,
+      urlTemplate = sprintf(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_%s_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        if (identical(variant, "dark_all")) "Dark" else "Light"),
+      attribution = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
+      options = leaflet::tileOptions(maxNativeZoom = 16, maxZoom = 19, noWrap = noWrap))
+  }
+}
+
 # ---- helpers + metadata ---------------------------------------------------
 source("R/site_metadata.R", local = FALSE)
 source("R/helpers.R", local = FALSE)
