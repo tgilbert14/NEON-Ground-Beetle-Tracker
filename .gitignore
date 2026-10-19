@@ -12,3 +12,10 @@ err*.txt
 
 # editor/agent scratch
 .claude/
+
+# local secrets (.env.example is the committed template)
+.env
+*.env
+!.env.example
+.Renviron
+.Renviron.*
