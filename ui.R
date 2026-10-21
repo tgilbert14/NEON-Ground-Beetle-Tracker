@@ -76,7 +76,6 @@ ground_beetle_poster <- function() {
 ui <- bslib::page_fillable(
   theme = app_theme,
   title = "NEON Ground Beetle Tracker", lang = "en",
-  fillable = FALSE,
 
   tags$head(
     tags$meta(name = "ddl-app-ready", content = "ground-beetle-tracker-v1"),
@@ -177,16 +176,11 @@ ui <- bslib::page_fillable(
     uiOutput("splash"),
     div(id = "site-picker-start", class = "splash-picker", tabindex = "-1",
       div(class = "splash-map-hint", bs_icon("hand-index-thumb"),
-        " Tap a site to explore it. Dot size is species richness, colour is how many beetles were caught."),
+        " Tap a site to explore it. Dot colour is how many beetles were caught there."),
       mapPickerUI("picker", height = "520px", spinner = DDL$forest),
-      # Legend for BOTH encoded channels: dot size = richness, dot colour = catch.
+      # Legend for the one encoded channel: dot colour = catch. Every dot is the
+      # same size (a richness-sized dot would read as a HELD cross-site ranking).
       div(class = "picker-legend",
-        div(class = "pl-block",
-          div(class = "pl-h", "Dot size"),
-          div(class = "pl-size",
-            tags$span(class = "pl-dot pl-d1"), tags$span(class = "pl-dot pl-d2"),
-            tags$span(class = "pl-dot pl-d3"),
-            tags$span(class = "pl-lab", "fewer \U2192 more species"))),
         div(class = "pl-block",
           div(class = "pl-h", "Dot colour"),
           div(class = "pl-ramp"),
@@ -413,7 +407,7 @@ ui <- bslib::page_fillable(
         div(class = "tab-head",
           div(class = "tab-head-text",
             h4("Carabid richness across NEON"),
-            p("Each marker is a NEON site with beetle data. With no species picked, markers size by total richness; choose a species to map its range, sized by local abundance. Tap a site to load it.")),
+            p("Each marker is a NEON site with beetle data. With no species picked every site gets the same dot; choose a species to map its range, sized by local abundance. Tap a site to load it.")),
           div(class = "map-controls",
             selectInput("rangeSpecies", tagList(bs_icon("search"), " Map a species' range"),
                         choices = NULL, width = "280px"))),
@@ -438,7 +432,9 @@ ui <- bslib::page_fillable(
               p("High on both = a genuine signature of that place. Computed across all bundled sites; samples are plot × year."))),
           spin(DT::DTOutput("indicatorTable"))),
         card(card_head("table", "Site comparison"),
-             spin(DT::DTOutput("siteTable")))
+             spin(DT::DTOutput("siteTable")),
+             p(class = "qa-cite", style = "margin:6px 0 0; font-size:12px;",
+               "Observed totals. Sites differ in habitat, years sampled and trapping effort, so these counts are not a ranking."))
       ),
 
       nav_panel(

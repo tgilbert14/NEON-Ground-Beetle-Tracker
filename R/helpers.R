@@ -484,6 +484,61 @@ annual_trend <- function(d) {
       attr(out, "pred") <- stats::predict(fit)
     }
   }
+  # 2023 design break: NEON cut beetle plots from 10 to 6 per site in 2023, so a
+  # trend is only "statistically clear" if it also holds without that year. Refit
+  # without 2023 (when at least 3 years remain) and expose it as separate attrs;
+  # the plotted series and the attrs above are unchanged.
+  if (2023L %in% m$year) {
+    m_ex <- m[m$year != 2023L, , drop = FALSE]
+    attr(out, "n_ex2023") <- nrow(m_ex)
+    attr(out, "slope_ex2023") <- NA_real_
+    attr(out, "p_ex2023") <- NA_real_
+    if (nrow(m_ex) >= 3) {
+      fit_ex <- tryCatch(stats::lm(metric ~ year, data = m_ex), error = function(e) NULL)
+      co_ex <- if (!is.null(fit_ex)) summary(fit_ex)$coefficients else NULL
+      if (!is.null(co_ex) && "year" %in% rownames(co_ex)) {
+        attr(out, "slope_ex2023") <- co_ex["year", "Estimate"]
+        attr(out, "p_ex2023") <- co_ex["year", "Pr(>|t|)"]
+      }
+    }
+  }
+  out
+}
+
+# One trend call shared by the in-app verdict and the PDF, so they cannot
+# disagree. kind: "none" (no finite slope/p), "few" (< 5 years), else "fit".
+# For "fit", `clear` requires the trend to survive dropping the 2023 design-break
+# year (NEON cut plots from 10 to 6 per site); `rests_on_2023` and
+# `masked_by_2023` name the two ways the 2023 value can change the call.
+# "p = 0.012" style text that never prints "p = 0.000": very small p-values read
+# as "p < 0.001". Shared by the in-app trend verdict and the PDF report.
+fmt_p <- function(p, digits = 3) {
+  if (is.null(p) || !length(p) || !is.finite(p[1])) return("p not available")
+  if (p[1] < 0.001) "p < 0.001" else sprintf("p = %.*f", digits, p[1])
+}
+
+trend_call <- function(t) {
+  n <- if (is.null(t)) 0L else nrow(t)
+  num <- function(a) { v <- if (is.null(t)) NULL else attr(t, a)
+    if (is.null(v) || !length(v)) NA_real_ else suppressWarnings(as.numeric(v[1])) }
+  slope <- num("slope"); p <- num("p"); pct <- num("pct_per_yr")
+  slope_ex <- num("slope_ex2023"); p_ex <- num("p_ex2023")
+  n_ex <- num("n_ex2023"); n_ex <- if (is.finite(n_ex)) as.integer(n_ex) else NA_integer_
+  has2023 <- !is.null(t) && "year" %in% names(t) && 2023L %in% as.integer(t$year)
+  sig_all <- is.finite(p) && p < 0.05
+  out <- list(n = n, kind = "fit", slope = slope, p = p, pct = pct, has2023 = has2023,
+              sig_all = sig_all, clear = NA, rests_on_2023 = NA, masked_by_2023 = NA,
+              p_ex2023 = p_ex, slope_ex2023 = slope_ex, n_ex2023 = n_ex)
+  if (!is.finite(slope) || !is.finite(p)) { out$kind <- "none"; return(out) }
+  if (n < 5) { out$kind <- "few"; return(out) }
+  ex_ok <- has2023 && !is.na(n_ex) && n_ex >= 5
+  clear <- sig_all && (
+    if (!has2023) TRUE
+    else if (ex_ok) is.finite(p_ex) && p_ex < 0.05 && is.finite(slope_ex) && sign(slope_ex) == sign(slope)
+    else FALSE)
+  out$clear <- clear
+  out$rests_on_2023 <- sig_all && has2023 && !clear
+  out$masked_by_2023 <- !sig_all && ex_ok && is.finite(p_ex) && p_ex < 0.05
   out
 }
 
@@ -607,7 +662,7 @@ beetle_export_codebook <- function() {
     "taxonID",                "string",   "",                              "NEON taxon code for the identification.",
     "scientificName",         "string",   "",                              "Scientific name - expert-taxonomist call where available, otherwise parataxonomist; may be a genus or family for unresolved IDs. Species and subspecies names are collapsed to the binomial with subgenus tags removed.",
     "scientificName_verbatim","string",   "",                              "scientificName exactly as NEON published it, before the subspecies and subgenus merge.",
-    "taxonRank",              "string",   "",                              "Taxonomic rank of scientificName (species, genus, family, ...), from NEON's expert table where available.",
+    "taxonRank",              "string",   "",                              "Taxonomic rank NEON published for the identification (species, subspecies, speciesGroup, genus, family, ...), from the expert table where available. Subspecies rows are counted under their species in scientificName.",
     "species_level",          "boolean",  "TRUE/FALSE",                    "TRUE when resolved to species. Subspecies are merged into their species; a species-group call counts only when no member species was caught at the site. Richness, diversity, ordination and indicator metrics use TRUE rows only; total abundance uses all rows.",
     "individualCount",        "integer",  "individuals",                   "Number of individuals on a catch row; zero on an effort anchor and not itself a taxon observation.",
     "trapnights",             "numeric",  "trap-nights",                   "Opportunity-complete plot x bout effort: sum of trappingDays over distinct collected trapID records.",
@@ -678,7 +733,7 @@ beetle_env_codebook <- function(env_df) {
 #   high = a result that reads BACKWARDS unless you know the caveat
 #          (an introduced European carabid is the dominant "signature" species)
 #   warn = worth a look (a high coarse-ID share; one species swamps the catch)
-#   info = a transparency note (genus/family-only rows; singleton-heavy tail)
+#   info = a transparency note (names not resolved to one species; singleton-heavy tail)
 # `d` is the cleaned long table (clean_beetle output) for ONE site.
 # ---------------------------------------------------------------------------
 beetle_qc <- function(d) {
@@ -725,7 +780,7 @@ beetle_qc <- function(d) {
     add("warn", sprintf("Coarse IDs: %.0f%% of the catch isn't named to species", pct_higher),
         "coarse",
         which(!sl),
-        sprintf("%.0f%% of the individuals here stop at genus or family (for example 'Bembidion sp.' or 'Carabidae'). Those are kept in total abundance but excluded from richness, diversity, the ordination and indicators, so the diversity story rests on the named slice. Worth knowing how much of the community is unresolved.", pct_higher))
+        sprintf("%.0f%% of the individuals here are not resolved to a single species (genus or family IDs such as 'Bembidion sp.' or 'Carabidae', or a species-group call whose member species is already counted). Those are kept in total abundance but excluded from richness, diversity, the ordination and indicators, so the diversity story rests on the named slice. Worth knowing how much of the community is unresolved.", pct_higher))
 
   # 3 (WARN) — one species swamps the catch. When a single species is >=60% of all
   # named individuals, the community is very uneven; verify it isn't a sampling or
@@ -749,12 +804,14 @@ beetle_qc <- function(d) {
     add("warn", "Catch with no trap-night effort", "noeffort", no_eff,
         "These records have beetles counted but no usable trap-night effort, so they can't be turned into a catch-per-100-trap-nights rate and drop out of the effort-normalised metrics (they still count toward raw totals). A trapping record with no recorded effort is unusable for fair site comparison.")
 
-  # 5 (INFO) — genus/family-only identifications (transparency list). Distinct from
-  # the WARN threshold: this always lists the unresolved rows so they're inspectable
-  # even when the coarse share is modest.
-  add("info", "Genus / family-only identifications", "higher",
+  # 5 (INFO) - names not resolved to one species (transparency list): genus or
+  # family IDs, plus species-group calls whose member species is already counted
+  # (the species merge leaves those off the species list). Distinct from the WARN
+  # threshold: this always lists the unresolved rows so they're inspectable even
+  # when the coarse share is modest. The flag key stays "higher".
+  add("info", "Names not resolved to one species", "higher",
       which(!sl),
-      "Rows left at genus or family rather than a species. They are kept in total abundance and listed here for transparency, but excluded from every richness-type metric (richness, Hill numbers, rarefaction, accumulation, ordination, indicators), so counting them as species can't inflate diversity.")
+      "Rows whose name does not resolve to a single species: genus or family IDs, and species-group calls whose member species is already counted. They are kept in total abundance and listed here for transparency, but excluded from every richness-type metric (richness, Hill numbers, rarefaction, accumulation, ordination, indicators), so counting them as species can't inflate diversity.")
 
   # 6 (INFO) — singleton-heavy tail. Many species seen as a single individual is a
   # normal hallmark of under-sampling, not an error; it means richness is a minimum

@@ -22,6 +22,43 @@ function count(pattern, source) {
   return (source.match(pattern) || []).length;
 }
 
+// Return the brace-balanced body that opens at the first "{" at or after `from`
+// (exclusive of the outer braces). Quote- and comment-aware for R source, so a
+// brace inside a string or a # comment does not end the block early.
+function braceBody(source, from) {
+  const open = source.indexOf("{", from);
+  if (open < 0) return "";
+  let depth = 0;
+  let quote = null;
+  for (let i = open; i < source.length; i++) {
+    const c = source[i];
+    if (quote) {
+      if (c === "\\") { i++; continue; }
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
+    if (c === "#") { const nl = source.indexOf("\n", i); if (nl < 0) break; i = nl; continue; }
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return source.slice(open + 1, i);
+    }
+  }
+  return "";
+}
+
+// Every observer body that opens with `marker` (several observers may share a trigger).
+function observerBodies(source, marker) {
+  const out = [];
+  let at = source.indexOf(marker);
+  while (at >= 0) {
+    out.push(braceBody(source, at + marker.length - 1));
+    at = source.indexOf(marker, at + marker.length);
+  }
+  return out;
+}
+
 // Item 18: keepInView pins an open popup to a map that later shrinks to 0 px.
 for (const [name, source] of [["R/map_picker.R", picker], ["server.R", server]]) {
   if (/keepInView\s*=\s*TRUE/.test(source)) fail(`${name} must not set keepInView = TRUE on a popup`);
@@ -30,17 +67,29 @@ for (const [name, source] of [["R/map_picker.R", picker], ["server.R", server]])
 // The resize path must not invalidate a hidden (0 px) map.
 const onRender = (picker.match(/htmlwidgets::onRender\("([\s\S]*?)"\)/) || [])[1] || "";
 if (!onRender) fail("R/map_picker.R onRender block not found");
-const resizeListener = (onRender.match(/addEventListener\('resize',\s*function\(\)\{([^}]*)\}/) || [])[1] || "";
-if (!/clientWidth\s*>\s*0/.test(resizeListener)) {
+// The guard must be the first thing each path does, so it cannot sit in dead code.
+if (!/addEventListener\(\s*'resize'\s*,\s*function\s*\(\s*\)\s*\{\s*if\s*\(\s*el\.clientWidth\s*>\s*0\s*\)/.test(onRender)) {
   fail("R/map_picker.R resize listener must guard invalidateSize on el.clientWidth > 0");
 }
-const kick = (onRender.match(/function kick\(\)\{([\s\S]*?)\n/) || [])[1] || "";
-if (!/clientWidth\s*>\s*0/.test(kick)) fail("R/map_picker.R timed kicks must guard on el.clientWidth > 0");
+if (!/function\s+kick\s*\(\s*\)\s*\{\s*try\s*\{\s*if\s*\(\s*el\.clientWidth\s*>\s*0\s*\)/.test(onRender)) {
+  fail("R/map_picker.R timed kicks must guard on el.clientWidth > 0");
+}
 
 // Item 21: window_title lands on <body>; the page needs a real <title> and lang.
+// Both are read from the page_fillable() call itself (up to its tags$head), so a
+// hreflang elsewhere, or a title in some other tag, cannot satisfy the check.
 if (/window_title/.test(ui)) fail("ui.R must not use window_title (it renders as a body attribute)");
-if (!/title\s*=\s*"NEON Ground Beetle Tracker"/.test(ui)) fail('ui.R must set title = "NEON Ground Beetle Tracker"');
-if (!/lang\s*=\s*"en"/.test(ui)) fail('ui.R must set lang = "en"');
+const pageStart = ui.indexOf("bslib::page_fillable(");
+const pageHead = pageStart < 0 ? -1 : ui.indexOf("tags$head(", pageStart);
+const pageArgs = pageStart < 0 || pageHead < 0 ? "" : ui.slice(pageStart, pageHead);
+if (!pageArgs) fail("ui.R bslib::page_fillable( ... tags$head( call not found");
+if (!/(^|[^A-Za-z0-9_.$])title\s*=\s*"NEON Ground Beetle Tracker"/.test(pageArgs)) {
+  fail('ui.R page_fillable() must set title = "NEON Ground Beetle Tracker"');
+}
+if (!/(^|[^A-Za-z0-9_.$])lang\s*=\s*"en"/.test(pageArgs)) fail('ui.R page_fillable() must set lang = "en"');
+if (/fillable\s*=/.test(pageArgs.replace("bslib::page_fillable(", ""))) {
+  fail("ui.R page_fillable() must not pass fillable = (it is not an argument and lands on <body>)");
+}
 
 // Item 17: banner text wraps as one prose child beside the icon.
 const verdictCount = count(/class\s*=\s*"verdict-text"/g, server);
@@ -64,5 +113,55 @@ if (/clearPopups\(/.test(server)) fail("server.R must not rely on leaflet::clear
 if (!/"SRER"\s*%in%\s*available_sites\(\)/.test(server)) fail('server.R must default the boot site to SRER when bundled');
 if (!/updateQueryString\(/.test(server)) fail("server.R must write a shareable ?site= URL after a load");
 if (!/rv\$restoreReq/.test(server)) fail("server.R must track the restore request (rv$restoreReq) past the boot skip");
+
+// Item 17 boot skip: the one-shot skip on input$site must be conditional on the
+// restore request, and the observer must still load the picked site.
+const siteObservers = observerBodies(server, "observeEvent(input$site, {")
+  .filter((body) => /rv\$siteReady/.test(body));
+if (siteObservers.length !== 1) {
+  fail(`server.R must have exactly one observeEvent(input$site) with the siteReady boot skip; found ${siteObservers.length}`);
+} else {
+  const body = siteObservers[0];
+  const readyAt = body.search(/if\s*\(\s*!isTRUE\(rv\$siteReady\)\s*\)\s*\{/);
+  const ready = readyAt < 0 ? "" : braceBody(body, readyAt);
+  if (!ready) fail("server.R input$site observer must open with an if (!isTRUE(rv$siteReady)) { ... } branch");
+  if (!/identical\(\s*input\$site\s*,\s*rv\$restoreReq\s*\)/.test(ready)) {
+    fail("server.R boot skip must be conditional on identical(input$site, rv$restoreReq)");
+  }
+  // Every return in the skip branch must be the conditional one.
+  for (const line of ready.split("\n")) {
+    if (/return\(/.test(line) && !/if\s*\(\s*!identical\(\s*input\$site\s*,\s*rv\$restoreReq\s*\)\s*\)\s*return\(/.test(line)) {
+      fail(`server.R boot skip has an unconditional return: ${line.trim()}`);
+    }
+  }
+  const rest = ready ? body.replace(ready, "") : body;
+  if (!/load_site\(\s*input\$site/.test(rest)) fail("server.R input$site observer must still call load_site(input$site, ...)");
+}
+
+// Same-site picks fire no input$site change, so the popup Explore and the
+// restore paths must each load the site directly when it is already selected.
+const sameSite = /identical\(\s*input\$site\s*,\s*s\s*\)\s*\)\s*load_site\(\s*s/;
+for (const [label, marker] of [["siteExplore", "observeEvent(input$siteExplore"],
+                               ["restore_site", "observeEvent(input$restore_site"]]) {
+  const bodies = observerBodies(server, marker);
+  if (bodies.length !== 1) { fail(`server.R must have exactly one observeEvent(input$${label}); found ${bodies.length}`); continue; }
+  if (!sameSite.test(bodies[0])) fail(`server.R observeEvent(input$${label}) must load directly when the site is already selected`);
+  if (label === "restore_site" && !/rv\$restoreReq\s*<-\s*s\b/.test(bodies[0])) {
+    fail("server.R observeEvent(input$restore_site) must set rv$restoreReq <- s");
+  }
+}
+
+// HELD: cross-site rankings stay HELD (docs/SCIENCE-CONTRACT.md), so no
+// richness-scaled mark, rank text or richest-first legend may come back.
+if (/sqrt\(\s*richness\s*\)/.test(server)) fail("server.R must not size marks by sqrt(richness) (HELD cross-site ranking)");
+// (The pre-fix banner read "ranks <b>#%d of %d</b> NEON sites"; the species-range
+// lines "found at <b>%d of %d</b> NEON sites" are occupancy counts, not ranks.)
+if (/ranks\s*<b>\s*#/.test(server) || /#%d of %d<\/b> NEON sites/.test(server)) {
+  fail("server.R must not print a cross-site rank (HELD)");
+}
+const pickerCall = (server.match(/mapPickerServer\(\s*"picker"[\s\S]*?radius_metric\s*=\s*([^,\n]+)/) || [])[1] || "";
+if (pickerCall.trim() !== "NULL") fail('server.R mapPickerServer("picker", ...) must pass radius_metric = NULL (fixed-size dots)');
+if (/Dot size is species richness/.test(ui)) fail("ui.R must not describe dot size as species richness (HELD)");
+if (/fewer \\U2192 more species|fewer → more species/.test(ui)) fail("ui.R must not carry the richness dot-size legend (HELD)");
 
 if (!process.exitCode) console.log("OK: Ground Beetle shell contracts passed");

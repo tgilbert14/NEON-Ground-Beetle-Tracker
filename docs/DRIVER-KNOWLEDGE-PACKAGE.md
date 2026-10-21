@@ -166,8 +166,10 @@ totals are unchanged; no site bundle byte changed. Copy that claimed per-trap-ni
 effort absorbs NEON's 2023 cut from 10 plots to 6 is corrected, and the trend
 chart marks 2018 and 2023. That cut is a real comparability limit for any Driver
 use of the 2023 annual value: the kept six plots catch 0.53x to 1.33x the old set
-at the extreme sites. The cross-site richness rank stays HELD and is no longer
-shown.
+at the extreme sites. The app now calls a trend "statistically clear" only when it
+also holds without 2023: ABBY, MLBS, HEAL and JORN lose that label, BARR, BLAN,
+DELA, UNDE, DEJU, DSNY and OSBS keep it. The cross-site richness rank stays HELD
+and is no longer shown, and neither map sizes dots by richness.
 
 Reusable engineering for the suite: a species key must be normalised once, where
 the table is cleaned, so every downstream consumer inherits it; and

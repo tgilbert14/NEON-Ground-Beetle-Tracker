@@ -50,8 +50,11 @@ below is retained as historical starting evidence, not current release state.
 ## 2026-10-21 MST - suite audit wave 2 items 15, 17, 18 candidate / [Claude]
 
 - **Scope and source:** branch `claude/audit-wave2-beetle-15-17-18` from `main`
-  `5a72edcfdbc5a5761f0f258fade8b727ef877a9b` (after PR #23). Lead on Claude Fable
-  5.1; two bounded Opus 5.5 workers implemented the science and shell halves.
+  `5a72edcfdbc5a5761f0f258fade8b727ef877a9b` (after PR #23). The first planning
+  pass (audit read, three lead rulings, worker briefs) ran on Claude Fable 5.1
+  until the account's Fable limit was reached; from then on the lead, review and
+  acceptance ran on Claude Opus 5.5 at max effort (fleet policy fallback, approved
+  by Tim 2026-10-21). All coding workers ran on Opus 5.5 at medium effort.
   Audit source: `neon-audit-2026-10-18` report items 15, 17, 18 plus the shell
   items 21 (title, lang) and 23 (QC flag keys) for this app.
 - **Item 15, species key:** `clean_beetle()` now keeps `scientificName_verbatim`
@@ -61,6 +64,15 @@ below is retained as historical starting evidence, not current release state.
   `docs/SCIENCE-CONTRACT.md`. `data/precomputed.rds` and `data/search_index.rds`
   were regenerated with the real builders (search index 2,523 taxon-by-site rows,
   767 taxa; two local builds byte-identical). No site bundle byte changed.
+- **Derived bytes come from the pinned runtime, not a laptop:** dispatch run
+  `39682167595` ("Propose NEON data refresh", `skip_download=true`) on exact head
+  `c48c543` passed gate, build and publish and pushed bot child `895bea4`. Its
+  `data/search_index.rds` was byte-identical to the macOS build, but
+  `data/precomputed.rds` was not: only the PCoA ordination differed (379 rows, max
+  absolute difference 2.3e-15), from BLAS rounding; every count, index row and
+  indicator was identical. A macOS-built file would make the next scheduled refresh
+  propose a spurious data change, so promotion uses the pinned producer's bytes,
+  and ci.yml now rebuilds both indexes before its committed-bytes check.
 - **Before/after species counts (local R 4.5.2, same 46 bundles):**
 
   | Site | Before | After | Dominant after |
@@ -75,8 +87,10 @@ below is retained as historical starting evidence, not current release state.
   absorbs the 2023 cut from 10 to 6 plots now say it does not; the trend chart and
   PDF carry design-change markers at 2018 and 2023. The plot-matched estimator is
   not built (separate HK decision).
-- **Item 15, rank:** the "#N of 46" Biogeography rank and richness-sized dots are
-  removed. The HELD gate stays; the contract records why.
+- **Item 15, rank:** the "#N of 46" Biogeography rank, the richness-sized dots on
+  both maps and the richest-first default order of the site table are removed. The
+  HELD gate stays; the contract records why. (The front-door picker dots and the
+  table order were caught by the independent review, not by the first pass.)
 - **Item 17:** boot default is SRER; ?site= links and the remembered site load;
   Explore on the pre-selected site loads; a loaded site writes ?site=; all nine
   verdict banners wrap their text in one span.
@@ -94,7 +108,7 @@ below is retained as historical starting evidence, not current release state.
   of global.R, ui.R and server.R. `scripts/verify_bundle.R`: 46 bundles, 100,163
   rows, 33,012 anchors, 67,151 catch rows; FAIL only on the expected manifest
   checksums for 9 changed runtime files. The manifest is not hand-edited; it comes
-  from the PR's pinned CI artifact.
+  from the pinned producer's bot commit.
 - **Local browser evidence (localhost, R 4.5.2):** fresh boot lands on the picker
   with AZ and SRER selected; popup Explore on pre-selected SRER loads it, writes
   ?site=SRER, closes the popup, 0 map move events, no errors; Biogeography card
@@ -103,12 +117,47 @@ below is retained as historical starting evidence, not current release state.
   welcome modal; remembered HARV and remembered SRER both load; at 375 px every
   visible banner has 2 children and 0 overflow, no page overflow; Space on a QC
   flag opens the inspector without a page jump; trend marker labels do not overlap.
+- **Independent review (Opus 5.5 at max, fresh context) and fixes:** confirmed the
+  merge keeps individuals identical at all 46 sites, never merges two different
+  species, and that boot/restore/Explore produce exactly one load in every order
+  traced. It found, and an Opus 5.5 medium worker fixed: richness-sized picker dots
+  and a richest-first site table (HELD leak, P1); trend verdicts that called a
+  trend "statistically clear" only because of the 2023 value (P2); a shell check
+  that passed a broken boot skip (P2); labels that called demoted species-group
+  rows "genus/family"; years counted from catch rather than effort (DSNY, OSBS and
+  YELL were one short); a stray `fillable` body attribute; "expert IDs ." spacing.
+- **Trend verdict rule (lead decision, recorded in the contract):** "statistically
+  clear" only when the fit also holds without 2023. Across the 46 bundles, clear
+  down: BARR, BLAN, DELA, UNDE; clear up: DEJU, DSNY, OSBS; now "rests on the 2023
+  value": ABBY and MLBS (down), HEAL and JORN (up); TEAK has too few years; 34 flat.
+  Plotted values, slope and the seasonal driver inputs are unchanged.
+- **New regression guards:** `scripts/test_server_restore.R` drives the real server
+  with `shiny::testServer` through five boot/restore/Explore orders and counts
+  loads (mutation-tested: an unconditional boot skip, a deleted Explore same-site
+  branch and a deleted restore same-site branch each fail it).
+  `scripts/check_shell_contracts.mjs` now parses the observer bodies and the
+  `page_fillable()` call; all 12 mutations tried were caught. ci.yml rebuilds both
+  indexes in the pinned runtime before its committed-bytes check.
+- **Production baseline, same headless harness (Playwright 1.62.1 Chromium,
+  2026-10-21 21:53Z, Connect app at `e136aeb`-era code):** title "" and lang "";
+  boot on ND/DCFS; after Explore from the SRER popup the hidden picker map sat at
+  latitude -85.05 with 1,204 move events, 3 "Maximum call stack size exceeded"
+  page errors and the popup still open; Biogeography after a tab switch with a card
+  open: latitude -85.55, 0 tiles, 1,271 move events; picker after change site:
+  latitude -86.31, 0 tiles; ?site=CPER and a remembered HARV never loaded; banner
+  "ranks #27 of 46"; 37 distinct dot radii; all 48 tile requests went to
+  server.arcgisonline.com (CARTO key absent on Connect).
+- **Same harness on this head, local:** picker after popup Explore latitude 40.98,
+  1 move event, popup closed, 0 page errors; Biogeography after tab switch latitude
+  43.96, 24 tiles; picker after change site latitude 40.98, 24 tiles; ?site=CPER
+  and remembered HARV load; every phone banner has 2 children and 0 overflow; one
+  dot radius.
 - **Residual risks:** the deployed app is unverified until Tim merges and Connect
   republishes. Other suite apps still carry `keepInView = TRUE` (a separate suite
   batch). `CARTO_BASEMAP_KEY` on Connect is an owner dashboard step outside this PR.
-- **Next action:** promote the CI-validated manifest artifact for the exact head,
-  require green CI, Tim merges, then verify the map, deep link and banners on the
-  deployed Connect app in a headless browser.
+- **Next action:** promote the pinned producer's bot commit as the exact PR head,
+  require green CI on it, Tim merges, then rerun the harness on the deployed Connect
+  app and record the result here.
 
 ## 2026-08-05 21:31 MST - Plotly lifecycle repair production closeout / [Codex]
 

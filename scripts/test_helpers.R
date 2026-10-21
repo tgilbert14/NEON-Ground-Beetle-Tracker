@@ -215,4 +215,46 @@ assert(setequal(species_group_members("Harpalus paratus/pensylvanicus"),
                 c("Harpalus paratus", "Harpalus pensylvanicus")),
        "slash species groups must expand every member epithet")
 
+# 2023 design break: a trend is "statistically clear" only if it survives
+# dropping the 2023 value (NEON cut plots from 10 to 6 per site that year).
+# Minimal legacy-shape annual series: one plot-bout per year, 100 trap-nights,
+# so catch per 100 trap-nights equals the count.
+trend_fixture <- function(years, counts) {
+  data.frame(siteID = "TEST", plotID = "P1",
+             collectDate = as.Date(sprintf("%d-07-01", years)),
+             trapnights = 100, individualCount = counts,
+             scientificName = "Carabus nemoralis", stringsAsFactors = FALSE)
+}
+yrs_23 <- 2015:2023
+noise <- c(1.2, -0.8, 0.6, -1.4, 1.0, -0.4, 0.8, -1.0, 0)
+# 2015-2022: a faint drift that is not significant on its own (p ~ 0.12); the
+# 2023 value 5 below 2022 tips the all-years fit to p ~ 0.03.
+rest_vals <- 50 - 0.2 * (0:7) + noise[1:8]
+rest_vals <- c(rest_vals, rest_vals[8] - 5)
+t_rest <- annual_trend(trend_fixture(yrs_23, rest_vals))
+tc_rest <- trend_call(t_rest)
+assert(identical(tc_rest$kind, "fit") && tc_rest$has2023, "2023 series must be a fitted call with has2023")
+assert(tc_rest$sig_all, "fixture: the all-years slope must be significant because of 2023")
+assert(identical(tc_rest$n_ex2023, 8L), "n_ex2023 must count the years without 2023")
+assert(isFALSE(tc_rest$clear) && isTRUE(tc_rest$rests_on_2023),
+       "a slope that is significant only because of 2023 must rest on 2023, not be clear")
+assert(isTRUE(all.equal(t_rest$metric, rest_vals)) && is.finite(attr(t_rest, "p_ex2023")) &&
+         attr(t_rest, "p_ex2023") >= 0.05,
+       "the 2023 refit must not change the plotted series")
+t_steady <- annual_trend(trend_fixture(yrs_23, 100 - 8 * (yrs_23 - 2015) + noise))
+tc_steady <- trend_call(t_steady)
+assert(isTRUE(tc_steady$clear) && isFALSE(tc_steady$rests_on_2023) && tc_steady$slope < 0,
+       "a steady decline through 2023 must stay statistically clear")
+yrs_old <- 2012:2020
+t_old <- annual_trend(trend_fixture(yrs_old, 100 - 8 * (yrs_old - 2012) + noise))
+tc_old <- trend_call(t_old)
+assert(!tc_old$has2023 && is.null(attr(t_old, "p_ex2023")),
+       "a series without 2023 must not get ex-2023 attrs")
+assert(identical(tc_old$clear, tc_old$sig_all) && isTRUE(tc_old$clear),
+       "without 2023 the call must equal the all-years significance")
+t_flat_old <- annual_trend(trend_fixture(yrs_old, 50 + noise))
+assert(isFALSE(trend_call(t_flat_old)$clear), "a flat series without 2023 must not be clear")
+assert(identical(trend_call(annual_trend(trend_fixture(2019:2022, c(5, 8, 9, 12))))$kind, "few"),
+       "under five years must stay the 'few' call")
+
 cat("OK: Ground Beetle effort, zero-catch, taxonomy, detection, QC, and legacy contracts passed.\n")

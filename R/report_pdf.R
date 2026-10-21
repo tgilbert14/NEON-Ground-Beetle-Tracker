@@ -226,7 +226,8 @@ render_beetle_report <- function(file, d, label, is_demo = FALSE, env = NULL) {
     if (is.na(hn$q2)) "-" else round(hn$q2, 1), even_word, if (is.na(hn$even)) "-" else hn$even),
     y, 9.5, gapAfter = 0.06)
   if (!is.null(qa))
-    y <- draw_para(sprintf(paste("Of %s individuals, %s%% are left at genus/family; richness counts the",
+    y <- draw_para(sprintf(paste("Of %s individuals, %s%% are not resolved to one species (genus or family IDs,",
+      "or species-group calls whose member species is already counted); richness counts the",
       "%s species-level taxa only, abundance keeps every beetle trapped."),
       format(qa$ind_total, big.mark = ","), qa$pct_ind_higher, format(qa$species, big.mark = ",")),
       y, 8.5, PG$muted, gapAfter = 0.12)
@@ -279,14 +280,30 @@ render_beetle_report <- function(file, d, label, is_demo = FALSE, env = NULL) {
       y <- draw_para(sprintf(paste("Across %d years, %s shows %s. %d years is too few to test reliably -",
         "read the direction, not the decimal."), ny, metric_txt, appdir, ny), y, 9.5, gapAfter = 0.06)
     } else {
-      sig <- is.finite(pv) && pv < 0.05
-      dir <- if (!sig) "roughly flat" else if (sl > 0) "rising" else "declining"
+      # Same three-way call as the in-app verdict (trend_call()): a trend is
+      # "statistically clear" only if it also holds without the 2023 value. The
+      # 2023 design sentence is printed once, in the muted note below.
+      tc <- trend_call(tr)
       pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (%+.0f%%/yr)", pct) else ""
-      ptxt <- if (sig) sprintf("statistically clear, p = %.3f", pv)
-              else if (is.finite(pv)) sprintf("not distinguishable from no change, p = %.2f", pv)
-              else "not testable"
-      y <- draw_para(sprintf("Across %d years, %s is %s%s - %s.", ny, metric_txt, dir, pcttxt, ptxt),
-        y, 9.5, gapAfter = 0.06)
+      txt <- if (isTRUE(tc$clear)) {
+        sprintf("Across %d years, %s is %s%s - statistically clear, %s.",
+          ny, metric_txt, if (sl > 0) "rising" else "declining", pcttxt, fmt_p(pv))
+      } else if (isTRUE(tc$rests_on_2023)) {
+        extxt <- if (!is.na(tc$n_ex2023) && tc$n_ex2023 >= 5 && is.finite(tc$p_ex2023))
+          sprintf("without 2023 it is not statistically clear, %s", fmt_p(tc$p_ex2023, 2))
+          else "without 2023 there are too few years to test"
+        sprintf("Across %d years, %s shows an apparent %s (%s%s), but it rests on the 2023 value: %s.",
+          ny, metric_txt, if (sl > 0) "rise" else "decline",
+          if (is.finite(pct) && abs(pct) <= 40) sprintf("%+.0f%%/yr, ", pct) else "", fmt_p(pv), extxt)
+      } else {
+        ptxt <- if (is.finite(pv)) sprintf("not distinguishable from no change, %s", fmt_p(pv, 2))
+                else "not testable"
+        paste0(sprintf("Across %d years, %s is roughly flat%s - %s.", ny, metric_txt, pcttxt, ptxt),
+          if (isTRUE(tc$masked_by_2023))
+            sprintf(" Without the 2023 value the series reads as %s, %s.",
+              if (tc$slope_ex2023 > 0) "rising" else "declining", fmt_p(tc$p_ex2023)) else "")
+      }
+      y <- draw_para(txt, y, 9.5, gapAfter = 0.06)
     }
     # design-change marker, the printed twin of the dashed lines on the app's trend chart
     if (2023 %in% tr$year)

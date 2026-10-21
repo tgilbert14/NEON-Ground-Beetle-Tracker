@@ -76,6 +76,10 @@ For an eligible scope:
   with earlier years. Trend charts and the PDF carry design-change markers at 2018
   and 2023 and the copy must not claim the 2023 change is normalised away. A
   plot-matched estimator is a separate HK-reviewed methods decision.
+- A trend verdict may say "statistically clear" only when the fit also holds,
+  with the same sign, after dropping the 2023 value (and at least 5 years remain).
+  When significance rests on 2023 the verdict reads as an apparent change that
+  depends on a non-comparable year; the plotted values and the slope are unchanged.
 - Preserve the existing small-series gate and show the number of supported years.
 - OLS trend language is descriptive; it does not establish population change or a
   causal driver.
@@ -114,9 +118,11 @@ For an eligible scope:
   The effort-row half is met (46 of 46 bundles carry explicit effort anchors); the
   protocol-change fixture half is not, and raw observed richness moves up to 18
   rank places once rarefied to a common catch. So on 2026-10-21 the Biogeography
-  "#N of 46" rank banner and the richness-sized map dots were removed rather than
-  the gate cleared. Any future rank must first clear this gate in writing here and
-  then rank on rarefied richness with per-site coverage shown.
+  "#N of 46" rank banner, the richness-sized dots on both maps (the front-door
+  picker and the Biogeography map) and the richest-first default order of the site
+  comparison table were removed rather than the gate cleared. Any future rank must
+  first clear this gate in writing here and then rank on rarefied richness with
+  per-site coverage shown.
 - Driver metric adoption remains held until the same source definition passes the
   pinned build, bundle, manifest, and deployed semantic-health gates.
 

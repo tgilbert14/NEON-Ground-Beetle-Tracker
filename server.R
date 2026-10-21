@@ -276,7 +276,9 @@ function(input, output, session) {
   }
 
   # ---- splash national PICKER map (the flagship front door) ----------------
-  # size = species richness, colour = total individuals (forest sequential ramp).
+  # Every dot is the same size (radius_metric = NULL): sizing by richness would read
+  # as a cross-site ranking, which the science contract keeps HELD. Colour = total
+  # individuals caught (forest sequential ramp).
   # Tapping a marker opens the Explore | About choice popup; the load comes from
   # the popup's Explore button (input$siteExplore), which runs the SAME cascade as
   # the dropdowns — no race, dropdowns and charts can't disagree.
@@ -284,8 +286,7 @@ function(input, output, session) {
     st <- picker_site_table
     if (!is.null(st) && nrow(st)) {
       # Colour = total individuals, a heavy-tailed count one outlier (STER ~24.8k)
-      # washes out under a raw-linear ramp. Match the colour channel to the dot's
-      # log1p RADIUS channel: ramp over log1p(individuals) clamped to robust p5/p95
+      # washes out under a raw-linear ramp. Ramp over log1p(individuals) clamped to robust p5/p95
       # so the bulk of sites spread across the full ramp and the single giant pins
       # to the dark end instead of flattening everyone else to pale green.
       iv  <- suppressWarnings(as.numeric(st$individuals)); iv[!is.finite(iv)] <- 0
@@ -295,7 +296,7 @@ function(input, output, session) {
       pal <- leaflet::colorNumeric(c("#d6f3e4", "#36d98a", "#1f8a5a"),
                                    domain = dom, na.color = "#c9d3bb")
       pal_clamp <- function(x) pal(pmin(pmax(log1p(pmax(0, x)), dom[1]), dom[2]))
-      mapPickerServer("picker", site_table = st, radius_metric = "richness",
+      mapPickerServer("picker", site_table = st, radius_metric = NULL,
         color_fn = function(s) pal_clamp(ifelse(is.finite(s$individuals), s$individuals, 0)),
         label_fn = function(r) sprintf(
           "<b>%s</b> · %s, %s<br><b>%s</b> species · <b>%s</b> individuals<br>dominant: <i>%s</i>%s",
@@ -957,7 +958,7 @@ function(input, output, session) {
         span(class = "verdict-text",
           HTML(sprintf(" All %d taxa here are identified to species, so richness counts are clean.", qa$species %||% 0)))))
     div(class = "qa-note qa-flag", bs_icon("funnel-fill"), span(class = "verdict-text",
-      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d record-type%s identified only to genus/family (%s individuals, %.1f%% of the catch) are <b>excluded from richness, diversity and ordination</b> (they'd otherwise inflate the species count) but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
+      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d name%s not resolved to a single species (genus or family IDs, or a species-group call whose member species is already counted) cover %s individuals, %.1f%% of the catch. They are <b>excluded from richness, diversity and ordination</b> (they'd otherwise inflate the species count) but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
         qa$species, fmt_int(qa$ind_total - qa$ind_higher),
         qa$higher_taxa, if (qa$higher_taxa == 1) "" else "s",
         fmt_int(qa$ind_higher), qa$pct_ind_higher))))
@@ -1089,20 +1090,38 @@ function(input, output, session) {
           nrow(t), appdir, pcttxt, nrow(t),
           if (identical(attr(t, "metric_kind"), "count")) " <i>(raw counts, no effort data)</i>" else "")))))
     }
-    sig <- is.finite(p) && p < 0.05
-    dir <- if (!sig) "flat" else if (slope > 0) "up" else "down"
-    word <- switch(dir, up = "rising", down = "declining", flat = "roughly flat")
+    tc <- trend_call(t)
+    clear <- isTRUE(tc$clear)
+    dir <- if (!clear) "flat" else if (slope > 0) "up" else "down"
     icon <- switch(dir, up = "arrow-up-right-circle-fill",
                    down = "arrow-down-right-circle-fill", flat = "dash-circle")
     pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (~%+.0f%%/yr)", pct) else ""
-    sigtxt <- if (sig) sprintf("statistically clear (p = %.3f)", p)
-              else if (is.finite(p)) sprintf("not statistically distinguishable from no change (p = %.2f)", p)
-              else "not statistically distinguishable from no change"
+    raw_txt <- if (identical(attr(t, "metric_kind"), "count"))
+      " <i>(raw counts; this bundle has no effort data)</i>" else ""
+    # A trend is "statistically clear" only if it also holds without the 2023
+    # design-break value (trend_call(), shared with the PDF report).
+    body <- if (clear) {
+      sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s, statistically clear (%s).",
+        nrow(t), if (slope > 0) "rising" else "declining", pcttxt, fmt_p(p))
+    } else if (isTRUE(tc$rests_on_2023)) {
+      extxt <- if (!is.na(tc$n_ex2023) && tc$n_ex2023 >= 5 && is.finite(tc$p_ex2023))
+        sprintf("without 2023 it is not statistically clear (%s)", fmt_p(tc$p_ex2023, 2))
+        else "without 2023 there are too few years to test"
+      sprintf(" Over %d years, catch-per-effort shows <b>an apparent %s</b> (%s%s), but it rests on the 2023 value: %s.",
+        nrow(t), if (slope > 0) "rise" else "decline",
+        if (is.finite(pct) && abs(pct) <= 40) sprintf("~%+.0f%%/yr, ", pct) else "", fmt_p(p), extxt)
+    } else {
+      sigtxt <- if (is.finite(p)) sprintf("not statistically distinguishable from no change (%s)", fmt_p(p, 2))
+                else "not statistically distinguishable from no change"
+      paste0(sprintf(" Over %d years, catch-per-effort is <b>roughly flat</b>%s, %s.", nrow(t), pcttxt, sigtxt),
+        if (isTRUE(tc$masked_by_2023))
+          sprintf(" Without the 2023 value the series reads as %s (%s).",
+            if (tc$slope_ex2023 > 0) "rising" else "declining", fmt_p(tc$p_ex2023)) else "")
+    }
+    if (isTRUE(tc$has2023))
+      body <- paste0(body, " 2023 follows NEON's cut from 10 plots to 6 per site, so that year is not directly comparable with earlier years.")
     div(class = paste("trend-verdict", paste0("trend-", dir)), bs_icon(icon), span(class = "verdict-text",
-      HTML(sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s, %s. %s",
-        nrow(t), word, pcttxt, sigtxt,
-        if (identical(attr(t, "metric_kind"), "count"))
-          "<i>(raw counts; this bundle has no effort data)</i>" else ""))))
+      HTML(paste0(body, raw_txt))))
   })
 
   output$trendPlot <- renderPlotly({
@@ -1666,7 +1685,7 @@ function(input, output, session) {
 
   # ---- Biogeography -------------------------------------------------------
   updateSelectInput(session, "rangeSpecies",
-                    choices = c("All species (richness)" = "", species_choices()))
+                    choices = c("All sites" = "", species_choices()))
 
   # "answer up front" banner for Biogeography — where this site sits nationally
   output$biogeoVerdict <- renderUI({
@@ -1681,7 +1700,7 @@ function(input, output, session) {
     ind <- if ("individuals_species" %in% names(row)) row$individuals_species[1] else NA
     yrs <- if ("years" %in% names(row)) row$years[1] else NA
     from_clause <- if (!is.na(ind)) sprintf(" from %s identified beetles", fmt_int(ind)) else ""
-    yrs_clause  <- if (!is.na(yrs)) sprintf(" over %d years", as.integer(yrs)) else ""
+    yrs_clause  <- if (!is.na(yrs)) sprintf(" over %d sampled years", as.integer(yrs)) else ""
     div(class = "trend-verdict trend-info", bs_icon("geo-alt-fill"),
       span(class = "verdict-text", HTML(sprintf(
         "<b>%s</b>: <b>%d</b> species%s%s. Sites differ in habitat, years sampled and trapping effort, so this count is not a ranking.",
@@ -1786,10 +1805,11 @@ function(input, output, session) {
 
   output$siteTable <- DT::renderDT({
     si <- SITE_INDEX; if (is.null(si)) return(NULL)
-    tab <- si[order(-si$richness), c("site", "name", "state", "richness", "individuals", "dominant", "source")]
+    # Default order is state then site, not richness: cross-site rankings are HELD.
+    tab <- si[order(si$state, si$site), c("site", "name", "state", "richness", "individuals", "dominant", "source")]
     names(tab) <- c("Site", "Name", "State", "Species", "Individuals", "Dominant species", "Source")
     DT::datatable(tab, rownames = FALSE, selection = "none",
-                  options = list(pageLength = 10, dom = "tp", scrollX = TRUE)) %>%
+                  options = list(pageLength = 10, dom = "tp", scrollX = TRUE, order = list())) %>%
       DT::formatCurrency("Individuals", currency = "", interval = 3, mark = ",", digits = 0)
   })
 
@@ -1836,7 +1856,7 @@ function(input, output, session) {
                 " still counts every beetle trapped. The Diversity tab shows exactly how many records this excludes."),
         tags$li(tags$b("How current is this?"), " NEON publishes ground-beetle records after the specimens are sorted and an expert taxonomist confirms the IDs, so the most recent year or two of trapping is usually not in the data yet. The latest season you see here lags real time by about two years. A site looking quiet at the end of its record often just means those bouts have not been published, not that the beetles vanished."),
         tags$li("Hill numbers (Hill 1973; Jost 2006); Hurlbert (1971) rarefaction; Gotelli & Colwell (2001) accumulation; Dufrêne & Legendre (1997) indicator value; NEON ground-beetle sampling design (Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744)."),
-        tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs"),
+        tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs", .noWS = "after"),
                 ". Per-trap-night effort absorbs the 2018 change from 4 to 3 traps per plot. In 2023 NEON cut sampling from 10 plots to 6, and the plots it kept can catch more or fewer beetles than the old set, so the 2023 value is not directly comparable with earlier years."),
         tags$li(tags$b("Download the data."), " The ", tags$b("Data + codebook"),
                 " button exports the loaded site as a tidy one-row-per-plot×bout×species table, bundled with a column ",

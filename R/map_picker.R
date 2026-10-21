@@ -1,8 +1,10 @@
 # ==========================================================================
 # map_picker.R — the reusable national site-PICKER map for the NEON suite.
 # The feature that defines the flagship: a US map of every bundled site, tap a
-# dot to load it. Marker size = a headline count (log1p-scaled), colour = a
-# headline metric. CRITICAL: the leafletOutput is STATIC in ui.R (placed via
+# dot to load it. Marker size = a headline count (log1p-scaled) when the caller
+# passes radius_metric, or a fixed 9 px for every dot when radius_metric = NULL
+# (use NULL when sizing by the metric would read as a cross-site ranking).
+# Colour = a headline metric. CRITICAL: the leafletOutput is STATIC in ui.R (placed via
 # mapPickerUI) — NEVER inside a renderUI — because a leaflet htmlwidget delivered
 # through renderUI loses the dependency-deliver → re-bind race on Posit Connect
 # Cloud and the spinner hangs forever. mapPickerServer keeps it alive while the
@@ -29,7 +31,8 @@ mapPickerUI <- function(id, height = "560px", spinner = "#2f7fb5") {
 }
 
 # site_table : data.frame with columns site, lat, lng (+ the metric columns used below)
-# radius_metric : column name driving dot size
+# radius_metric : column name driving dot size (log1p-scaled via picker_radius),
+#   or NULL for a fixed 9 px radius on every dot
 # color_fn  : function(site_table) -> vector of fill colours (length = nrow)
 # label_fn  : function(one-row df) -> HTML string for the hover label
 # popup_fn  : OPTIONAL function(one-row df) -> HTML string for a CLICK popup. When
@@ -57,7 +60,8 @@ mapPickerServer <- function(id, site_table, radius_metric, color_fn, label_fn, p
         add_suite_basemap("light_all", noWrap = TRUE) %>%  # keyed CARTO Positron (global.R helper; CARTO watermarks unkeyed tiles)
         leaflet::setView(lng = -96, lat = 41, zoom = 4) %>%
         leaflet::addCircleMarkers(lng = ~lng, lat = ~lat, layerId = ~site,
-          radius = picker_radius(st[[radius_metric]]), stroke = TRUE, color = "#ffffff",
+          radius = if (is.null(radius_metric)) rep(9, nrow(st)) else picker_radius(st[[radius_metric]]),
+          stroke = TRUE, color = "#ffffff",
           weight = 1.4, opacity = 1, fillColor = color_fn(st), fillOpacity = 0.85,
           label = labs, popup = pops, popupOptions = pop_opts,
           labelOptions = leaflet::labelOptions(direction = "auto", textsize = "13px",

@@ -221,8 +221,11 @@ build_national_index <- function() {
       richness = nrow(sp),
       individuals = sum(ct$individuals),
       individuals_species = sum(sp$individuals, na.rm = TRUE),
+      # Years sampled: count years with sampled effort rows when the bundle has
+      # them (zero-catch years still count as sampled), else years with catch.
       years = {
-        yy <- d$year[d$record_type == "catch" & !is.na(d$year)]
+        rt <- if (any(d$record_type == "effort", na.rm = TRUE)) "effort" else "catch"
+        yy <- d$year[d$record_type %in% rt & !is.na(d$year)]
         if (length(yy)) dplyr::n_distinct(yy) else NA_integer_
       },
       dominant =if (nrow(sp)) sp$scientificName[1] else ct$scientificName[1],
