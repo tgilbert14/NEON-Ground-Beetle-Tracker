@@ -148,3 +148,34 @@ artifact or ecological data byte changed. The next dependency remains a separate
 reviewed, pinned Driver adapter with measured join/support at suite synthesis; the
 next app-release check is a full-download refresh through the same exact-head
 review path.
+
+## 2026-10-21 MST - species-key and copy addendum (suite audit wave 2)
+
+The species-level composition basis this package calls defensible had a key defect:
+NEON publishes one species under several names (nominal trinomials, subgenus tags
+and species-group calls), and the app grouped on the raw name, so 36 of 46 sites
+counted at least one species twice (GRSM 60 vs 51, UNDE 42 vs 39, SRER 42 vs 41).
+`clean_beetle()` now collapses species and subspecies names to the binomial,
+strips subgenus tags, and demotes a species-group call when a member species is
+present at the site; the published name travels as `scientificName_verbatim`.
+After the fix 0 of 46 sites are inflated and UNDE's dominant is the introduced
+*Pterostichus melanarius* (25.2%).
+
+The activity-density estimand, opportunity denominator, zero rule and abundance
+totals are unchanged; no site bundle byte changed. Copy that claimed per-trap-night
+effort absorbs NEON's 2023 cut from 10 plots to 6 is corrected, and the trend
+chart marks 2018 and 2023. That cut is a real comparability limit for any Driver
+use of the 2023 annual value: the kept six plots catch 0.53x to 1.33x the old set
+at the extreme sites. The cross-site richness rank stays HELD and is no longer
+shown.
+
+Reusable engineering for the suite: a species key must be normalised once, where
+the table is cleaned, so every downstream consumer inherits it; and
+`leaflet::clearPopups()` does not close marker-bound popups, so closing them before
+a map is hidden needs `closePopup()` on the client.
+
+Driver decision: **`CONTEXT`** for composition and richness (richer and now
+correct, still descriptive) and **`HOLD`** for any annual activity series that
+includes 2023 until a plot-matched estimator is reviewed. No Driver artifact byte
+changed. Next dependency: an HK-reviewed plot-matched annual estimator, then the
+existing separately reviewed Driver adapter with measured join and support.

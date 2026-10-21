@@ -220,7 +220,12 @@ build_national_index <- function() {
       state = if (nrow(meta)) meta$state else NA_character_,
       richness = nrow(sp),
       individuals = sum(ct$individuals),
-      dominant = if (nrow(sp)) sp$scientificName[1] else ct$scientificName[1],
+      individuals_species = sum(sp$individuals, na.rm = TRUE),
+      years = {
+        yy <- d$year[d$record_type == "catch" & !is.na(d$year)]
+        if (length(yy)) dplyr::n_distinct(yy) else NA_integer_
+      },
+      dominant =if (nrow(sp)) sp$scientificName[1] else ct$scientificName[1],
       source = attr(d, "source") %||% "neon")
     d$siteID <- s; all[[s]] <- d
   }

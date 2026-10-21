@@ -54,8 +54,10 @@ Pick a site and it loads automatically (the date window snaps to that site's rea
 
 - **Effort-normalised abundance.** Counts are expressed as **catch per 100 trap-nights**
   (effort = the sum of unique plot × bout trap-night totals), so sites and windows
-  with different sampling effort compare fairly. This also absorbs NEON's protocol
-  changes (4→3 traps/plot in 2018; 10→6 plots/site in 2023).
+  with different sampling effort compare fairly. Per-trap-night effort absorbs the
+  2018 change from 4 to 3 traps per plot. In 2023 NEON cut sampling from 10 plots to
+  6, and the plots it kept can catch more or fewer beetles than the old set, so the
+  2023 value is not directly comparable with earlier years.
 - **Diversity** — Hill numbers (Hill 1973; Jost 2006); individual-based rarefaction
   with an analytic SD (Hurlbert 1971; Heck et al. 1975); sample-based species
   accumulation averaged over random bout orders (Gotelli & Colwell 2001).

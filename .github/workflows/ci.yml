@@ -92,6 +92,8 @@ jobs:
           node --check scripts/check_custom_message_handlers.mjs
           node scripts/check_custom_message_handlers.mjs
           node scripts/check_cover.mjs
+          node --check scripts/check_shell_contracts.mjs
+          node scripts/check_shell_contracts.mjs
           bash -n scripts/post_deploy_smoke.sh
 
       - name: Run scientific helper contracts

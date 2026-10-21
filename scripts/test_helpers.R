@@ -165,4 +165,54 @@ legacy <- clean_beetle(data.frame(
 assert(!effort_opportunity_complete(legacy), "legacy catch-only bundle must remain explicitly incomplete")
 assert(effort_trapnights(legacy) == 5, "legacy display fallback remains readable during migration")
 
+# Species key merge (audit item 15, 2026-10-21): subspecies and subgenus variants
+# collapse to one binomial, and a species-group call with a member present at the
+# site is demoted out of richness but kept in abundance.
+assert(species_binomial("Pterostichus (Morphnosoma) melanarius melanarius") ==
+         "Pterostichus melanarius", "subgenus and subspecies must collapse to the binomial")
+merge_names <- c("Pterostichus melanarius",
+                 "Pterostichus (Morphnosoma) melanarius melanarius",
+                 "Harpalus pensylvanicus", "Harpalus pensylvanicus/texanus",
+                 "Amara aenea/cupreolata", "Bembidion sp.")
+merge_ranks <- c("species", "subspecies", "species", "speciesGroup", "speciesGroup", "genus")
+merge_counts <- c(4, 3, 5, 2, 1, 6)
+merge_fx <- data.frame(
+  siteID = "TEST", plotID = "P1", collectDate = as.Date("2024-06-10"),
+  taxonID = paste0("T", seq_along(merge_names)), scientificName = merge_names,
+  taxonRank = merge_ranks, individualCount = merge_counts, trapnights = 10,
+  record_type = "catch", traps_sampled = 3L, effort_records = 3L,
+  effort_status = "valid_sample_collected", stringsAsFactors = FALSE)
+merge_fx <- rbind(merge_fx, data.frame(
+  siteID = "TEST", plotID = "P1", collectDate = as.Date("2024-06-10"),
+  taxonID = NA, scientificName = NA, taxonRank = NA, individualCount = 0,
+  trapnights = 10, record_type = "effort", traps_sampled = 3L, effort_records = 3L,
+  effort_status = "valid_sample_collected", stringsAsFactors = FALSE))
+merged <- clean_beetle(merge_fx)
+merged_catch <- merged[merged$record_type == "catch", , drop = FALSE]
+assert(identical(merged_catch$scientificName_verbatim, merge_names),
+       "scientificName_verbatim must preserve every published name")
+assert(identical(merged_catch$taxonID, paste0("T", seq_along(merge_names))),
+       "taxonID must not change in the species merge")
+merged_ct <- community_table(merged)
+assert(sum(merged_ct$species_level %in% TRUE) == 3L,
+       "species richness must count P. melanarius, H. pensylvanicus and the Amara group once each")
+assert(setequal(merged_ct$scientificName[merged_ct$species_level %in% TRUE],
+                c("Pterostichus melanarius", "Harpalus pensylvanicus", "Amara aenea/cupreolata")),
+       "species-level set must be the merged binomials plus the member-free group")
+assert(sum(merged_ct$individuals) == sum(merge_counts),
+       "total abundance must be unchanged by the species merge")
+assert(merged_ct$individuals[merged_ct$scientificName == "Pterostichus melanarius"] == 7,
+       "subspecies catch must merge into its species")
+harp_grp <- merged_catch$scientificName == "Harpalus pensylvanicus/texanus"
+assert(any(harp_grp) && all(!merged_catch$species_level[harp_grp]),
+       "a species group with a member present must be demoted from species level")
+assert(merged_ct$individuals[merged_ct$scientificName == "Harpalus pensylvanicus/texanus"] == 2,
+       "a demoted species group must still count toward abundance")
+assert(taxon_qa(merged)$species == 3L, "taxon QA must agree with the merged species count")
+assert(identical(species_group_members("Amara cupreolata group"), "Amara cupreolata"),
+       "a 'Genus epithet group' call must resolve to its named member")
+assert(setequal(species_group_members("Harpalus paratus/pensylvanicus"),
+                c("Harpalus paratus", "Harpalus pensylvanicus")),
+       "slash species groups must expand every member epithet")
+
 cat("OK: Ground Beetle effort, zero-catch, taxonomy, detection, QC, and legacy contracts passed.\n")

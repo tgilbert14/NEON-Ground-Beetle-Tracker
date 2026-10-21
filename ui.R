@@ -75,7 +75,7 @@ ground_beetle_poster <- function() {
 
 ui <- bslib::page_fillable(
   theme = app_theme,
-  window_title = "NEON Ground Beetle Tracker",
+  title = "NEON Ground Beetle Tracker", lang = "en",
   fillable = FALSE,
 
   tags$head(
@@ -110,7 +110,13 @@ ui <- bslib::page_fillable(
       "function waveMascot(){try{if(localStorage.getItem('smtMascotSeen')==='1')return;var g=document.querySelector('.splash-guide');if(g){g.classList.add('wave');localStorage.setItem('smtMascotSeen','1');setTimeout(function(){g.classList.remove('wave');},3300);}}catch(e){}}",
       # celebration: a beetle hops up + fades on a legendary find (no confetti in this app — exposed for parity/future use)
       "window.mascotCheer=function(big){try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;var src=document.querySelector('#bootOverlay .mascot')||document.querySelector('.sg-mascot .mascot');if(!src)return;var wrap=document.createElement('div');wrap.className='mascot-cheer';wrap.appendChild(src.cloneNode(true));document.body.appendChild(wrap);setTimeout(function(){if(wrap.parentNode){wrap.parentNode.removeChild(wrap);}},1700);}catch(e){}};",
-      "jQuery(document).one('shiny:idle',function(){hideOv();showWelcome();waveMascot();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
+      # a ?site= deep link goes straight to that site, so it skips the welcome modal
+      "jQuery(document).one('shiny:idle',function(){hideOv();var dl=false;try{dl=new URLSearchParams(window.location.search).has('site');}catch(e){}if(!dl){showWelcome();}waveMascot();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
+      # Close every open Leaflet popup: called before the splash hides on a load and
+      # on every tab switch, because a popup left open on a map that goes to 0 px
+      # starts Leaflet's auto-pan loop (blank map at latitude -85).
+      "window.gbtClosePopups=function(){try{document.querySelectorAll('.leaflet-container').forEach(function(c){try{var w=c.id&&HTMLWidgets.find('#'+c.id);if(w&&w.getMap){w.getMap().closePopup();}}catch(e){}});}catch(e){}};",
+      "jQuery(document).on('hide.bs.tab',function(){window.gbtClosePopups();});",
       "}init();})();")),
     # Robust boot-overlay dismiss — vanilla JS, NO jQuery / shiny:idle dependency, so
     # the "Waking up the Ground Beetle Tracker..." overlay can NEVER stick (the path

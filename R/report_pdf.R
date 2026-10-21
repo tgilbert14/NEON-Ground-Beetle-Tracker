@@ -288,6 +288,11 @@ render_beetle_report <- function(file, d, label, is_demo = FALSE, env = NULL) {
       y <- draw_para(sprintf("Across %d years, %s is %s%s - %s.", ny, metric_txt, dir, pcttxt, ptxt),
         y, 9.5, gapAfter = 0.06)
     }
+    # design-change marker, the printed twin of the dashed lines on the app's trend chart
+    if (2023 %in% tr$year)
+      y <- draw_para(paste("2023 marks NEON's cut from 10 plots to 6 per site; that year's value is",
+        "not directly comparable with earlier years. 2018 marks the change from 4 to 3 traps per plot."),
+        y, 9, PG$muted, gapAfter = 0.06)
   } else y <- draw_para("Fewer than two years in this window - no trend.", y, 9.5, PG$muted)
 
   # environmental driver (if env available)
@@ -313,6 +318,9 @@ render_beetle_report <- function(file, d, label, is_demo = FALSE, env = NULL) {
         top$label, top$r, top$lag, top$n, ptxt), y, 9.5, PG$muted)
     }
   }
-  y <- embed_chart(chart_season(d), y, height_in = 2.9)
+  # fit the closing chart to the room left above the footer (long species lists
+  # plus the trend and driver notes previously pushed it past the page bottom)
+  season_h <- max(1.6, min(2.9, PG$ch - 0.35 - y))
+  y <- embed_chart(chart_season(d), y, height_in = season_h)
   invisible(file)
 }

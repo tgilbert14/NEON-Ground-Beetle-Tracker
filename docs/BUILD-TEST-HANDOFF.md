@@ -47,6 +47,69 @@ measured eligible join/support analysis; it does not qualify the released app or
 its opportunity-complete metric. No Driver artifact byte changed. The July audit
 below is retained as historical starting evidence, not current release state.
 
+## 2026-10-21 MST - suite audit wave 2 items 15, 17, 18 candidate / [Claude]
+
+- **Scope and source:** branch `claude/audit-wave2-beetle-15-17-18` from `main`
+  `5a72edcfdbc5a5761f0f258fade8b727ef877a9b` (after PR #23). Lead on Claude Fable
+  5.1; two bounded Opus 5.5 workers implemented the science and shell halves.
+  Audit source: `neon-audit-2026-10-18` report items 15, 17, 18 plus the shell
+  items 21 (title, lang) and 23 (QC flag keys) for this app.
+- **Item 15, species key:** `clean_beetle()` now keeps `scientificName_verbatim`
+  and collapses species and subspecies names to the binomial with subgenus tags
+  stripped; a species-group call (slash form, or "X y group") counts only when no
+  member species was caught at the site. Lead ruling recorded in
+  `docs/SCIENCE-CONTRACT.md`. `data/precomputed.rds` and `data/search_index.rds`
+  were regenerated with the real builders (search index 2,523 taxon-by-site rows,
+  767 taxa; two local builds byte-identical). No site bundle byte changed.
+- **Before/after species counts (local R 4.5.2, same 46 bundles):**
+
+  | Site | Before | After | Dominant after |
+  |---|---|---|---|
+  | GRSM | 60 | 51 | Carabus goryi 53.7% |
+  | UNDE | 42 | 39 | Pterostichus melanarius 25.2%, introduced |
+  | SRER | 42 | 41 | Discoderus robustus 83.0% |
+
+  Sites inflated: 36 of 46 before, 0 after. UNDE's "dominant species is
+  introduced" flag now fires; ONAQ's dominance warning now fires at 64%.
+- **Item 15, 2023 plot cut:** the four copies that said per-trap-night effort
+  absorbs the 2023 cut from 10 to 6 plots now say it does not; the trend chart and
+  PDF carry design-change markers at 2018 and 2023. The plot-matched estimator is
+  not built (separate HK decision).
+- **Item 15, rank:** the "#N of 46" Biogeography rank and richness-sized dots are
+  removed. The HELD gate stays; the contract records why.
+- **Item 17:** boot default is SRER; ?site= links and the remembered site load;
+  Explore on the pre-selected site loads; a loaded site writes ?site=; all nine
+  verdict banners wrap their text in one span.
+- **Item 18:** `keepInView = FALSE` on both maps; the picker's resize kicks run
+  only when the map has width; open popups close before the splash hides and on
+  every tab switch through a client helper, because `leaflet::clearPopups()` does
+  not remove marker-bound popups (measured: the popup stayed open with it).
+- **Shell:** `title` and `lang = "en"` replace `window_title`; QC flags call
+  `preventDefault()` on Enter and Space. New `scripts/check_shell_contracts.mjs`
+  guards all of the above in CI and the refresh workflow.
+- **Commands and results (PASS unless noted):** R parse of every R file;
+  `node scripts/check_custom_message_handlers.mjs` (4 handlers);
+  `node scripts/check_cover.mjs`; `node scripts/check_shell_contracts.mjs`;
+  `Rscript --vanilla scripts/test_helpers.R` (new merge fixture); offline source
+  of global.R, ui.R and server.R. `scripts/verify_bundle.R`: 46 bundles, 100,163
+  rows, 33,012 anchors, 67,151 catch rows; FAIL only on the expected manifest
+  checksums for 9 changed runtime files. The manifest is not hand-edited; it comes
+  from the PR's pinned CI artifact.
+- **Local browser evidence (localhost, R 4.5.2):** fresh boot lands on the picker
+  with AZ and SRER selected; popup Explore on pre-selected SRER loads it, writes
+  ?site=SRER, closes the popup, 0 map move events, no errors; Biogeography card
+  open then tab switch and back: popup closed, centre latitude 44, zoom 3, 16
+  tiles, 46 markers, 4 move events, no errors; fresh ?site=CPER loads CPER with no
+  welcome modal; remembered HARV and remembered SRER both load; at 375 px every
+  visible banner has 2 children and 0 overflow, no page overflow; Space on a QC
+  flag opens the inspector without a page jump; trend marker labels do not overlap.
+- **Residual risks:** the deployed app is unverified until Tim merges and Connect
+  republishes. Other suite apps still carry `keepInView = TRUE` (a separate suite
+  batch). `CARTO_BASEMAP_KEY` on Connect is an owner dashboard step outside this PR.
+- **Next action:** promote the CI-validated manifest artifact for the exact head,
+  require green CI, Tim merges, then verify the map, deep link and banners on the
+  deployed Connect app in a headless browser.
+
 ## 2026-08-05 21:31 MST - Plotly lifecycle repair production closeout / [Codex]
 
 - **Validated source and promotion:** implementation source

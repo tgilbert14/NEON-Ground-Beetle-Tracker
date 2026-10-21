@@ -51,7 +51,7 @@ mapPickerServer <- function(id, site_table, radius_metric, color_fn, label_fn, p
         vapply(seq_len(nrow(st)), function(i) as.character(popup_fn(st[i, , drop = FALSE])), character(1))
         else NULL
       pop_opts <- if (!is.null(popup_fn)) leaflet::popupOptions(maxWidth = 300, minWidth = 230,
-        autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = TRUE,
+        autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = FALSE,
         closeButton = TRUE, closeOnClick = FALSE, className = "pm-pop-card") else NULL
       leaflet::leaflet(st, options = leaflet::leafletOptions(minZoom = 2, worldCopyJump = TRUE)) %>%
         add_suite_basemap("light_all", noWrap = TRUE) %>%  # keyed CARTO Positron (global.R helper; CARTO watermarks unkeyed tiles)
@@ -69,11 +69,14 @@ mapPickerServer <- function(id, site_table, radius_metric, color_fn, label_fn, p
         # 0-width container, so we FORCE a reflow (dispatch resize) on a few timers,
         # invalidateSize each time, and watch for the container finally getting width
         # via ResizeObserver. Belt-and-suspenders, but reliably fills the map.
+        # Every invalidateSize is guarded on clientWidth > 0: once the splash hides,
+        # the map sits at 0 px, and invalidating it there (with a popup open) starts
+        # Leaflet's auto-pan loop.
         htmlwidgets::onRender("function(el, x) { var m = this;
-          function kick(){ try { window.dispatchEvent(new Event('resize')); m.invalidateSize(); } catch(e){} }
+          function kick(){ try { if (el.clientWidth > 0) { window.dispatchEvent(new Event('resize')); m.invalidateSize(); } } catch(e){} }
           [120, 400, 900, 1800, 3000].forEach(function(t){ setTimeout(kick, t); });
           if (window.ResizeObserver) { var ro = new ResizeObserver(function(){ if (el.clientWidth > 0) m.invalidateSize(); }); ro.observe(el); }
-          window.addEventListener('resize', function(){ m.invalidateSize(); }); }")
+          window.addEventListener('resize', function(){ if (el.clientWidth > 0) m.invalidateSize(); }); }")
     })
     # keep the map bound after the splash hides, so leafletProxy stays valid
     shiny::outputOptions(output, "map", suspendWhenHidden = FALSE)

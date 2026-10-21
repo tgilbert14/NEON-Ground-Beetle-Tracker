@@ -38,14 +38,19 @@ for (s in sites) {
   meta <- neon_sites[neon_sites$site == s, , drop = FALSE]
 
   # one row per (taxon × site): sum individuals, earliest/latest year, rank.
+  # Group on the normalised species key only: after the subspecies/subgenus merge
+  # one binomial can carry several NEON taxonIDs, which must not split it into
+  # two search rows. The first taxonID is kept for reference.
   agg <- catches %>%
-    dplyr::group_by(.data$scientificName, .data$taxonID) %>%
+    dplyr::group_by(.data$scientificName) %>%
     dplyr::summarise(
+      taxonID       = .data$taxonID[1],
       individuals   = sum(.data$individualCount, na.rm = TRUE),
       year_min      = suppressWarnings(min(.data$year, na.rm = TRUE)),
       year_max      = suppressWarnings(max(.data$year, na.rm = TRUE)),
       species_level = any(.data$species_level %in% TRUE),
-      taxonRank     = .data$taxonRank[1],
+      taxonRank     = if (any(.data$taxonRank %in% c("species", "subspecies")))
+                        "species" else .data$taxonRank[1],
       .groups = "drop")
   if (!nrow(agg)) next
   agg$year_min[!is.finite(agg$year_min)] <- NA_integer_

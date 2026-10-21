@@ -25,6 +25,18 @@
 # metrics use only those, while abundance keeps every beetle actually caught.
 # A species-level name is a binomial: "Genus species" (epithet lowercase), and
 # is not a "sp./spp./cf./aff." placeholder nor a family/subfamily/tribe name.
+#
+# Merge rule (species key, 2026-10-21): the flag alone is not enough, because NEON
+# publishes one species under several names. clean_beetle() therefore also
+# normalises the key every downstream table groups on (scientificName):
+#   - species and subspecies names collapse to the bare binomial and subgenus tags
+#     are stripped, so "Pterostichus (Morphnosoma) melanarius melanarius" and
+#     "Pterostichus melanarius" are one species (two non-nominal subspecies of the
+#     same species also merge into one);
+#   - a speciesGroup call ("Harpalus pensylvanicus/texanus") counts as one species
+#     only when no member binomial was caught at the site as species/subspecies;
+#     otherwise its species_level is FALSE and it stays in total abundance only.
+# The published name is kept in scientificName_verbatim; taxonID is unchanged.
 # Ref: NEON ground-beetle design, Hoekman et al. 2017, Ecosphere 8(4):e01744.
 is_species_level <- function(name) {
   n <- trimws(as.character(name))
@@ -41,13 +53,86 @@ is_species_level <- function(name) {
 # Decide, per row, whether an ID is resolved to species. Prefer NEON's authoritative
 # `taxonRank` (the robust discriminator the real bundle now carries from the expert
 # table) and fall back to the scientific-name test when rank is missing (e.g. the
-# demo CSV). Mirrors species_level_only() in the small-mammal app.
+# demo CSV). Mirrors species_level_only() in the small-mammal app. This is the
+# first pass only: normalise_species_keys() then merges subspecies into their
+# species and demotes species-group calls that have a member present at the site.
 resolved_to_species <- function(rank, name) {
   name_ok <- is_species_level(name)
   if (is.null(rank)) return(name_ok)
   rank <- as.character(rank)
   known <- !is.na(rank) & nzchar(rank)
   ifelse(known, rank %in% c("species", "subspecies", "speciesGroup"), name_ok)
+}
+
+# Collapse a species- or subspecies-level name to its bare binomial: drop any
+# subgenus tag "(Morphnosoma)", squish whitespace, and keep "Genus epithet" only,
+# so "Pterostichus (Morphnosoma) melanarius melanarius" -> "Pterostichus melanarius".
+# Names that do not look like a binomial are returned with only the subgenus
+# tag and extra whitespace removed.
+species_binomial <- function(name) {
+  x <- as.character(name)
+  x <- gsub("\\s*\\([^)]*\\)\\s*", " ", x)
+  x <- trimws(gsub("\\s+", " ", x))
+  sub("^([A-Z][a-z]+ [a-z][a-z-]+).*$", "\\1", x)
+}
+
+# Member binomials of a species-group call. NEON writes these as
+# "Genus epithet1/epithet2" (possibly with more members, or with a full binomial
+# after a slash), and occasionally as "Genus epithet group", named after one
+# member; returns the member binomials for ONE name.
+species_group_members <- function(name) {
+  x <- species_binomial_clean(name)
+  if (is.na(x) || !nzchar(x)) return(character(0))
+  # "Amara cupreolata group": a group named after one member species
+  if (!grepl("/", x)) {
+    if (!grepl("\\s(group|complex)$", x, ignore.case = TRUE)) return(character(0))
+    m <- species_binomial(sub("\\s(group|complex)$", "", x, ignore.case = TRUE))
+    return(m[grepl("^[A-Z][a-z]+ [a-z][a-z-]+$", m)])
+  }
+  parts <- trimws(strsplit(x, "/", fixed = TRUE)[[1]])
+  parts <- parts[nzchar(parts)]
+  if (!length(parts)) return(character(0))
+  genus <- sub(" .*$", "", parts[1])
+  out <- vapply(seq_along(parts), function(i) {
+    p <- parts[i]
+    if (i == 1L || grepl(" ", p)) species_binomial(p) else species_binomial(paste(genus, p))
+  }, character(1))
+  unique(out[grepl("^[A-Z][a-z]+ [a-z][a-z-]+$", out)])
+}
+
+# Subgenus/whitespace clean without truncating to the binomial (used before a
+# species-group name is split on "/").
+species_binomial_clean <- function(name) {
+  x <- gsub("\\s*\\([^)]*\\)\\s*", " ", as.character(name))
+  trimws(gsub("\\s+", " ", x))
+}
+
+# Apply the species merge rule to ONE site's cleaned table (clean_beetle()):
+#  1. species/subspecies catch rows (or rank-missing rows that passed the name
+#     test) are renamed to their binomial, so subspecies and subgenus variants
+#     merge into one species;
+#  2. a speciesGroup call stays a countable species only when none of its member
+#     binomials was caught at the site as a species/subspecies; otherwise its
+#     species_level is set FALSE (it still counts toward total abundance).
+# taxonID, scientificName_verbatim and effort rows are left untouched.
+normalise_species_keys <- function(d) {
+  if (is.null(d) || !nrow(d)) return(d)
+  rank <- as.character(d$taxonRank)
+  catch <- d$record_type == "catch" & !is.na(d$scientificName)
+  rank_known <- !is.na(rank) & nzchar(rank)
+  sp_rows <- catch & d$species_level %in% TRUE &
+    ((rank_known & rank %in% c("species", "subspecies")) | !rank_known)
+  sp_rows <- sp_rows %in% TRUE
+  if (any(sp_rows)) d$scientificName[sp_rows] <- species_binomial(d$scientificName[sp_rows])
+  grp_rows <- which((catch & rank_known & rank == "speciesGroup") %in% TRUE)
+  if (length(grp_rows)) {
+    present <- unique(d$scientificName[sp_rows])
+    for (i in grp_rows) {
+      if (any(species_group_members(d$scientificName[i]) %in% present))
+        d$species_level[i] <- FALSE
+    }
+  }
+  d
 }
 
 # Keep only species-level rows (for richness, diversity, ordination, indicators).
@@ -116,6 +201,11 @@ clean_beetle <- function(d) {
   d <- d[(keep_catch | keep_effort) %in% TRUE, , drop = FALSE]
   d$species_level <- resolved_to_species(d$taxonRank, d$scientificName)
   d$species_level[d$record_type == "effort"] <- FALSE
+  # Species key normalisation (see the merge rule in the header above). Keep the
+  # name exactly as NEON published it, then collapse species/subspecies rows to
+  # the bare binomial so one species is never counted under several names.
+  d$scientificName_verbatim <- d$scientificName
+  d <- normalise_species_keys(d)
   d$sampled_opportunity <- d$record_type == "effort"
   d
 }
@@ -515,9 +605,10 @@ beetle_export_codebook <- function() {
     "traps_sampled",          "integer",  "traps",                         "Distinct collected trapID records contributing to this plot x bout effort value.",
     "effort_records",         "integer",  "records",                       "Deduplicated physical field-opportunity records contributing to this plot x bout.",
     "taxonID",                "string",   "",                              "NEON taxon code for the identification.",
-    "scientificName",         "string",   "",                              "Scientific name - expert-taxonomist call where available, otherwise parataxonomist; may be a genus or family for unresolved IDs.",
+    "scientificName",         "string",   "",                              "Scientific name - expert-taxonomist call where available, otherwise parataxonomist; may be a genus or family for unresolved IDs. Species and subspecies names are collapsed to the binomial with subgenus tags removed.",
+    "scientificName_verbatim","string",   "",                              "scientificName exactly as NEON published it, before the subspecies and subgenus merge.",
     "taxonRank",              "string",   "",                              "Taxonomic rank of scientificName (species, genus, family, ...), from NEON's expert table where available.",
-    "species_level",          "boolean",  "TRUE/FALSE",                    "TRUE when resolved to species/subspecies. Richness, diversity, ordination and indicator metrics use TRUE rows only; total abundance uses all rows.",
+    "species_level",          "boolean",  "TRUE/FALSE",                    "TRUE when resolved to species. Subspecies are merged into their species; a species-group call counts only when no member species was caught at the site. Richness, diversity, ordination and indicator metrics use TRUE rows only; total abundance uses all rows.",
     "individualCount",        "integer",  "individuals",                   "Number of individuals on a catch row; zero on an effort anchor and not itself a taxon observation.",
     "trapnights",             "numeric",  "trap-nights",                   "Opportunity-complete plot x bout effort: sum of trappingDays over distinct collected trapID records.",
     "cpn_per_100_trapnights", "numeric",  "individuals / 100 trap-nights", "On catch rows, effort-normalised contribution = 100 x individualCount / trapnights. Empty on effort anchors or missing effort.",
@@ -910,8 +1001,10 @@ resolve_beetle_catches <- function(raw) {
 #  2. reconcile pinned individuals through parataxonomist -> expert individualID,
 #     conserving the residual unpinned sorting count at sorting taxonomy
 #  3. effort: trap-nights per plot × bout from bet_fielddata$daysOfTrapping,
-#     summed over the traps actually set — this absorbs the 2018 trap-count and
-#     2023 plot-count protocol changes, so abundance stays per-trap-night.
+#     summed over the traps actually set. Per-trap-night effort absorbs the 2018
+#     change from 4 to 3 traps per plot. In 2023 NEON cut sampling from 10 plots
+#     to 6, and the plots it kept can catch more or fewer beetles than the old
+#     set, so the 2023 value is not directly comparable with earlier years.
 #
 # Defensive about column names (NEON renames tables occasionally); a maintainer
 # should confirm names once with names(loadByProduct(...)). Used by both the
