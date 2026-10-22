@@ -181,3 +181,25 @@ correct, still descriptive) and **`HOLD`** for any annual activity series that
 includes 2023 until a plot-matched estimator is reviewed. No Driver artifact byte
 changed. Next dependency: an HK-reviewed plot-matched annual estimator, then the
 existing separately reviewed Driver adapter with measured join and support.
+
+## 2026-10-21 22:15 MST - wave 2 production closeout
+
+PR #24 merged exact head `eb9351c` as `9680014e647580a67932988e7ac0bb89560c8172`,
+which is now both the runtime and the data/science authority. Exact-head CI
+`39692994645`, merged-main validation `39726281467`, Pages `39726280935` and
+semantic production `39726281393` passed. A headless Chromium harness confirmed
+the deployed Connect app serves the merged code (stylesheet md5, title and lang)
+and measured the species-key, rank-removal, 2023-verdict and site-picker fixes
+live; the measurements are in `docs/BUILD-TEST-HANDOFF.md`.
+
+Engineering learning for the suite: derived indexes that contain an ordination
+must be built in the pinned runtime. A macOS build of `data/precomputed.rds`
+differed from the pinned Linux build only in PCoA coordinates (at most 2.3e-15),
+which is enough to make a scheduled refresh propose a false data change. CI now
+rebuilds both indexes before its committed-bytes check.
+
+Driver decision for this closeout: **`NONE`** beyond the addendum above, which
+stands (`CONTEXT` for composition and richness, `HOLD` for any annual series that
+includes 2023). No Driver artifact byte changed. Next dependency: record this pass
+in the Driver suite register and implication backlog, then the HK-reviewed
+plot-matched annual estimator.
