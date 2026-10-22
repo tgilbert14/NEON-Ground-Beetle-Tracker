@@ -75,8 +75,7 @@ ground_beetle_poster <- function() {
 
 ui <- bslib::page_fillable(
   theme = app_theme,
-  window_title = "NEON Ground Beetle Tracker",
-  fillable = FALSE,
+  title = "NEON Ground Beetle Tracker", lang = "en",
 
   tags$head(
     tags$meta(name = "ddl-app-ready", content = "ground-beetle-tracker-v1"),
@@ -110,7 +109,13 @@ ui <- bslib::page_fillable(
       "function waveMascot(){try{if(localStorage.getItem('smtMascotSeen')==='1')return;var g=document.querySelector('.splash-guide');if(g){g.classList.add('wave');localStorage.setItem('smtMascotSeen','1');setTimeout(function(){g.classList.remove('wave');},3300);}}catch(e){}}",
       # celebration: a beetle hops up + fades on a legendary find (no confetti in this app — exposed for parity/future use)
       "window.mascotCheer=function(big){try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;var src=document.querySelector('#bootOverlay .mascot')||document.querySelector('.sg-mascot .mascot');if(!src)return;var wrap=document.createElement('div');wrap.className='mascot-cheer';wrap.appendChild(src.cloneNode(true));document.body.appendChild(wrap);setTimeout(function(){if(wrap.parentNode){wrap.parentNode.removeChild(wrap);}},1700);}catch(e){}};",
-      "jQuery(document).one('shiny:idle',function(){hideOv();showWelcome();waveMascot();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
+      # a ?site= deep link goes straight to that site, so it skips the welcome modal
+      "jQuery(document).one('shiny:idle',function(){hideOv();var dl=false;try{dl=new URLSearchParams(window.location.search).has('site');}catch(e){}if(!dl){showWelcome();}waveMascot();});setTimeout(hideOv,20000);",   # fallback: overlay only, no modal on half-rendered app
+      # Close every open Leaflet popup: called before the splash hides on a load and
+      # on every tab switch, because a popup left open on a map that goes to 0 px
+      # starts Leaflet's auto-pan loop (blank map at latitude -85).
+      "window.gbtClosePopups=function(){try{document.querySelectorAll('.leaflet-container').forEach(function(c){try{var w=c.id&&HTMLWidgets.find('#'+c.id);if(w&&w.getMap){w.getMap().closePopup();}}catch(e){}});}catch(e){}};",
+      "jQuery(document).on('hide.bs.tab',function(){window.gbtClosePopups();});",
       "}init();})();")),
     # Robust boot-overlay dismiss — vanilla JS, NO jQuery / shiny:idle dependency, so
     # the "Waking up the Ground Beetle Tracker..." overlay can NEVER stick (the path
@@ -171,16 +176,11 @@ ui <- bslib::page_fillable(
     uiOutput("splash"),
     div(id = "site-picker-start", class = "splash-picker", tabindex = "-1",
       div(class = "splash-map-hint", bs_icon("hand-index-thumb"),
-        " Tap a site to explore it. Dot size is species richness, colour is how many beetles were caught."),
+        " Tap a site to explore it. Dot colour is how many beetles were caught there."),
       mapPickerUI("picker", height = "520px", spinner = DDL$forest),
-      # Legend for BOTH encoded channels: dot size = richness, dot colour = catch.
+      # Legend for the one encoded channel: dot colour = catch. Every dot is the
+      # same size (a richness-sized dot would read as a HELD cross-site ranking).
       div(class = "picker-legend",
-        div(class = "pl-block",
-          div(class = "pl-h", "Dot size"),
-          div(class = "pl-size",
-            tags$span(class = "pl-dot pl-d1"), tags$span(class = "pl-dot pl-d2"),
-            tags$span(class = "pl-dot pl-d3"),
-            tags$span(class = "pl-lab", "fewer \U2192 more species"))),
         div(class = "pl-block",
           div(class = "pl-h", "Dot colour"),
           div(class = "pl-ramp"),
@@ -407,7 +407,7 @@ ui <- bslib::page_fillable(
         div(class = "tab-head",
           div(class = "tab-head-text",
             h4("Carabid richness across NEON"),
-            p("Each marker is a NEON site with beetle data. With no species picked, markers size by total richness; choose a species to map its range, sized by local abundance. Tap a site to load it.")),
+            p("Each marker is a NEON site with beetle data. With no species picked every site gets the same dot; choose a species to map its range, sized by local abundance. Tap a site to load it.")),
           div(class = "map-controls",
             selectInput("rangeSpecies", tagList(bs_icon("search"), " Map a species' range"),
                         choices = NULL, width = "280px"))),
@@ -432,7 +432,9 @@ ui <- bslib::page_fillable(
               p("High on both = a genuine signature of that place. Computed across all bundled sites; samples are plot × year."))),
           spin(DT::DTOutput("indicatorTable"))),
         card(card_head("table", "Site comparison"),
-             spin(DT::DTOutput("siteTable")))
+             spin(DT::DTOutput("siteTable")),
+             p(class = "qa-cite", style = "margin:6px 0 0; font-size:12px;",
+               "Observed totals. Sites differ in habitat, years sampled and trapping effort, so these counts are not a ranking."))
       ),
 
       nav_panel(

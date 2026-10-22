@@ -76,16 +76,11 @@ body {
   box-shadow: 0 4px 16px rgba(19,99,43,.10); }
 .map-picker-wrap .leaflet-container { background: var(--paper); }
 
-/* picker map legend — size = richness, colour = catch (matches the leaflet dots) */
+/* picker map legend: colour = catch (matches the leaflet dots; every dot is one size) */
 .picker-legend { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center;
   margin: 10px 0 2px; font-size: 12px; color: var(--muted); }
 .picker-legend .pl-h { font-weight: 600; color: var(--ink); margin-bottom: 4px; font-size: 11.5px;
   text-transform: uppercase; letter-spacing: .03em; }
-.pl-size { display: flex; align-items: center; gap: 7px; }
-.pl-dot { display: inline-block; border-radius: 50%; background: #2f9e55;
-  border: 1.4px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
-.pl-d1 { width: 8px; height: 8px; } .pl-d2 { width: 13px; height: 13px; } .pl-d3 { width: 19px; height: 19px; }
-.pl-lab { margin-left: 6px; }
 .pl-ramp { width: 150px; height: 11px; border-radius: 6px;
   background: linear-gradient(90deg, #d6f3e4, #36d98a, #1f8a5a); }
 .pl-ramp-labs { display: flex; justify-content: space-between; margin-top: 3px; }
@@ -203,6 +198,8 @@ body {
 .trend-verdict { display: flex; gap: 9px; align-items: flex-start; border-radius: 10px;
   padding: 11px 14px; margin: 0 0 14px; font-size: 14px; line-height: 1.5; border: 1px solid; }
 .trend-verdict .bi { margin-top: 2px; flex: none; font-size: 18px; }
+/* one text child beside the icon so inline markup wraps as prose, not flex items */
+.verdict-text { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
 .trend-up   { background: #eef6f0; border-color: #cfe6d6; color: #21503a; }
 .trend-up .bi   { color: var(--forest); }
 .trend-down { background: #fbeef0; border-color: #f0cdd4; color: #7a1020; }

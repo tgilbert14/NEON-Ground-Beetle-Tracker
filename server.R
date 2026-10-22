@@ -58,10 +58,12 @@ function(input, output, session) {
 
   # ---- cascading state -> site picker ------------------------------------
   .states <- state_choices()
-  # Open on the richest site so the first thing a user sees is real data — not an
-  # arbitrary "Kansas" default, and not an empty splash. The site-change auto-load
+  # SRER (Santa Rita Experimental Range, Arizona desert) is the suite's settled demo
+  # site, so every NEON app opens its pickers on the same place. Fall back to the
+  # richest bundled site only when SRER is not bundled. The site-change auto-load
   # (below) then drives every subsequent pick.
-  .firstSite <- if (!is.null(SITE_INDEX) && nrow(SITE_INDEX))
+  .firstSite <- if ("SRER" %in% available_sites()) "SRER"
+                else if (!is.null(SITE_INDEX) && nrow(SITE_INDEX))
                   SITE_INDEX$site[which.max(SITE_INDEX$richness)] else NULL
   .firstState <- if (!is.null(.firstSite)) neon_sites$state[neon_sites$site == .firstSite][1]
                  else unname(.states)[1]
@@ -69,9 +71,11 @@ function(input, output, session) {
   updateSelectInput(session, "stateSel", choices = .states, selected = .firstState)
   observeEvent(input$stateSel, {
     sites <- sites_in_state(input$stateSel)
-    sel <- if (!is.null(rv$pendingSite) && rv$pendingSite %in% sites) rv$pendingSite
-           else if (length(sites)) sites[[1]] else NULL
-    rv$pendingSite <- NULL
+    # Consume the pending site only on the firing whose state actually holds it, so
+    # an early firing for another state cannot drop the boot or restore target.
+    if (!is.null(rv$pendingSite) && rv$pendingSite %in% sites) {
+      sel <- rv$pendingSite; rv$pendingSite <- NULL
+    } else sel <- if (length(sites)) sites[[1]] else NULL
     updateSelectInput(session, "site", choices = sites, selected = sel)
   }, ignoreNULL = TRUE)
 
@@ -173,7 +177,14 @@ function(input, output, session) {
     updateSelectInput(session, "envLayer", choices = ch, selected = if (sel0 %in% ch) sel0 else "none")
     updateSliderInput(session, "envLag", value = lag0)
     prog$set(value = 1, detail = "done")
+    # Close any open site popup before its map goes to 0 px: a popup left open on a
+    # hidden Leaflet map starts an auto-pan loop. The leaflet proxy cannot do
+    # this (it removes only addPopups() layers, not marker-bound popups), so the
+    # client helper gbtClosePopups() (ui.R) calls closePopup() on every map.
+    shinyjs::runjs("if(window.gbtClosePopups){window.gbtClosePopups();}")
     shinyjs::show("mainTabsWrap"); shinyjs::show("loadedHero"); shinyjs::hide("splash"); shinyjs::hide("splashHome")
+    updateQueryString(paste0("?site=", site), mode = "replace", session = session)  # shareable URL
+    rv$restoreReq <- NULL   # a restore is fulfilled; a later manual pick is unaffected
     session$sendCustomMessage("gbt_remember", site)   # persist last site for next visit
     session$sendCustomMessage("beetleSite", list(site = site))  # name the site in pin-export filenames
   }
@@ -185,8 +196,14 @@ function(input, output, session) {
   # Skip the ONE boot-time auto-load so a new visitor lands on the national picker
   # map (the flagship front door, on par with the Small Mammal Tracker); every later
   # pick — dropdown change, map tap, or the remembered-site restore — loads normally.
+  # The skip applies only to the boot default: if a deep link or remembered-site
+  # restore (rv$restoreReq) lands first, the first input$site change IS that request
+  # and loads, whichever message arrives first.
   observeEvent(input$site, {
-    if (!isTRUE(rv$siteReady)) { rv$siteReady <- TRUE; return(invisible()) }
+    if (!isTRUE(rv$siteReady)) {
+      rv$siteReady <- TRUE
+      if (!identical(input$site, rv$restoreReq)) return(invisible())
+    }
     load_site(input$site, snap = TRUE)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
@@ -259,7 +276,9 @@ function(input, output, session) {
   }
 
   # ---- splash national PICKER map (the flagship front door) ----------------
-  # size = species richness, colour = total individuals (forest sequential ramp).
+  # Every dot is the same size (radius_metric = NULL): sizing by richness would read
+  # as a cross-site ranking, which the science contract keeps HELD. Colour = total
+  # individuals caught (forest sequential ramp).
   # Tapping a marker opens the Explore | About choice popup; the load comes from
   # the popup's Explore button (input$siteExplore), which runs the SAME cascade as
   # the dropdowns — no race, dropdowns and charts can't disagree.
@@ -267,8 +286,7 @@ function(input, output, session) {
     st <- picker_site_table
     if (!is.null(st) && nrow(st)) {
       # Colour = total individuals, a heavy-tailed count one outlier (STER ~24.8k)
-      # washes out under a raw-linear ramp. Match the colour channel to the dot's
-      # log1p RADIUS channel: ramp over log1p(individuals) clamped to robust p5/p95
+      # washes out under a raw-linear ramp. Ramp over log1p(individuals) clamped to robust p5/p95
       # so the bulk of sites spread across the full ramp and the single giant pins
       # to the dark end instead of flattening everyone else to pale green.
       iv  <- suppressWarnings(as.numeric(st$individuals)); iv[!is.finite(iv)] <- 0
@@ -278,7 +296,7 @@ function(input, output, session) {
       pal <- leaflet::colorNumeric(c("#d6f3e4", "#36d98a", "#1f8a5a"),
                                    domain = dom, na.color = "#c9d3bb")
       pal_clamp <- function(x) pal(pmin(pmax(log1p(pmax(0, x)), dom[1]), dom[2]))
-      mapPickerServer("picker", site_table = st, radius_metric = "richness",
+      mapPickerServer("picker", site_table = st, radius_metric = NULL,
         color_fn = function(s) pal_clamp(ifelse(is.finite(s$individuals), s$individuals, 0)),
         label_fn = function(r) sprintf(
           "<b>%s</b> · %s, %s<br><b>%s</b> species · <b>%s</b> individuals<br>dominant: <i>%s</i>%s",
@@ -299,7 +317,10 @@ function(input, output, session) {
     # land on the Overview no matter which tab the jump came from (e.g. Search),
     # so "Go to this site" always shows the site's single-site profile.
     nav_select("tabs", "overview", session = session)
-    if (identical(input$stateSel, m$state)) updateSelectInput(session, "site", selected = s)
+    # Same site already selected: updateSelectInput with an unchanged value fires
+    # nothing, so load it directly.
+    if (identical(input$site, s)) load_site(s, snap = TRUE)
+    else if (identical(input$stateSel, m$state)) updateSelectInput(session, "site", selected = s)
     else { rv$pendingSite <- s; updateSelectInput(session, "stateSel", selected = m$state) }
   })
   # "About this site" -> instant info card (no bundle load)
@@ -309,9 +330,11 @@ function(input, output, session) {
   observeEvent(input$restore_site, {
     s <- input$restore_site
     if (is.null(s) || !(s %in% available_sites())) return()
+    rv$restoreReq <- s   # lets the one-shot boot skip on input$site pass this request
     m <- neon_sites[neon_sites$site == s, ]
     if (!nrow(m)) return()
-    if (identical(input$stateSel, m$state))
+    if (identical(input$site, s)) load_site(s, snap = TRUE)        # already selected: nothing would fire
+    else if (identical(input$stateSel, m$state))
       updateSelectInput(session, "site", selected = s)            # same state → triggers auto-load
     else {
       rv$pendingSite <- s
@@ -473,6 +496,7 @@ function(input, output, session) {
       effort_records         = d$effort_records,
       taxonID                = d$taxonID,
       scientificName         = d$scientificName,
+      scientificName_verbatim = d$scientificName_verbatim %||% d$scientificName,
       taxonRank              = d$taxonRank,
       species_level          = d$species_level,
       individualCount        = d$individualCount,
@@ -539,8 +563,13 @@ function(input, output, session) {
         "------------",
         "- Effort anchors come from distinct bet_fielddata trapID records with sampleCollected=Y,",
         "  including sampled plot x bouts with zero Carabidae; they are never taxon observations.",
-        "- Effort-normalised catch uses all valid attempted trap-nights, absorbing NEON's 2018",
-        "  trap-count and 2023 plot-count protocol changes without conditioning on positive catch.",
+        "- Effort-normalised catch uses all valid attempted trap-nights, without conditioning",
+        "  on positive catch. Per-trap-night effort absorbs the 2018 change from 4 to 3 traps",
+        "  per plot. In 2023 NEON cut sampling from 10 plots to 6, and the plots it kept can",
+        "  catch more or fewer beetles than the old set, so the 2023 value is not directly",
+        "  comparable with earlier years.",
+        "- scientificName collapses subspecies and subgenus variants to the binomial; the",
+        "  published name is kept in scientificName_verbatim.",
         "- scientificName reconciles parataxonomist IDs with authoritative expert IDs;",
         "  species_level flags binomial resolution (Hoekman et al. 2017, Ecosphere 8(4):e01744).",
         "- Richness / diversity / ordination / indicators use species_level == TRUE only;",
@@ -580,7 +609,7 @@ function(input, output, session) {
           class = paste0("qc-flag qc-flag-", f$level, " qc-flag-click"),
           role = "button", tabindex = "0",
           onclick = sprintf("Shiny.setInputValue('beetleQcInspect','%s',{priority:'event'})", f$key),
-          onkeydown = sprintf("if(event.key==='Enter'||event.key===' '){Shiny.setInputValue('beetleQcInspect','%s',{priority:'event'});}", f$key),
+          onkeydown = sprintf("if(event.key==='Enter'||event.key===' '){event.preventDefault();Shiny.setInputValue('beetleQcInspect','%s',{priority:'event'});}", f$key),
           bs_icon(qc_icon(f$level)),
           div(class = "qcf-body",
             div(class = "qcf-title", f$title, tags$span(class = "qcf-n", f$n)),
@@ -769,11 +798,12 @@ function(input, output, session) {
     share <- round(100 * top$individuals / sum(sp$individuals))
     cls <- if (share >= 50) "trend-flat" else "trend-up"   # one species dominating = amber, not "good"
     div(class = paste("trend-verdict", cls), bs_icon("bar-chart-line-fill"),
-      HTML(sprintf(" <b>%d</b> carabid species identified here. Most abundant: <b><i>%s</i></b>, <b>%d%%</b> of named individuals (%s per 100 trap-nights).",
-        nrow(sp), top$scientificName, share, top$cpn)),
-      # When the #1 species is an introduced European carabid, a clickable marker so
-      # "most abundant" isn't read as intact native fauna (the caveat is behind the dot).
-      if (is_introduced(top$scientificName)) introduced_marker(top$scientificName) else NULL)
+      span(class = "verdict-text",
+        HTML(sprintf(" <b>%d</b> carabid species identified here. Most abundant: <b><i>%s</i></b>, <b>%d%%</b> of named individuals (%s per 100 trap-nights).",
+          nrow(sp), top$scientificName, share, top$cpn)),
+        # When the #1 species is an introduced European carabid, a clickable marker so
+        # "most abundant" isn't read as intact native fauna (the caveat is behind the dot).
+        if (is_introduced(top$scientificName)) introduced_marker(top$scientificName) else NULL))
   })
 
   output$commBar <- renderPlotly({
@@ -925,12 +955,13 @@ function(input, output, session) {
     qa <- attr(ct_rx(), "qa")
     if (is.null(qa) || qa$higher_taxa == 0)
       return(div(class = "qa-note qa-clean", bs_icon("patch-check-fill"),
-        HTML(sprintf(" All %d taxa here are identified to species, so richness counts are clean.", qa$species %||% 0))))
-    div(class = "qa-note qa-flag", bs_icon("funnel-fill"),
-      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d record-type%s identified only to genus/family (%s individuals, %.1f%% of the catch) are <b>excluded from richness, diversity and ordination</b> (they'd otherwise inflate the species count) but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
+        span(class = "verdict-text",
+          HTML(sprintf(" All %d taxa here are identified to species, so richness counts are clean.", qa$species %||% 0)))))
+    div(class = "qa-note qa-flag", bs_icon("funnel-fill"), span(class = "verdict-text",
+      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d name%s not resolved to a single species (genus or family IDs, or a species-group call whose member species is already counted) cover %s individuals, %.1f%% of the catch. They are <b>excluded from richness, diversity and ordination</b> (they'd otherwise inflate the species count) but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
         qa$species, fmt_int(qa$ind_total - qa$ind_higher),
         qa$higher_taxa, if (qa$higher_taxa == 1) "" else "s",
-        fmt_int(qa$ind_higher), qa$pct_ind_higher)))
+        fmt_int(qa$ind_higher), qa$pct_ind_higher))))
   })
 
   output$hillPlot <- renderPlotly({
@@ -996,9 +1027,9 @@ function(input, output, session) {
                  else "a community dominated by a few species"
     cls <- if (is.na(hn$even) || hn$even < 0.35) "trend-flat"
            else if (hn$even >= 0.6) "trend-up" else "trend-info"
-    div(class = paste("trend-verdict", cls), bs_icon("diagram-3-fill"),
+    div(class = paste("trend-verdict", cls), bs_icon("diagram-3-fill"), span(class = "verdict-text",
       HTML(sprintf(" <b>%d</b> beetle species here: q1 = <b>%.1f</b> common, q2 = <b>%.1f</b> dominant, %s.",
-        as.integer(hn$q0), hn$q1, hn$q2, even_word)))
+        as.integer(hn$q0), hn$q1, hn$q2, even_word))))
   })
 
   output$rarePlot <- renderPlotly({
@@ -1046,33 +1077,51 @@ function(input, output, session) {
     if (is.null(t) || nrow(t) < 2) return(NULL)
     slope <- attr(t, "slope"); p <- attr(t, "p"); pct <- attr(t, "pct_per_yr")
     if (is.null(slope) || is.null(p) || !is.finite(slope)) {
-      return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"),
-        HTML(sprintf(" Only %d years of data, too few to fit a trend yet.", nrow(t)))))
+      return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"), span(class = "verdict-text",
+        HTML(sprintf(" Only %d years of data, too few to fit a trend yet.", nrow(t))))))
     }
     # Under ~5 years a regression p-value is noise — show the apparent direction
     # but don't dress it up with a decimal the info-popover itself says to ignore.
     if (nrow(t) < 5) {
       appdir <- if (slope > 0) "an apparent rise" else if (slope < 0) "an apparent decline" else "little change"
       pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (~%+.0f%%/yr)", pct) else ""
-      return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"),
+      return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"), span(class = "verdict-text",
         HTML(sprintf(" Over %d years, catch-per-effort shows <b>%s</b>%s, but %d years is too few to test reliably; read the direction, not the decimal.%s",
           nrow(t), appdir, pcttxt, nrow(t),
-          if (identical(attr(t, "metric_kind"), "count")) " <i>(raw counts, no effort data)</i>" else ""))))
+          if (identical(attr(t, "metric_kind"), "count")) " <i>(raw counts, no effort data)</i>" else "")))))
     }
-    sig <- is.finite(p) && p < 0.05
-    dir <- if (!sig) "flat" else if (slope > 0) "up" else "down"
-    word <- switch(dir, up = "rising", down = "declining", flat = "roughly flat")
+    tc <- trend_call(t)
+    clear <- isTRUE(tc$clear)
+    dir <- if (!clear) "flat" else if (slope > 0) "up" else "down"
     icon <- switch(dir, up = "arrow-up-right-circle-fill",
                    down = "arrow-down-right-circle-fill", flat = "dash-circle")
     pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (~%+.0f%%/yr)", pct) else ""
-    sigtxt <- if (sig) sprintf("statistically clear (p = %.3f)", p)
-              else if (is.finite(p)) sprintf("not statistically distinguishable from no change (p = %.2f)", p)
-              else "not statistically distinguishable from no change"
-    div(class = paste("trend-verdict", paste0("trend-", dir)), bs_icon(icon),
-      HTML(sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s, %s. %s",
-        nrow(t), word, pcttxt, sigtxt,
-        if (identical(attr(t, "metric_kind"), "count"))
-          "<i>(raw counts; this bundle has no effort data)</i>" else "")))
+    raw_txt <- if (identical(attr(t, "metric_kind"), "count"))
+      " <i>(raw counts; this bundle has no effort data)</i>" else ""
+    # A trend is "statistically clear" only if it also holds without the 2023
+    # design-break value (trend_call(), shared with the PDF report).
+    body <- if (clear) {
+      sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s, statistically clear (%s).",
+        nrow(t), if (slope > 0) "rising" else "declining", pcttxt, fmt_p(p))
+    } else if (isTRUE(tc$rests_on_2023)) {
+      extxt <- if (!is.na(tc$n_ex2023) && tc$n_ex2023 >= 5 && is.finite(tc$p_ex2023))
+        sprintf("without 2023 it is not statistically clear (%s)", fmt_p(tc$p_ex2023, 2))
+        else "without 2023 there are too few years to test"
+      sprintf(" Over %d years, catch-per-effort shows <b>an apparent %s</b> (%s%s), but it rests on the 2023 value: %s.",
+        nrow(t), if (slope > 0) "rise" else "decline",
+        if (is.finite(pct) && abs(pct) <= 40) sprintf("~%+.0f%%/yr, ", pct) else "", fmt_p(p), extxt)
+    } else {
+      sigtxt <- if (is.finite(p)) sprintf("not statistically distinguishable from no change (%s)", fmt_p(p, 2))
+                else "not statistically distinguishable from no change"
+      paste0(sprintf(" Over %d years, catch-per-effort is <b>roughly flat</b>%s, %s.", nrow(t), pcttxt, sigtxt),
+        if (isTRUE(tc$masked_by_2023))
+          sprintf(" Without the 2023 value the series reads as %s (%s).",
+            if (tc$slope_ex2023 > 0) "rising" else "declining", fmt_p(tc$p_ex2023)) else "")
+    }
+    if (isTRUE(tc$has2023))
+      body <- paste0(body, " 2023 follows NEON's cut from 10 plots to 6 per site, so that year is not directly comparable with earlier years.")
+    div(class = paste("trend-verdict", paste0("trend-", dir)), bs_icon(icon), span(class = "verdict-text",
+      HTML(paste0(body, raw_txt))))
   })
 
   output$trendPlot <- renderPlotly({
@@ -1093,9 +1142,38 @@ function(input, output, session) {
         line = list(color = "#e0b43a", width = 2, dash = "dash"),
         hoverinfo = "skip", inherit = FALSE)
     }
-    plotly_theme(p) %>% plotly::layout(
+    # NEON design-change markers: dashed verticals at 2018 (4 to 3 traps per plot)
+    # and 2023 (10 to 6 plots per site) when they fall inside the plotted years.
+    # Per-trap-night effort absorbs the 2018 change; the 2023 plot cut changes
+    # which plots are sampled, so values either side are not directly comparable.
+    design_changes <- c(`2018` = "2018: 4 to 3 traps per plot",
+                        `2023` = "2023: 10 to 6 plots per site")
+    yr_rng <- range(t$year, na.rm = TRUE)
+    dc_yrs <- as.numeric(names(design_changes))
+    dc_in <- dc_yrs >= yr_rng[1] & dc_yrs <= yr_rng[2]
+    p <- plotly_theme(p) %>% plotly::layout(
       xaxis = list(title = "", dtick = 1),
       yaxis = list(title = ytitle, rangemode = "tozero"))
+    if (any(dc_in)) {
+      dc_shapes <- lapply(dc_yrs[dc_in], function(x) list(
+        type = "line", xref = "x", yref = "paper", x0 = x, x1 = x, y0 = 0, y1 = 1,
+        line = list(color = "rgba(140,140,140,0.75)", width = 1.5, dash = "dash")))
+      # short labels, each to the left of its line and at its own height so the
+      # two never collide on a phone; the full wording is on hover.
+      dc_short <- c(`2018` = "4 to 3 traps", `2023` = "10 to 6 plots")
+      dc_notes <- lapply(which(dc_in), function(i) list(
+        x = dc_yrs[i], xref = "x", y = if (i == 1L) 1 else 1.07, yref = "paper",
+        yanchor = "bottom", xanchor = "right", xshift = -3,
+        text = dc_short[[i]], hovertext = design_changes[[i]], showarrow = FALSE,
+        font = list(size = 10, color = "rgba(140,140,140,1)")))
+      # Append to whatever shapes/annotations the built figure already carries.
+      # A second layout(shapes = ...) call does not reliably replace or extend an
+      # earlier one, so merge on the built object instead.
+      p <- plotly::plotly_build(p)
+      p$x$layout$shapes <- c(p$x$layout$shapes %||% list(), dc_shapes)
+      p$x$layout$annotations <- c(p$x$layout$annotations %||% list(), dc_notes)
+    }
+    p
   })
 
   # ---- Seasonality --------------------------------------------------------
@@ -1496,9 +1574,9 @@ function(input, output, session) {
     peak <- s$mon[which.max(s$cpn)]
     act <- sort(s$mon[s$cpn >= 0.2 * max(s$cpn, na.rm = TRUE)])
     win <- if (length(act) >= 2) sprintf("%s–%s", month.abb[min(act)], month.abb[max(act)]) else month.abb[peak]
-    div(class = "trend-verdict trend-info", bs_icon("calendar-heart"),
+    div(class = "trend-verdict trend-info", bs_icon("calendar-heart"), span(class = "verdict-text",
       HTML(sprintf(" Activity peaks in <b>%s</b>; the warm-season window runs <b>%s</b>.",
-        month.abb[peak], win)))
+        month.abb[peak], win))))
   })
 
   # ---- Search the network -------------------------------------------------
@@ -1607,7 +1685,7 @@ function(input, output, session) {
 
   # ---- Biogeography -------------------------------------------------------
   updateSelectInput(session, "rangeSpecies",
-                    choices = c("All species (richness)" = "", species_choices()))
+                    choices = c("All sites" = "", species_choices()))
 
   # "answer up front" banner for Biogeography — where this site sits nationally
   output$biogeoVerdict <- renderUI({
@@ -1616,13 +1694,17 @@ function(input, output, session) {
     if (is.null(si) || !nrow(si)) return(NULL)
     row <- si[si$site == input$site, , drop = FALSE]
     if (!nrow(row) || is.na(row$richness[1])) return(NULL)
-    M <- nrow(si); r <- row$richness[1]
-    rank <- sum(si$richness > r, na.rm = TRUE) + 1L
-    pct <- rank / M
-    cls <- if (pct <= 0.34) "trend-up" else if (pct >= 0.67) "trend-flat" else "trend-info"
-    div(class = paste("trend-verdict", cls), bs_icon("geo-alt-fill"),
-      HTML(sprintf(" <b>%s</b> ranks <b>#%d of %d</b> NEON sites for carabid richness, with <b>%d</b> species recorded across all years.",
-        row$name[1], rank, M, as.integer(r))))
+    # No cross-site rank: raw richness depends on habitat, years sampled and
+    # trapping effort, so a "#N of 46" ordering would not be a fair comparison.
+    r <- row$richness[1]
+    ind <- if ("individuals_species" %in% names(row)) row$individuals_species[1] else NA
+    yrs <- if ("years" %in% names(row)) row$years[1] else NA
+    from_clause <- if (!is.na(ind)) sprintf(" from %s identified beetles", fmt_int(ind)) else ""
+    yrs_clause  <- if (!is.na(yrs)) sprintf(" over %d sampled years", as.integer(yrs)) else ""
+    div(class = "trend-verdict trend-info", bs_icon("geo-alt-fill"),
+      span(class = "verdict-text", HTML(sprintf(
+        "<b>%s</b>: <b>%d</b> species%s%s. Sites differ in habitat, years sampled and trapping effort, so this count is not a ranking.",
+        row$name[1], as.integer(r), from_clause, yrs_clause))))
   })
 
   output$map <- renderLeaflet({
@@ -1652,13 +1734,19 @@ function(input, output, session) {
     bio_pops <- vapply(seq_len(nrow(si)),
       function(i) as.character(site_popup_html(si[i, , drop = FALSE])), character(1))
     m <- base %>% addCircleMarkers(data = si, lng = ~lng, lat = ~lat, layerId = ~site,
-        radius = ~pmax(12, sqrt(richness) * 4), color = ~unname(pal[source]),
+        # fixed size: sizing dots by raw richness implied a cross-site ranking
+        # that differing habitat, years and effort do not support.
+        radius = 11, color = ~unname(pal[source]),
         fillOpacity = 0.7, stroke = TRUE, weight = 1.5,
         popup = bio_pops, popupOptions = popupOptions(maxWidth = 300, minWidth = 230,
-          autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = TRUE,
+          autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = FALSE,
           closeButton = TRUE, closeOnClick = FALSE, className = "pm-pop-card"),
-        label = ~lapply(sprintf("<b>%s</b> · %s<br>%d species · %s individuals<br>dominant: <i>%s</i>%s",
-          site, name, richness, fmt_int(individuals), dominant,
+        label = ~lapply(sprintf("<b>%s</b> · %s<br>%d species · %s individuals%s<br>dominant: <i>%s</i>%s",
+          site, name, richness, fmt_int(individuals),
+          if ("years" %in% names(si))
+            ifelse(is.na(years), "", sprintf("<br>%d years sampled", as.integer(years)))
+          else "",
+          dominant,
           ifelse(source == "demo", "<br><b>demo data</b>", "")), htmltools::HTML))
     cur <- isolate(rv$siteCode)   # ring the loaded site so the map ↔ single-site view connect
     if (!is.null(cur)) {
@@ -1717,10 +1805,11 @@ function(input, output, session) {
 
   output$siteTable <- DT::renderDT({
     si <- SITE_INDEX; if (is.null(si)) return(NULL)
-    tab <- si[order(-si$richness), c("site", "name", "state", "richness", "individuals", "dominant", "source")]
+    # Default order is state then site, not richness: cross-site rankings are HELD.
+    tab <- si[order(si$state, si$site), c("site", "name", "state", "richness", "individuals", "dominant", "source")]
     names(tab) <- c("Site", "Name", "State", "Species", "Individuals", "Dominant species", "Source")
     DT::datatable(tab, rownames = FALSE, selection = "none",
-                  options = list(pageLength = 10, dom = "tp", scrollX = TRUE)) %>%
+                  options = list(pageLength = 10, dom = "tp", scrollX = TRUE, order = list())) %>%
       DT::formatCurrency("Individuals", currency = "", interval = 3, mark = ",", digits = 0)
   })
 
@@ -1767,8 +1856,8 @@ function(input, output, session) {
                 " still counts every beetle trapped. The Diversity tab shows exactly how many records this excludes."),
         tags$li(tags$b("How current is this?"), " NEON publishes ground-beetle records after the specimens are sorted and an expert taxonomist confirms the IDs, so the most recent year or two of trapping is usually not in the data yet. The latest season you see here lags real time by about two years. A site looking quiet at the end of its record often just means those bouts have not been published, not that the beetles vanished."),
         tags$li("Hill numbers (Hill 1973; Jost 2006); Hurlbert (1971) rarefaction; Gotelli & Colwell (2001) accumulation; Dufrêne & Legendre (1997) indicator value; NEON ground-beetle sampling design (Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744)."),
-        tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs"),
-                " and normalise the 2018 trap-count and 2023 plot-count protocol changes via per-trap-night effort."),
+        tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs", .noWS = "after"),
+                ". Per-trap-night effort absorbs the 2018 change from 4 to 3 traps per plot. In 2023 NEON cut sampling from 10 plots to 6, and the plots it kept can catch more or fewer beetles than the old set, so the 2023 value is not directly comparable with earlier years."),
         tags$li(tags$b("Download the data."), " The ", tags$b("Data + codebook"),
                 " button exports the loaded site as a tidy one-row-per-plot×bout×species table, bundled with a column ",
                 tags$b("codebook"), " and a provenance README so it loads straight into R/pandas and documents itself.")),
@@ -1814,7 +1903,7 @@ function(input, output, session) {
       div(class = "about",
         h4("How the numbers are built"),
         tags$ul(
-          tags$li(tags$b("Effort-normalised catch."), " Counts are expressed as catch per 100 trap-nights. Effort is resolved from distinct collected trapID records before taxon catches are joined, so sampled zero-carabid bouts stay in the denominator. This absorbs NEON's protocol changes (4 to 3 traps per plot in 2018; 10 to 6 plots per site in 2023) without conditioning on positive catch."),
+          tags$li(tags$b("Effort-normalised catch."), " Counts are expressed as catch per 100 trap-nights. Effort is resolved from distinct collected trapID records before taxon catches are joined, so sampled zero-carabid bouts stay in the denominator. Per-trap-night effort absorbs the 2018 change from 4 to 3 traps per plot. In 2023 NEON cut sampling from 10 plots to 6, and the plots it kept can catch more or fewer beetles than the old set, so the 2023 value is not directly comparable with earlier years."),
           tags$li(tags$b("Species vs. higher taxa."), " Not every beetle is named to species. Records left at genus or family are kept in total abundance but excluded from every richness-type metric, so they can't inflate diversity. The split is driven by NEON's expert-taxonomist rank where present."),
           tags$li(tags$b("Diversity."), " Hill numbers (Hill 1973; Jost 2006); individual-based rarefaction with an approximate analytic SD (Hurlbert 1971; Heck et al. 1975); sample-based accumulation averaged over random bout orders (Gotelli & Colwell 2001)."),
           tags$li(tags$b("Biogeography."), " A Bray-Curtis PCoA places each site x year community, coloured by biome; indicator species use the Dufrene-Legendre IndVal (1997)."),

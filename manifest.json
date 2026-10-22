@@ -3248,10 +3248,10 @@
       "checksum": "09eaf8b677d24ddcc48b6fa0e23e6040"
     },
     "data/precomputed.rds": {
-      "checksum": "64f367acf2c69c161365c384a127eb0f"
+      "checksum": "2751c4e7ccaa667576484601780b11fd"
     },
     "data/search_index.rds": {
-      "checksum": "27c2c412ad0546971103b1de603b60c4"
+      "checksum": "aef70f713229a45c4536f02352d1698a"
     },
     "data/sites/ABBY.rds": {
       "checksum": "a1c6dab3ea9a0c832ebc11b0a6bf2de1"
@@ -3392,16 +3392,16 @@
       "checksum": "16d8f0cc826b436eac0cf2f6d479ec78"
     },
     "global.R": {
-      "checksum": "be4690dca6dd923f545e341cf0292961"
+      "checksum": "25446f8b5de8f2fdb2da5527fb1f3e61"
     },
     "R/helpers.R": {
-      "checksum": "808b9d36ad3cd6a3c63d3a45cc720dd6"
+      "checksum": "e25eb10497735e6f999457d79907ea6f"
     },
     "R/map_picker.R": {
-      "checksum": "ee740da8cbb84663e1d8fb5e67c4e56c"
+      "checksum": "898c4ede149a0ca0f4d8bf226b883657"
     },
     "R/report_pdf.R": {
-      "checksum": "125437db180a8335d8b63983f8263b1a"
+      "checksum": "5ae6bfdf7a75490eb9de4d27dbafda47"
     },
     "R/seasonal_env.R": {
       "checksum": "dac63e6aa78b665e297bfc608b7e86b0"
@@ -3410,10 +3410,10 @@
       "checksum": "78f85ef17669abcf1d86cda178609c7b"
     },
     "server.R": {
-      "checksum": "f22402425b0f5541f9942c9a1b5f27bf"
+      "checksum": "6cf6466dc621ac9a7f117fe8ba8f7a89"
     },
     "ui.R": {
-      "checksum": "9281ef451428219b3f379866c0e34c3e"
+      "checksum": "7df7f7d9ac6810dcb462995570ed8af1"
     },
     "www/assets/ground-beetle-living-poster-840.webp": {
       "checksum": "a6f6ee5226fb85db35d1b850b44ee16e"
@@ -3428,7 +3428,7 @@
       "checksum": "8067bcf56d41f0c9006b6ada0e82f6f4"
     },
     "www/styles.css": {
-      "checksum": "8401332cee063caa03a418eb5f494373"
+      "checksum": "8491e26a370561f7d544de3a6487058e"
     },
     "www/vendor/html-to-image-1.11.11.js": {
       "checksum": "1b01c7cd9fb375bd1fb395b3dfd31450"

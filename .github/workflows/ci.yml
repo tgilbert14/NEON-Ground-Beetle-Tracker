@@ -92,10 +92,21 @@ jobs:
           node --check scripts/check_custom_message_handlers.mjs
           node scripts/check_custom_message_handlers.mjs
           node scripts/check_cover.mjs
+          node --check scripts/check_shell_contracts.mjs
+          node scripts/check_shell_contracts.mjs
           bash -n scripts/post_deploy_smoke.sh
 
       - name: Run scientific helper contracts
-        run: Rscript --vanilla scripts/test_helpers.R
+        run: |
+          set -euo pipefail
+          Rscript --vanilla scripts/test_helpers.R
+          Rscript --vanilla scripts/test_server_restore.R
+
+      - name: Rebuild derived indexes in the pinned runtime
+        run: |
+          set -euo pipefail
+          Rscript --vanilla scripts/precompute.R
+          Rscript --vanilla scripts/build_search_index.R
 
       - name: Generate manifest in the pinned runtime
         id: manifest

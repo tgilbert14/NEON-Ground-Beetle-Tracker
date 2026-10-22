@@ -45,7 +45,7 @@ sharing its Desert Data Labs house style and **bundle-first** data pattern.
 | **Diversity** | Hill numbers (q0/q1/q2 effective species), Hurlbert rarefaction (richness at equal sample size), and species accumulation across bouts. |
 | **Seasonality** | Activity-density by month (catch per 100 trap-nights), overall or split by the top species. |
 | **Trends** | Inter-annual catch-per-effort with a fitted OLS trend line and a plain-English verdict (rising / declining / flat, with %/yr and p-value) — the insect-trend view. |
-| **Biogeography** | A national map sized by carabid richness — or by a chosen species' local abundance (a range map); a **PCoA community ordination** (Bray–Curtis) showing which site×year communities resemble each other; an **indicator-species table** (Dufrêne–Legendre IndVal) naming each site's signature beetles; and a sortable comparison table. |
+| **Biogeography** | A national map of every site (or a chosen species' range, sized by local abundance); a **PCoA community ordination** (Bray–Curtis) showing which site×year communities resemble each other; an **indicator-species table** (Dufrêne–Legendre IndVal) naming each site's signature beetles; and a sortable comparison table. |
 | **About** | Data product, methods, and the live data-source note. |
 
 Pick a site and it loads automatically (the date window snaps to that site's real coverage); tap a marker on the map to jump there, or hit **Surprise me** for a random site. Choose a **Compare with** site to overlay any second site on the Diversity and Seasonality charts — a prairie next to a forest.
@@ -54,8 +54,10 @@ Pick a site and it loads automatically (the date window snaps to that site's rea
 
 - **Effort-normalised abundance.** Counts are expressed as **catch per 100 trap-nights**
   (effort = the sum of unique plot × bout trap-night totals), so sites and windows
-  with different sampling effort compare fairly. This also absorbs NEON's protocol
-  changes (4→3 traps/plot in 2018; 10→6 plots/site in 2023).
+  with different sampling effort compare fairly. Per-trap-night effort absorbs the
+  2018 change from 4 to 3 traps per plot. In 2023 NEON cut sampling from 10 plots to
+  6, and the plots it kept can catch more or fewer beetles than the old set, so the
+  2023 value is not directly comparable with earlier years.
 - **Diversity** — Hill numbers (Hill 1973; Jost 2006); individual-based rarefaction
   with an analytic SD (Hurlbert 1971; Heck et al. 1975); sample-based species
   accumulation averaged over random bout orders (Gotelli & Colwell 2001).

@@ -1,8 +1,10 @@
 # ==========================================================================
 # map_picker.R — the reusable national site-PICKER map for the NEON suite.
 # The feature that defines the flagship: a US map of every bundled site, tap a
-# dot to load it. Marker size = a headline count (log1p-scaled), colour = a
-# headline metric. CRITICAL: the leafletOutput is STATIC in ui.R (placed via
+# dot to load it. Marker size = a headline count (log1p-scaled) when the caller
+# passes radius_metric, or a fixed 9 px for every dot when radius_metric = NULL
+# (use NULL when sizing by the metric would read as a cross-site ranking).
+# Colour = a headline metric. CRITICAL: the leafletOutput is STATIC in ui.R (placed via
 # mapPickerUI) — NEVER inside a renderUI — because a leaflet htmlwidget delivered
 # through renderUI loses the dependency-deliver → re-bind race on Posit Connect
 # Cloud and the spinner hangs forever. mapPickerServer keeps it alive while the
@@ -29,7 +31,8 @@ mapPickerUI <- function(id, height = "560px", spinner = "#2f7fb5") {
 }
 
 # site_table : data.frame with columns site, lat, lng (+ the metric columns used below)
-# radius_metric : column name driving dot size
+# radius_metric : column name driving dot size (log1p-scaled via picker_radius),
+#   or NULL for a fixed 9 px radius on every dot
 # color_fn  : function(site_table) -> vector of fill colours (length = nrow)
 # label_fn  : function(one-row df) -> HTML string for the hover label
 # popup_fn  : OPTIONAL function(one-row df) -> HTML string for a CLICK popup. When
@@ -51,13 +54,14 @@ mapPickerServer <- function(id, site_table, radius_metric, color_fn, label_fn, p
         vapply(seq_len(nrow(st)), function(i) as.character(popup_fn(st[i, , drop = FALSE])), character(1))
         else NULL
       pop_opts <- if (!is.null(popup_fn)) leaflet::popupOptions(maxWidth = 300, minWidth = 230,
-        autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = TRUE,
+        autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = FALSE,
         closeButton = TRUE, closeOnClick = FALSE, className = "pm-pop-card") else NULL
       leaflet::leaflet(st, options = leaflet::leafletOptions(minZoom = 2, worldCopyJump = TRUE)) %>%
         add_suite_basemap("light_all", noWrap = TRUE) %>%  # keyed CARTO Positron (global.R helper; CARTO watermarks unkeyed tiles)
         leaflet::setView(lng = -96, lat = 41, zoom = 4) %>%
         leaflet::addCircleMarkers(lng = ~lng, lat = ~lat, layerId = ~site,
-          radius = picker_radius(st[[radius_metric]]), stroke = TRUE, color = "#ffffff",
+          radius = if (is.null(radius_metric)) rep(9, nrow(st)) else picker_radius(st[[radius_metric]]),
+          stroke = TRUE, color = "#ffffff",
           weight = 1.4, opacity = 1, fillColor = color_fn(st), fillOpacity = 0.85,
           label = labs, popup = pops, popupOptions = pop_opts,
           labelOptions = leaflet::labelOptions(direction = "auto", textsize = "13px",
@@ -69,11 +73,14 @@ mapPickerServer <- function(id, site_table, radius_metric, color_fn, label_fn, p
         # 0-width container, so we FORCE a reflow (dispatch resize) on a few timers,
         # invalidateSize each time, and watch for the container finally getting width
         # via ResizeObserver. Belt-and-suspenders, but reliably fills the map.
+        # Every invalidateSize is guarded on clientWidth > 0: once the splash hides,
+        # the map sits at 0 px, and invalidating it there (with a popup open) starts
+        # Leaflet's auto-pan loop.
         htmlwidgets::onRender("function(el, x) { var m = this;
-          function kick(){ try { window.dispatchEvent(new Event('resize')); m.invalidateSize(); } catch(e){} }
+          function kick(){ try { if (el.clientWidth > 0) { window.dispatchEvent(new Event('resize')); m.invalidateSize(); } } catch(e){} }
           [120, 400, 900, 1800, 3000].forEach(function(t){ setTimeout(kick, t); });
           if (window.ResizeObserver) { var ro = new ResizeObserver(function(){ if (el.clientWidth > 0) m.invalidateSize(); }); ro.observe(el); }
-          window.addEventListener('resize', function(){ m.invalidateSize(); }); }")
+          window.addEventListener('resize', function(){ if (el.clientWidth > 0) m.invalidateSize(); }); }")
     })
     # keep the map bound after the splash hides, so leafletProxy stays valid
     shiny::outputOptions(output, "map", suspendWhenHidden = FALSE)

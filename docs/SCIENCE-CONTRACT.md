@@ -49,6 +49,12 @@ For an eligible scope:
 - Reconcile parataxonomist records to the authoritative expert identification.
 - Count richness only for accepted species-level ranks. Coarser identifications may
   remain in total catch/activity summaries but never count as species.
+- The species key is the binomial. Subgenus tags are stripped and every trinomial
+  (nominal or not) is merged into its species, so one species never counts twice
+  under two names. A species-group call ("Genus a/b") counts as one species only
+  when no member species was caught at that site; otherwise it stays in abundance
+  with `species_level = FALSE`. The verbatim NEON name travels in the export as
+  `scientificName_verbatim`. (Lead ruling 2026-10-21, audit item 15.)
 - Richness is observed/minimum richness unless an explicitly tested estimator and
   its uncertainty/support diagnostics are shown.
 
@@ -64,6 +70,16 @@ For an eligible scope:
 ### Temporal trends
 
 - Annual values must share the same effort-opportunity contract as activity-density.
+- Per-trap-night effort absorbs the 2018 change from 4 to 3 traps per plot. It does
+  not absorb the 2023 cut from 10 plots to 6 per site: the kept plots can catch more
+  or fewer beetles than the old set, so the 2023 value is not directly comparable
+  with earlier years. Trend charts and the PDF carry design-change markers at 2018
+  and 2023 and the copy must not claim the 2023 change is normalised away. A
+  plot-matched estimator is a separate HK-reviewed methods decision.
+- A trend verdict may say "statistically clear" only when the fit also holds,
+  with the same sign, after dropping the 2023 value (and at least 5 years remain).
+  When significance rests on 2023 the verdict reads as an apparent change that
+  depends on a non-comparable year; the plotted values and the slope are unchanged.
 - Preserve the existing small-series gate and show the number of supported years.
 - OLS trend language is descriptive; it does not establish population change or a
   causal driver.
@@ -99,6 +115,14 @@ For an eligible scope:
 - Cross-site rankings and occupancy-like outputs remain held until committed
   bundles include opportunity-complete field-effort rows and adversarial fixtures
   prove zero-catch, missing-effort, duplicate-effort, and protocol-change behavior.
+  The effort-row half is met (46 of 46 bundles carry explicit effort anchors); the
+  protocol-change fixture half is not, and raw observed richness moves up to 18
+  rank places once rarefied to a common catch. So on 2026-10-21 the Biogeography
+  "#N of 46" rank banner, the richness-sized dots on both maps (the front-door
+  picker and the Biogeography map) and the richest-first default order of the site
+  comparison table were removed rather than the gate cleared. Any future rank must
+  first clear this gate in writing here and then rank on rarefied richness with
+  per-site coverage shown.
 - Driver metric adoption remains held until the same source definition passes the
   pinned build, bundle, manifest, and deployed semantic-health gates.
 
