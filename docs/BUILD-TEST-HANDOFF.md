@@ -9,8 +9,10 @@ re-read the latest entry immediately before revising it.
 - Repository: `tgilbert14/NEON-Ground-Beetle-Tracker`
 - Watched branch: `main`
 - Data product: NEON `DP1.10022.001`, Ground beetles sampled from pitfall traps
-- Production source: `a5d3e0efe0aada84ccbaf7f2e3fb6c38d13ec54c`
-- Audited data/science authority: `a615d6cdf550ea19ea13448bd234004f94de312e`
+- Production source: `9680014e647580a67932988e7ac0bb89560c8172` (PR #24 merge)
+- Audited data/science authority: `9680014e647580a67932988e7ac0bb89560c8172`
+  (species key, 2023 verdict rule and pinned derived indexes; site bundles
+  unchanged since `a615d6cdf550ea19ea13448bd234004f94de312e`)
 - Historical audit source: `ff82104db2fb944af897df9c12dc2cff108ce52e`
 - Pages: <https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/>
 - Connect: <https://019ec8ff-2a4b-e0e9-871d-07a047a571d3.share.connect.posit.cloud/>
@@ -18,8 +20,16 @@ re-read the latest entry immediately before revising it.
 
 ## Current release state
 
-**`PASS 5 COMPLETE / PRODUCTION VERIFIED / DRIVER INGESTION HELD`** as of
-2026-08-05 MST. Current runtime authority is exact `main` lifecycle-repair merge
+**`AUDIT WAVE 2 LIVE / PRODUCTION VERIFIED BY HEADLESS HARNESS / DRIVER INGESTION
+HELD`** as of 2026-10-21 22:15 MST (2026-10-22 05:15 UTC). PR #24 merged exact
+head `eb9351c` as `9680014`; exact-head CI, merged-main CI, Pages and the production
+smoke check passed, and the deployed Connect app was measured live (entry below).
+Species richness is now keyed on the binomial, the cross-site rank stays HELD and
+is not shown, and trend verdicts that rest on the non-comparable 2023 value are no
+longer called statistically clear. The 2026-08-05 state below is kept as history.
+
+Previous state: **`PASS 5 COMPLETE / PRODUCTION VERIFIED / DRIVER INGESTION HELD`**
+as of 2026-08-05 MST. Current runtime authority is exact `main` lifecycle-repair merge
 `a5d3e0efe0aada84ccbaf7f2e3fb6c38d13ec54c`; audited data/science authority
 remains `a615d6cdf550ea19ea13448bd234004f94de312e`.
 
@@ -46,6 +56,59 @@ The remaining hold applies only to a separately reviewed Driver adapter and a
 measured eligible join/support analysis; it does not qualify the released app or
 its opportunity-complete metric. No Driver artifact byte changed. The July audit
 below is retained as historical starting evidence, not current release state.
+
+## 2026-10-21 22:15 MST - suite audit wave 2 production closeout / [Claude]
+
+- **Release identity:** PR #24 exact head `eb9351c3c3cbea5e135a4a10f1fe205bdc833a40`
+  (the pinned producer's bot commit from dispatch run `39692587669`, a direct child
+  of fix commit `8867dd4`) merged at 2026-10-22 05:08:04 UTC as
+  `9680014e647580a67932988e7ac0bb89560c8172`. Exact-head CI `39692994645`,
+  merged-main validation `39726281467` (now including the pinned index rebuild
+  before the committed-bytes check), Pages `39726280935` and semantic production
+  `39726281393` all passed.
+- **Live revision proof (the static marker is not proof):** 37 s after the merge
+  the Connect app served `www/styles.css` with md5
+  `8491e26a370561f7d544de3a6487058e`, equal to the merged file and different from
+  the previous `8401332cee063caa03a418eb5f494373`, plus the new `<title>` and
+  `lang="en"`. Behaviour that only the merged server code produces (SRER boot,
+  binomial counts, the rank-free banner, the ABBY verdict) confirmed it. The
+  signed-in Connect deployment history was not inspected.
+- **Command:** `NODE_PATH=$(npm root -g) BASE=<Connect URL> node verify_beetle.mjs`
+  (Playwright 1.62.1, headless Chromium, script kept in the session scratchpad and
+  summarised in the shared notes), run 2026-10-22 05:09 UTC, plus a focused probe
+  for the trend chart and the phone Seasonality banner.
+
+  | Check | Before (2026-10-21 21:53 UTC) | After (2026-10-22 05:09 UTC) |
+  |---|---|---|
+  | Title, lang | empty, empty | "NEON Ground Beetle Tracker", "en" |
+  | Boot selection | ND / DCFS | AZ / SRER, picker landing, nothing loaded |
+  | Picker after Explore from the SRER popup | lat -85.05, 1,204 moves, popup open, 3 RangeErrors | lat 40.98, 1 move, popup closed, 0 errors |
+  | Biogeography after a tab switch with a card open | lat -85.55, 0 tiles, 1,271 moves | lat 43.96, 24 tiles, popup closed |
+  | Picker after change site | lat -86.31, 0 tiles | lat 40.98, 24 tiles |
+  | ?site=CPER on a fresh profile | not loaded | CPER loaded, no welcome modal |
+  | Remembered HARV | not loaded | HARV loaded, ?site=HARV written |
+  | SRER species (hero) | 42 | 41 |
+  | Biogeography banner | "ranks #27 of 46" | "41 species from 9,422 identified beetles over 7 sampled years ... not a ranking" |
+  | Dot radii (picker, Biogeography) | 37 distinct on Biogeography | 9 px and 11 px, one each |
+  | ABBY trend verdict | (not measured) | amber "apparent decline (~-9%/yr, p = 0.039), but it rests on the 2023 value: without 2023 ... p = 0.15" |
+  | Trend chart markers | none | two dashed lines, labels "4 to 3 traps" and "10 to 6 plots" |
+  | Phone banners at 375 px | split into 4 to 9 flex items, clipped | every visible banner 2 children, 0 overflow, page overflow 0 |
+
+- **Pages cover (same run):** HTTP 200, `lang="en"`, one h1, one main, one CTA
+  inside the first viewport, art loaded, 0 horizontal overflow and 0 console
+  errors at 1280, 390 and 320 px.
+- **Expected/actual:** every row above matched the expected result. No failure.
+- **Residual risks:** all 48 production tile requests still go to
+  `server.arcgisonline.com` because `CARTO_BASEMAP_KEY` is absent on Connect (owner
+  dashboard step). The Pages `<title>` still contains an em dash (audit copy item,
+  not in this scope). The other suite site pickers still carry `keepInView = TRUE`
+  and need the client `closePopup()` pattern, not only the option change. Search
+  tables still order sites by activity-density, and "Amara cupreolata group"
+  membership is unconfirmed (cara). The Driver suite register in the Driver repo
+  is not yet updated for this pass.
+- **Next action:** owner restores `CARTO_BASEMAP_KEY` on Connect and republishes;
+  update the Driver suite register and implication backlog row for Ground Beetle
+  from the package addendum; port the picker pattern in the suite batch.
 
 ## 2026-10-21 MST - suite audit wave 2 items 15, 17, 18 candidate / [Claude]
 
