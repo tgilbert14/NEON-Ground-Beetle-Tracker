@@ -57,6 +57,54 @@ measured eligible join/support analysis; it does not qualify the released app or
 its opportunity-complete metric. No Driver artifact byte changed. The July audit
 below is retained as historical starting evidence, not current release state.
 
+## 2026-10-26 MST - finish the 2026-10-18 audit, PR #25 candidate / [Claude]
+
+- **Scope:** every remaining Ground Beetle finding in the 2026-10-18 audit appendix
+  (P1 to P3) and the suite finish ledger's cross-cutting list, on PR #25's branch
+  `claude/beetle-wave2-production-closeout` (base `main` `9680014`), so the app
+  lands in one PR. Per-finding accounting: the suite status file
+  `neon-audit-2026-10-18/reports/status/ground-beetle.md`. Lead on Opus 5.5 at max
+  (Fable capped), coding workers on Opus 5.5 at medium; one independent four-lens
+  review (Opus 5.5 max) found 4 P2s and 14 P3s, all fixed or recorded.
+- **Science:** a trend is "statistically clear" only with at least 6 years and when
+  it also holds without 2023 and on a season-standardised series with partial
+  seasons and 2023 left out together; an untestable check reads "cannot be
+  confirmed". On the 46 pre-PUUM sites: clear down BLAN, DELA; clear up OSBS; 8
+  apparent; 3 too few; 32 flat. The seasonal card is gated on adjusted p over
+  comparable years only. Accumulation runs over sampled plot-bouts; species
+  seasonality fills sampled zeros; sampled-zero sites no longer break the index.
+  *Trechus obtusus* and *Agonum muelleri* join the introduced list (PUUM, ABBY).
+- **Provenance and pipeline:** release pinned (`GBT_RELEASE` RELEASE-2026, DOI
+  https://doi.org/10.48443/q9ne-6b77) in `data/release.rds` and shown in the app,
+  PDF and export; release-watch, keepalive and review-issue jobs; token mapped only
+  on the download step; the publisher stages before its no-change test and rejects
+  unexpected archive paths; env overlays sync from the Small Mammal Tracker with a
+  schema check; the post-deploy smoke proves the revision with a 59-file content
+  digest (`build=` marker) and checks title and lang; CI rebuilds both indexes in
+  the pinned runtime; `verify_bundle.R` has an independent oracle for individuals,
+  richness, years, trap-nights and catch rate.
+- **Data runs (pinned Ubuntu 22.04, R 4.5.2):** full refresh with download, dispatch
+  run `40348422926` on `46f4579` (2026-10-26 15:20 to 16:22 UTC, every job green):
+  all 46 existing site bundles reproduced byte for byte; PUUM added (1,202 rows,
+  538 sampled plot-bouts, 6,970 beetles, 15 species, 2019 to 2023); bot commit
+  `f6a9d50`. Skip-download rebuild run `40359069043` on `19659ce` (introduced list):
+  bot commit `152f994`, search index and two manifest checksums only. Release
+  record: 47 sites, data through 2023-12-20. Manifest: 91 packages, 114 files,
+  terra 1.8-50, no neonUtilities.
+- **Commands and results (PASS):** R parse; `scripts/test_helpers.R`;
+  `scripts/test_server_restore.R`; the handler, cover and shell-contract checks;
+  digest equality (R `DDL_BUILD` = `bash scripts/build_digest.sh` =
+  `10b79b67b639` at `152f994`); `scripts/verify_bundle.R` (47 bundles, 101,365
+  rows, oracle over 47 sites, exact manifest); suite lint 0 red, 0 yellow (was 0
+  red, 7 yellow on 2026-10-22); EnvKit checker 12 settings, 0 findings. PUUM loads
+  through the real server code with every view rendering.
+- **Residual risks:** axe-core was not rerun (not in the toolchain); the plot-matched
+  2023 estimator, the species range map's dot size and the "Amara cupreolata group"
+  membership are owner decisions; CARTO_BASEMAP_KEY on Connect, branch protection
+  and the Actions policy are Tim's settings. The keepalive job is a trial.
+- **Next action:** Tim merges PR #25; the post-deploy job must go green on the
+  `build=` digest; rerun the headless harness on Connect and record it here.
+
 ## 2026-10-21 22:15 MST - suite audit wave 2 production closeout / [Claude]
 
 - **Release identity:** PR #24 exact head `eb9351c3c3cbea5e135a4a10f1fe205bdc833a40`

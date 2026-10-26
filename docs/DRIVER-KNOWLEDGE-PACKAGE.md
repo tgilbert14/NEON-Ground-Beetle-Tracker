@@ -203,3 +203,33 @@ stands (`CONTEXT` for composition and richness, `HOLD` for any annual series tha
 includes 2023). No Driver artifact byte changed. Next dependency: record this pass
 in the Driver suite register and implication backlog, then the HK-reviewed
 plot-matched annual estimator.
+
+## 2026-10-26 MST - audit finish addendum (PR #25 candidate)
+
+What changed for Driver use, all on PR #25 (not merged at the time of writing):
+
+- **Release identity is now explicit.** The bundle is pinned to NEON RELEASE-2026
+  (DOI https://doi.org/10.48443/q9ne-6b77, generated 2026-01-23, released data only,
+  data through 2023-12-20) and recorded in `data/release.rds`. A `release_watch`
+  job opens an issue when NEON publishes a newer release or a change-log entry
+  newer than the pinned release (today: the DELA closure, 2026-01-29).
+- **Roster: 47 sites.** PUUM (Hawaii, D20) joined from RELEASE-2026: 5 years
+  (2019 to 2023), 538 sampled plot-bouts, 6,970 beetles, 15 species. Its dominant
+  species, *Trechus obtusus* (58%), is introduced; some state-listed taxa there are
+  reported only above species rank, so its richness is a floor.
+- **Trend verdicts are stricter.** "Statistically clear" now needs at least 6
+  years and must hold without 2023 and on a season-standardised series with
+  partial seasons and 2023 left out together. On the 46 sites present before PUUM
+  that leaves BLAN and DELA declining and OSBS rising; 8 sites show only an
+  apparent change. The plotted annual values are unchanged.
+- **New site-index columns:** total trap-nights and catch per 100 trap-nights per
+  site, checked by an independent oracle in `scripts/verify_bundle.R`.
+
+Engineering learning: a full refresh with download reproduced all 46 existing site
+bundles byte for byte, so the producer is deterministic end to end; only the new
+PUUM bundle and the derived files changed.
+
+Driver decision for this addendum: **`NONE`** beyond the 2026-10-21 addendum, which
+stands (`CONTEXT` for composition and richness, `HOLD` for any annual series that
+includes 2023). PUUM adds one site outside the current Driver calendar; it changes no
+Driver input until the adapter is reviewed. No Driver artifact byte changed.
