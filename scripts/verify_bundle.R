@@ -17,10 +17,75 @@ site_files <- list.files("data/sites", pattern = "[.]rds$", full.names = TRUE)
 site_codes <- sub("[.]rds$", "", basename(site_files))
 missing_sites <- setdiff(expected_sites, site_codes)
 extra_sites <- setdiff(site_codes, expected_sites)
-if (length(missing_sites) || length(extra_sites)) {
-  note(sprintf("site set mismatch: missing=[%s] extra=[%s]",
-               paste(missing_sites, collapse = ","), paste(extra_sites, collapse = ",")))
+if (length(missing_sites)) {
+  note(sprintf(paste0(
+    "site roster in R/site_metadata.R lists %d site(s) with no bundle in data/sites: [%s]; ",
+    "run the release-pinned refresh to fetch them"),
+    length(missing_sites), paste(missing_sites, collapse = ",")))
 }
+if (length(extra_sites)) {
+  note(sprintf("data/sites has %d bundle(s) not in the R/site_metadata.R roster: [%s]",
+               length(extra_sites), paste(extra_sites, collapse = ",")))
+}
+
+# ---- independent headline-metric oracle -------------------------------------
+# Written here on purpose, without sourcing R/helpers.R, so a bug in the app's
+# own metric code cannot also hide in the check. Mirrors the science contract:
+#   individuals = sum of individualCount over catch rows
+#   richness    = distinct species keys: species/subspecies rows reduced to
+#                 "Genus epithet" after removing "(Subgenus)" tags, plus each
+#                 speciesGroup name none of whose member binomials is present
+#   years       = distinct calendar years of explicit effort rows
+#   trapnights  = sum of trapnights over unique effort anchors
+#                 (siteID, plotID, collectDate)
+#   cpn         = 100 x (sum of individualCount over catch rows whose plot-bout
+#                 has a valid effort anchor) / trapnights
+oracle_binomial <- function(x) {
+  x <- gsub("[(][^)]*[)]", " ", as.character(x))
+  x <- trimws(gsub("[[:space:]]+", " ", x))
+  m <- regmatches(x, regexpr("^[A-Z][a-z]+ [a-z][a-z-]+", x))
+  out <- rep(NA_character_, length(x))
+  out[grepl("^[A-Z][a-z]+ [a-z][a-z-]+", x)] <- m
+  out
+}
+oracle_group_members <- function(name) {
+  x <- trimws(gsub("[[:space:]]+", " ", gsub("[(][^)]*[)]", " ", name)))
+  if (grepl("/", x, fixed = TRUE)) {
+    parts <- trimws(strsplit(x, "/", fixed = TRUE)[[1]])
+    parts <- parts[nzchar(parts)]
+    if (!length(parts)) return(character(0))
+    genus <- strsplit(parts[1], " ", fixed = TRUE)[[1]][1]
+    full <- ifelse(grepl(" ", parts), parts, paste(genus, parts))
+    full[1] <- parts[1]
+    return(unique(stats::na.omit(oracle_binomial(full))))
+  }
+  if (grepl(" (group|complex)$", x, ignore.case = TRUE))
+    return(stats::na.omit(oracle_binomial(sub(" (group|complex)$", "", x, ignore.case = TRUE))))
+  character(0)
+}
+oracle_metrics <- function(b) {
+  catch <- b[b$record_type == "catch" & !is.na(b$scientificName) &
+               is.finite(b$individualCount) & b$individualCount > 0, , drop = FALSE]
+  rank <- as.character(catch$taxonRank)
+  sp_keys <- unique(stats::na.omit(oracle_binomial(catch$scientificName[rank %in% c("species", "subspecies")])))
+  groups <- unique(trimws(catch$scientificName[rank %in% "speciesGroup"]))
+  kept <- groups[vapply(groups, function(g) !any(oracle_group_members(g) %in% sp_keys), logical(1))]
+  eff_dates <- b$collectDate[b$record_type == "effort" & !is.na(b$collectDate)]
+  eff <- b[b$record_type == "effort" & is.finite(b$trapnights) & b$trapnights > 0 &
+             !is.na(b$plotID) & !is.na(b$collectDate), , drop = FALSE]
+  eff_key <- paste(eff$siteID, eff$plotID, as.character(eff$collectDate), sep = "|")
+  eff <- eff[!duplicated(eff_key), , drop = FALSE]
+  eff_key <- eff_key[!duplicated(eff_key)]
+  tn <- if (nrow(eff)) sum(eff$trapnights) else NA_real_
+  catch_key <- paste(catch$siteID, catch$plotID, as.character(catch$collectDate), sep = "|")
+  matched <- sum(catch$individualCount[catch_key %in% eff_key])
+  c(individuals = sum(catch$individualCount),
+    richness = length(sp_keys) + length(kept),
+    years = length(unique(format(as.Date(eff_dates), "%Y"))),
+    trapnights = tn,
+    cpn = if (is.finite(tn) && tn > 0) 100 * matched / tn else NA_real_)
+}
+oracle <- list()
 
 bundle_rows <- integer(0)
 anchor_rows <- integer(0)
@@ -68,6 +133,7 @@ for (file in site_files) {
     unmatched <- catches$effort_status != "valid_sample_collected" | !(catch_key %in% anchor_key)
     if (any(unmatched)) note(sprintf("%s has %d catch rows without a valid opportunity anchor", code, sum(unmatched)))
   }
+  oracle[[code]] <- oracle_metrics(object)
   bundle_rows[code] <- nrow(object)
   anchor_rows[code] <- nrow(anchors)
   catch_rows[code] <- nrow(catches)
@@ -85,9 +151,74 @@ if (inherits(precomputed, "error") || !is.list(precomputed)) {
       note(sprintf("precomputed index %s is absent or empty", name))
   }
   if (is.data.frame(precomputed$site_index)) {
-    got <- sort(unique(as.character(precomputed$site_index$site)))
-    if (!identical(got, expected_sites)) note("precomputed site_index does not match expected site roster")
+    si <- precomputed$site_index
+    got <- sort(unique(as.character(si$site)))
+    if (!identical(got, expected_sites))
+      note(sprintf("precomputed site_index does not match the site roster: missing=[%s] extra=[%s]",
+                   paste(setdiff(expected_sites, got), collapse = ","),
+                   paste(setdiff(got, expected_sites), collapse = ",")))
+    checked <- 0L
+    for (code in names(oracle)) {
+      row <- si[as.character(si$site) == code, , drop = FALSE]
+      if (nrow(row) != 1L) {
+        note(sprintf("oracle: %s has %d site_index rows (expected 1)", code, nrow(row)))
+        next
+      }
+      want <- oracle[[code]]
+      for (metric in c("individuals", "richness", "years")) {
+        have <- suppressWarnings(as.numeric(row[[metric]]))
+        if (length(have) != 1L || is.na(have) || have != unname(want[[metric]]))
+          note(sprintf("oracle: %s %s mismatch: site_index=%s, recomputed=%s",
+                       code, metric, format(have), format(unname(want[[metric]]))))
+      }
+      if (!all(c("trapnights", "cpn") %in% names(row))) {
+        note(sprintf("oracle: %s site_index lacks trapnights/cpn columns (rebuild data/precomputed.rds)", code))
+      } else {
+        have_tn <- suppressWarnings(as.numeric(row$trapnights))
+        want_tn <- unname(want[["trapnights"]])
+        if (length(have_tn) != 1L || !identical(is.na(have_tn), is.na(want_tn)) ||
+            (!is.na(want_tn) && have_tn != want_tn))
+          note(sprintf("oracle: %s trapnights mismatch: site_index=%s, recomputed=%s",
+                       code, format(have_tn), format(want_tn)))
+        have_cpn <- suppressWarnings(as.numeric(row$cpn))
+        want_cpn <- unname(want[["cpn"]])
+        if (length(have_cpn) != 1L || !identical(is.na(have_cpn), is.na(want_cpn)) ||
+            (!is.na(want_cpn) && abs(have_cpn - want_cpn) > 1e-9))
+          note(sprintf("oracle: %s cpn mismatch: site_index=%s, recomputed=%s",
+                       code, format(have_cpn, digits = 12), format(want_cpn, digits = 12)))
+      }
+      checked <- checked + 1L
+    }
+    cat(sprintf("oracle: recomputed individuals, richness, years, trap-nights and cpn for %d site(s)\n", checked))
   }
+}
+
+# ---- release identity ---------------------------------------------------------
+rel <- tryCatch(readRDS("data/release.rds"), error = function(e) e)
+if (inherits(rel, "error") || !is.list(rel)) {
+  note("data/release.rds is missing or unreadable (run scripts/record_release.R)")
+} else {
+  bundle_dates <- unlist(lapply(site_files, function(f) {
+    d <- tryCatch(readRDS(f)$collectDate, error = function(e) NULL)
+    if (is.null(d)) return(NULL)
+    as.character(max(as.Date(substr(as.character(d), 1, 10)), na.rm = TRUE))
+  }))
+  max_date <- if (length(bundle_dates)) max(bundle_dates) else NA_character_
+  if (!is.character(rel$release) || !grepl("^RELEASE-[0-9]{4}$", rel$release %||% ""))
+    note("data/release.rds release is not of the form RELEASE-YYYY")
+  if (!is.character(rel$doi) || !startsWith(rel$doi %||% "", "https://doi.org/10.48443/"))
+    note("data/release.rds doi does not start with https://doi.org/10.48443/")
+  if (!identical(rel$provisional_included, FALSE))
+    note("data/release.rds provisional_included is not FALSE")
+  if (!identical(as.character(rel$data_through %||% ""), as.character(max_date)))
+    note(sprintf("data/release.rds data_through=%s but the bundles end %s",
+                 as.character(rel$data_through %||% "NA"), max_date))
+  if (!identical(as.integer(rel$n_sites %||% NA), length(site_files)))
+    note(sprintf("data/release.rds n_sites=%s but data/sites has %d bundles",
+                 as.character(rel$n_sites %||% "NA"), length(site_files)))
+  cat(sprintf("release: %s (%s), data through %s, %s sites\n",
+              rel$release %||% "?", rel$doi %||% "?", rel$data_through %||% "?",
+              as.character(rel$n_sites %||% "?")))
 }
 
 search <- tryCatch(readRDS("data/search_index.rds"), error = function(e) e)

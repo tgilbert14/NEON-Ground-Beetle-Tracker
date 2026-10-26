@@ -52,13 +52,14 @@ neon_sites <- tibble::tribble(
   "TOOL", "D18",  "Toolik Lake",                                   "AK",   68.6611, -149.3705,  "Arctic foothills tundra on Alaska's North Slope.",
   "BONA", "D19",  "Caribou-Poker Creeks Research Watershed",       "AK",   65.1540, -147.5026,  "Boreal black-spruce forest and permafrost of interior Alaska.",
   "DEJU", "D19",  "Delta Junction",                                "AK",   63.8811, -145.7514,  "Boreal forest and fire mosaic of interior Alaska.",
-  "HEAL", "D19",  "Healy",                                         "AK",   63.8758, -149.2133,  "Boreal-to-tundra transition near Denali, Alaska."
+  "HEAL", "D19",  "Healy",                                         "AK",   63.8758, -149.2133,  "Boreal-to-tundra transition near Denali, Alaska.",
+  "PUUM", "D20",  "Pu'u Maka'ala Natural Area Reserve",            "HI",   19.5531, -155.3173,  "Montane wet forest of ohia and tree ferns on the windward slope of Mauna Loa, Hawaii."
 )
 
 # full state name for grouping the picker
 state_names <- c(
   AK = "Alaska", AL = "Alabama", AZ = "Arizona", CA = "California", CO = "Colorado",
-  FL = "Florida", GA = "Georgia", KS = "Kansas", MA = "Massachusetts", MD = "Maryland",
+  FL = "Florida", GA = "Georgia", HI = "Hawaii", KS = "Kansas", MA = "Massachusetts", MD = "Maryland",
   MI = "Michigan", ND = "North Dakota", NH = "New Hampshire", NM = "New Mexico",
   OK = "Oklahoma", PR = "Puerto Rico", TN = "Tennessee", TX = "Texas", UT = "Utah",
   VA = "Virginia", WA = "Washington", WI = "Wisconsin", WY = "Wyoming"
@@ -83,7 +84,10 @@ site_biome_lut <- c(
   BARR = "Boreal & tundra", TOOL = "Boreal & tundra", NIWO = "Boreal & tundra",
   # Southeastern pine flatwoods / Coastal Plain
   DSNY = "Southeast pine", JERC = "Southeast pine", OSBS = "Southeast pine",
-  TALL = "Southeast pine", GUAN = "Southeast pine", LAJA = "Southeast pine",
+  TALL = "Southeast pine",
+  # Tropical islands (Puerto Rico dry forest and pasture, Hawaii wet forest). These
+  # were filed under "Southeast pine" before 2026-10-22, which mislabelled them.
+  GUAN = "Tropical island", LAJA = "Tropical island", PUUM = "Tropical island",
   # Grassland & prairie
   KONA = "Grassland", KONZ = "Grassland", DCFS = "Grassland", NOGP = "Grassland",
   WOOD = "Grassland", CPER = "Grassland", STER = "Grassland", CLBJ = "Grassland",
@@ -110,6 +114,7 @@ BIOME_COLORS <- c(
   "Grassland"       = "#E69F00",
   "Desert & shrub"  = "#D55E00",
   "Western montane" = "#1a7f37",
+  "Tropical island" = "#CC79A7",
   "Other"           = "#8a97a8"
 )
 

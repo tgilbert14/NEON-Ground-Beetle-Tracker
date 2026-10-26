@@ -46,7 +46,7 @@ add_suite_basemap <- function(map, variant = "light_all", noWrap = FALSE) {
       urlTemplate = sprintf(
         "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_%s_Gray_Base/MapServer/tile/{z}/{y}/{x}",
         if (identical(variant, "dark_all")) "Dark" else "Light"),
-      attribution = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
+      attribution = 'Tiles &copy; Esri: Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
       options = leaflet::tileOptions(maxNativeZoom = 16, maxZoom = 19, noWrap = noWrap))
   }
 }
@@ -64,7 +64,9 @@ NEON_DPID <- "DP1.10022.001"   # Ground beetles sampled from pitfall traps
 # Live downloads are OPTIONAL. neonUtilities is referenced by a computed name so
 # the rsconnect/renv scanner doesn't pin it; the deployed showcase is bundle-only.
 .NEON_PKG <- paste0("neon", "Utilities")
-LIVE_FETCH <- (Sys.getenv("GBT_LIVE", "1") != "0") &&
+# An empty GBT_LIVE (for example a copied .env.example) counts as unset.
+.gbt_live <- Sys.getenv("GBT_LIVE", "")
+LIVE_FETCH <- (!nzchar(.gbt_live) || .gbt_live != "0") &&
   requireNamespace(.NEON_PKG, quietly = TRUE)
 
 # ---- bundled per-site data ------------------------------------------------
@@ -209,27 +211,8 @@ build_national_index <- function() {
   rows <- list(); all <- list()
   for (s in sites) {
     d <- load_site_bundle(s); if (is.null(d) || !nrow(d)) next
-    ct <- community_table(d)
-    sp <- ct[ct$species_level %in% TRUE, , drop = FALSE]   # richness = species only
     meta <- neon_sites[neon_sites$site == s, , drop = FALSE]
-    rows[[s]] <- tibble::tibble(
-      site = s,
-      name = if (nrow(meta)) meta$name else s,
-      lat  = if (nrow(meta)) meta$lat else NA_real_,
-      lng  = if (nrow(meta)) meta$lng else NA_real_,
-      state = if (nrow(meta)) meta$state else NA_character_,
-      richness = nrow(sp),
-      individuals = sum(ct$individuals),
-      individuals_species = sum(sp$individuals, na.rm = TRUE),
-      # Years sampled: count years with sampled effort rows when the bundle has
-      # them (zero-catch years still count as sampled), else years with catch.
-      years = {
-        rt <- if (any(d$record_type == "effort", na.rm = TRUE)) "effort" else "catch"
-        yy <- d$year[d$record_type %in% rt & !is.na(d$year)]
-        if (length(yy)) dplyr::n_distinct(yy) else NA_integer_
-      },
-      dominant =if (nrow(sp)) sp$scientificName[1] else ct$scientificName[1],
-      source = attr(d, "source") %||% "neon")
+    rows[[s]] <- site_index_row(d, s, meta)
     d$siteID <- s; all[[s]] <- d
   }
   all_data <- if (!length(all)) NULL else dplyr::bind_rows(all)
@@ -284,6 +267,37 @@ SEARCH_INDEX <- local({
   if (file.exists(f)) tryCatch(readRDS(f), error = function(e) NULL) else NULL
 })
 SEARCH_TAXA <- if (!is.null(SEARCH_INDEX)) SEARCH_INDEX$taxa else NULL
+
+# ---- release identity of the bundle ----------------------------------------
+# data/release.rds (scripts/record_release.R) names the one NEON release the
+# bundle is pinned to: release tag, generation date, DOI, citation, data-through
+# date and site count. NULL when absent, so the app still boots without it.
+BUNDLE_RELEASE <- tryCatch(readRDS(file.path("data", "release.rds")), error = function(e) NULL)
+
+# ---- runtime build digest ---------------------------------------------------
+# A short content digest of the files that decide what the deployed app shows.
+# DDL_BUILD is the first 12 hex characters of the md5 of the concatenated md5
+# hex of each file below, in this order, with no separators and no newline; a
+# missing file contributes the literal "missing". scripts/build_digest.sh prints
+# the same value from a shell, so a deployed build can be matched to a commit.
+# Keep this list and the array in scripts/build_digest.sh identical. After the
+# fixed list come every data/env/*.rds bundle, sorted by name in C order (the
+# Small Mammal sync step can change them).
+DDL_DIGEST_FILES <- c("global.R", "ui.R", "server.R", "R/helpers.R", "R/map_picker.R",
+                      "R/report_pdf.R", "R/seasonal_env.R", "R/site_metadata.R",
+                      "www/styles.css", "www/pincards.js", "data/precomputed.rds",
+                      "data/search_index.rds", "data/release.rds",
+                      file.path("data/env", sort(list.files("data/env", pattern = "[.]rds$"),
+                                                 method = "radix")))
+DDL_BUILD <- local({
+  sums <- vapply(DDL_DIGEST_FILES, function(f) {
+    if (file.exists(f)) tolower(unname(tools::md5sum(f))) else "missing"
+  }, character(1))
+  tmp <- tempfile("ddl-digest-")
+  on.exit(unlink(tmp), add = TRUE)
+  cat(sums, file = tmp, sep = "")
+  substr(tolower(unname(tools::md5sum(tmp))), 1, 12)
+})
 
 # Autocomplete choices for the Search tab: every taxon in the index, labelled with
 # how many sites it occurs at so the picker doubles as a quick range hint.
@@ -344,8 +358,10 @@ rubik_stack <- bslib::font_collection(
   "Rubik", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif")
 app_theme <- bs_theme(
   version = 5, bg = "#ffffff", fg = "#16243a",
-  primary = "#1f8a5a", secondary = "#c47a2c",
-  success = "#3f9a52", info = "#2f93a0", warning = "#c79a1c", danger = "#c47a2c",
+  # primary/secondary/success carry white button text: each clears WCAG AA 4.5:1
+  # (#1a7a4f 5.33:1, #9a5a1c 5.45:1).
+  primary = "#1a7a4f", secondary = "#9a5a1c",
+  success = "#1a7a4f", info = "#2f93a0", warning = "#c79a1c", danger = "#c47a2c",
   base_font = rubik_stack, heading_font = rubik_stack,
   "border-radius" = "10px"
 )
@@ -355,8 +371,70 @@ spin <- function(x) shinycssloaders::withSpinner(x, color = DDL$forest,
                                                  proxy.height = "300px", hide.ui = FALSE)
 
 info_pop <- function(title, ..., placement = "auto")
-  bslib::popover(tags$span(class = "info-dot", bsicons::bs_icon("info-circle")),
+  bslib::popover(tags$span(class = "info-dot", `aria-label` = paste("About:", title),
+                           bsicons::bs_icon("info-circle")),
                  ..., title = title, placement = placement)
+
+# Says whether a card shows the loaded site or every bundled site. The count
+# comes from SITE_INDEX so it follows the bundle.
+scope_chip <- function(all = FALSE) {
+  n <- if (!is.null(SITE_INDEX)) nrow(SITE_INDEX) else 0L
+  tags$span(class = paste("scope-chip", if (all) "scope-all" else "scope-site"),
+            if (all) sprintf("All %d sites", n) else "This site")
+}
+
+# modalDialog() renders its title in a plain h4 and gives the dialog no name.
+# This wraps the title in an id'd span (or uses `label_id` for a heading already
+# in the body) and points the dialog's aria-labelledby at it.
+labelled_modal <- function(..., title = NULL, label_id = "gbt-modal-title") {
+  m <- shiny::modalDialog(..., title = if (!is.null(title)) tags$span(id = label_id, title))
+  htmltools::tagAppendAttributes(m, `aria-labelledby` = label_id)
+}
+
+# ---- release identity for display ------------------------------------------
+# Every value comes from BUNDLE_RELEASE (data/release.rds); each helper returns a
+# usable fallback when the file is absent.
+release_tag <- function() {
+  r <- BUNDLE_RELEASE$release
+  if (is.character(r) && length(r) == 1 && nzchar(r)) r else NA_character_
+}
+release_doi <- function() {
+  d <- BUNDLE_RELEASE$doi
+  if (is.character(d) && length(d) == 1 && nzchar(d)) d else NA_character_
+}
+release_through <- function() {
+  x <- tryCatch(as.Date(BUNDLE_RELEASE$data_through), error = function(e) NA)
+  if (length(x) == 1 && !is.na(x)) x else as.Date(NA)
+}
+release_through_label <- function(fmt = "%B %Y") {
+  x <- release_through(); if (is.na(x)) NA_character_ else format(x, fmt)
+}
+release_citation <- function() {
+  c0 <- BUNDLE_RELEASE$citation
+  if (is.character(c0) && length(c0) == 1 && nzchar(c0)) c0 else
+    "NEON (National Ecological Observatory Network). Ground beetles sampled from pitfall traps (DP1.10022.001)."
+}
+# "Release: RELEASE-2026 (DOI); provisional records not included; data through <date>"
+release_line_ui <- function() {
+  rel <- release_tag(); doi <- release_doi(); thr <- release_through_label("%d %B %Y")
+  if (is.na(rel)) return(tags$p(class = "release-line",
+    "Release: NEON's released data for DP1.10022.001; provisional records not included."))
+  esc <- htmltools::htmlEscape
+  doi_html <- if (!is.na(doi)) sprintf(' (<a href="%s" target="_blank" rel="noopener">%s</a>)',
+                                       esc(doi, attribute = TRUE), esc(sub("^https://doi.org/", "doi:", doi))) else ""
+  tags$p(class = "release-line", HTML(sprintf(
+    "<b>Release:</b> %s%s; provisional records not included%s.",
+    esc(rel), doi_html, if (!is.na(thr)) paste0("; data through ", esc(thr)) else "")))
+}
+# Both "How current is this?" copies share this sentence.
+release_currency_text <- function() {
+  rel <- release_tag(); thr <- release_through()
+  yr <- if (!is.na(thr)) format(thr, "%Y") else NA_character_
+  first <- if (!is.na(rel) && !is.na(yr))
+    sprintf("This uses NEON's yearly release (%s), which runs through the %s trapping season.", rel, yr)
+  else "This uses NEON's yearly release of this product."
+  paste(first, "NEON also posts newer provisional records, but their IDs can still change, so they stay out until a release includes them.")
+}
 
 # A small clickable "introduced" badge for non-native European carabids. Reuses
 # the bslib popover so provenance and interpretation stay beside the label.
@@ -409,11 +487,11 @@ MASCOT_CRITTER <- htmltools::HTML(paste0(
   '</svg>'))
 
 # ---- the NEON suite registry (in-app sibling links) -----------------------
-# Canonical list mirrored from docs/index.html's cross-promo grid. Rendered as an
-# "Explore the NEON series" block in the About panel so every sibling is one tap
-# away from inside the app (suite-cohesion standard).
+# The ten NEON explorers (the nine siblings plus this app, marked current), with
+# the URLs of the suite registry. Rendered in the About panel and, before a site
+# loads, under the landing picker, so every sibling is one tap away.
 SUITE_SIBLINGS <- list(
-  list(name = "Driver Cascade",   emoji = "\U0001F517", url = "https://tgilbert14.github.io/NEON-Driver-Cascade/",                  blurb = "How weather ripples up through plants, bugs, and animals."),
+  list(name = "NEON Cross-Product Response Atlas",   emoji = "\U0001F517", url = "https://tgilbert14.github.io/NEON-Driver-Cascade/",                  blurb = "How weather ripples up through plants, bugs, and animals."),
   list(name = "Small Mammals",    emoji = "\U0001F42D", url = "https://tgilbert14.github.io/NEON-Small-Mammal-Tracker-App/",        blurb = "Who's scurrying around each site, and how the populations shift."),
   list(name = "Breeding Birds",   emoji = "\U0001F426", url = "https://tgilbert14.github.io/NEON-Breeding-Birds/",                  blurb = "The dawn-chorus point counts, mapped and tracked over the years."),
   list(name = "Plant Diversity",  emoji = "\U0001F33F", url = "https://tgilbert14.github.io/NEON-Plant-Diversity/",                 blurb = "How many plant species share each plot, and which ones."),
@@ -421,8 +499,26 @@ SUITE_SIBLINGS <- list(
   list(name = "Veg Structure",    emoji = "\U0001F333", url = "https://tgilbert14.github.io/NEON-Vegetation-Structure-Explorer/",   blurb = "How tall and how dense the vegetation stands at each site."),
   list(name = "Water Chemistry",  emoji = "\U0001F4A7", url = "https://tgilbert14.github.io/NEON-WaterChemistry-Analyte-Viewer-App/", blurb = "What's dissolved in the streams, analyte by analyte."),
   list(name = "Mosquito Pulse",   emoji = "\U0001F99F", url = "https://tgilbert14.github.io/NEON-Mosquito-Pulse/",                  blurb = "When and where mosquitoes are active, by genus and sex."),
-  list(name = "Little Inverts",   emoji = "\U0001F990", url = "https://tgilbert14.github.io/NEON-My-Little-Inverts/",              blurb = "The little animals on the bottom of NEON's streams, and the clean-water signal they carry.")
+  list(name = "Little Inverts",   emoji = "\U0001F990", url = "https://tgilbert14.github.io/NEON-My-Little-Inverts/",              blurb = "The little animals on the bottom of NEON's streams, and the clean-water signal they carry."),
+  list(name = "Ground Beetles",   emoji = "\U0001FAB2", url = "https://tgilbert14.github.io/NEON-Ground-Beetle-Tracker/",       blurb = "This app: ground beetles from NEON pitfall traps.", current = TRUE)
 )
+
+# The ten explorers as a card grid. The current app is a plain card (no link to
+# itself). Used by the About tab and the landing's "More NEON explorers".
+suite_sibling_grid <- function() {
+  div(class = "suite-grid",
+    lapply(SUITE_SIBLINGS, function(s) {
+      body <- tagList(
+        tags$span(class = "suite-emoji", `aria-hidden` = "true", s$emoji),
+        div(class = "suite-card-body",
+          div(class = "suite-name", s$name,
+            if (isTRUE(s$current)) tags$span(class = "suite-here", "you are here")
+            else bsicons::bs_icon("box-arrow-up-right")),
+          div(class = "suite-blurb", s$blurb)))
+      if (isTRUE(s$current)) div(class = "suite-card suite-current", `aria-current` = "page", body)
+      else tags$a(class = "suite-card", href = s$url, target = "_blank", rel = "noopener", body)
+    }))
+}
 
 # Server-side PDF site report (sourced last — needs DDL + helpers + ENV_LAYERS).
 source("R/report_pdf.R", local = FALSE)

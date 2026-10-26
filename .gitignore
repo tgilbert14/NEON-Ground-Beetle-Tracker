@@ -16,6 +16,7 @@ err*.txt
 # local secrets (.env.example is the committed template)
 .env
 *.env
+.env.*
 !.env.example
 .Renviron
 .Renviron.*

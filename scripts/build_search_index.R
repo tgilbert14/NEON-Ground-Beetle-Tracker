@@ -63,9 +63,9 @@ for (s in sites) {
   # individuals remain visible, but an unmatched catch can never enter a rate.
   eligible_ind <- if (!is.null(eligible) && nrow(eligible))
     tapply(eligible$individualCount, eligible$scientificName, sum, na.rm = TRUE) else numeric(0)
-  numerator <- unname(eligible_ind[agg$scientificName])
+  numerator <- as.vector(unname(eligible_ind[agg$scientificName]))
   agg$activity_density <- if (is.finite(tn) && tn > 0)
-    round(100 * numerator / tn, 2) else NA_real_
+    as.vector(round(100 * numerator / tn, 2)) else NA_real_
   agg$trapnights   <- tn
   agg$is_introduced <- is_introduced(agg$scientificName)
   taxa_rows[[s]] <- agg

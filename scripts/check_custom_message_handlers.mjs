@@ -1,19 +1,51 @@
 import fs from "node:fs";
+import path from "node:path";
 
-const files = ["ui.R", "www/pincards.js"];
-const handlerPattern = /Shiny\.addCustomMessageHandler\(\s*["'][^"']+["']\s*,\s*function\s*\(([^)]*)\)/g;
+// Every R file at the repo root and under R/, plus every www/*.js file (vendored
+// libraries live under www/vendor/ and are not scanned).
+function listFiles(dir, pattern) {
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && pattern.test(entry.name))
+    .map((entry) => (dir === "." ? entry.name : path.join(dir, entry.name)))
+    .sort();
+}
+
+const files = [
+  ...listFiles(".", /\.R$/),
+  ...listFiles("R", /\.R$/),
+  ...listFiles("www", /\.js$/),
+];
+// Count every addCustomMessageHandler( call, whatever follows it, so a handler
+// in a form the parameter parser does not know still counts (and fails).
+const callPattern = /addCustomMessageHandler\(/g;
+// After the quoted message name: a function expression, a parenthesised arrow
+// function, or a bare single-parameter arrow function.
+const handlerForms = [
+  /^\s*["'][^"']+["']\s*,\s*(?:async\s+)?function\s*[A-Za-z0-9_$]*\s*\(([^)]*)\)/,
+  /^\s*["'][^"']+["']\s*,\s*(?:async\s+)?\(([^)]*)\)\s*=>/,
+  /^\s*["'][^"']+["']\s*,\s*(?:async\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*=>/,
+];
 let seen = 0;
 const invalid = [];
 
 for (const file of files) {
   const source = fs.readFileSync(file, "utf8");
-  for (const match of source.matchAll(handlerPattern)) {
+  for (const match of source.matchAll(callPattern)) {
     seen += 1;
-    const params = match[1]
+    const rest = source.slice(match.index + match[0].length, match.index + match[0].length + 400);
+    const form = handlerForms.map((re) => rest.match(re)).find(Boolean);
+    const line = source.slice(0, match.index).split("\n").length;
+    if (!form) {
+      invalid.push(`${file}:${line}: handler form not recognised`);
+      continue;
+    }
+    const params = form[1]
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);
-    if (params.length !== 1) invalid.push(`${file}: ${match[0]}`);
+    if (params.length !== 1) invalid.push(`${file}:${line}: ${params.length} parameters`);
   }
 }
 
@@ -26,7 +58,9 @@ if (invalid.length) {
   );
 }
 
-console.log(`OK: ${seen} Shiny custom message handlers accept exactly one payload argument.`);
+console.log(
+  `OK: ${seen} Shiny custom message handlers in ${files.length} scanned files accept exactly one payload argument.`,
+);
 
 const server = fs.readFileSync("server.R", "utf8");
 const activeServer = server

@@ -1,0 +1,6 @@
+# Ambient toolchain variables that are not this app's configuration (read by
+# .claude/scripts/check-env-manifest.mjs and the boot probe).
+R_ZIPCMD
+# Set and read only inside one step of .github/workflows/refresh-data.yml (the
+# data/env sync); not configuration anyone sets.
+GBT_ENV_SRC

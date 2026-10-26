@@ -4,9 +4,11 @@
 # National Ecological Observatory Network.
 # ===========================================================================
 
-card_head <- function(icon, title, ...)
+# `chip` is an optional scope_chip() (global.R) saying whether the card shows the
+# loaded site or every bundled site.
+card_head <- function(icon, title, ..., chip = NULL)
   bslib::card_header(class = "with-info", bsicons::bs_icon(icon),
-                     tags$span(class = "ch-title", " ", title), ...)
+                     tags$span(class = "ch-title", " ", title), chip, ...)
 
 # A pinnable chart box: wraps a plotlyOutput in the `.smt-pinnable` positioning
 # context (so pins + leader lines live inside it and ride into the exported PNG)
@@ -39,7 +41,7 @@ ground_beetle_poster <- function() {
           tags$a(class = "gbt-poster-suite-link",
             href = "https://tgilbert14.github.io/NEON-Driver-Cascade/",
             target = "_blank", rel = "noopener",
-            "Whole suite: ", tags$strong("Driver Cascade"), tags$span("↗")))),
+            "Whole suite: ", tags$strong("NEON Cross-Product Response Atlas"), tags$span("↗")))),
       div(class = "gbt-poster-app", "NEON Ground Beetle Tracker · unofficial"),
       h1(id = "gbt-poster-title", `aria-label` = "What moves at ground level?",
         tags$span("What moves"), tags$em("at ground level?")),
@@ -49,7 +51,7 @@ ground_beetle_poster <- function() {
         onclick = "window.setTimeout(function(){var target=document.getElementById('site-picker-start');if(target){target.focus({preventScroll:true});}},0)",
         "Pick a place ", bs_icon("arrow-down")),
       p(class = "gbt-poster-note",
-        "Public NEON DP1.10022.001 · catch per valid trap-night is an activity index—not population density or site health.")),
+        "Public NEON DP1.10022.001 · catch per valid trap-night is an activity index, not population density or site health.")),
     tags$figure(class = "gbt-poster-art",
       tags$picture(
         tags$source(
@@ -78,7 +80,7 @@ ui <- bslib::page_fillable(
   title = "NEON Ground Beetle Tracker", lang = "en",
 
   tags$head(
-    tags$meta(name = "ddl-app-ready", content = "ground-beetle-tracker-v1"),
+    tags$meta(name = "ddl-app-ready", content = paste0("ground-beetle-tracker-v1 build=", DDL_BUILD)),
     tags$link(rel = "stylesheet", href = "styles.css"),
     # pin-card export deps (toast + DOM->PNG) and the pin-card engine itself.
     # SweetAlert is optional chrome (the export still runs without it); html-to-image
@@ -116,6 +118,9 @@ ui <- bslib::page_fillable(
       # starts Leaflet's auto-pan loop (blank map at latitude -85).
       "window.gbtClosePopups=function(){try{document.querySelectorAll('.leaflet-container').forEach(function(c){try{var w=c.id&&HTMLWidgets.find('#'+c.id);if(w&&w.getMap){w.getMap().closePopup();}}catch(e){}});}catch(e){}};",
       "jQuery(document).on('hide.bs.tab',function(){window.gbtClosePopups();});",
+      # QC flags are role=button divs: one delegated handler makes Enter and Space
+      # click them (preventDefault so Space does not scroll the page).
+      "document.addEventListener('keydown',function(e){var t=e.target;if(!t||!t.classList||!t.classList.contains('qc-flag-click'))return;if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){e.preventDefault();t.click();}});",
       "}init();})();")),
     # Robust boot-overlay dismiss — vanilla JS, NO jQuery / shiny:idle dependency, so
     # the "Waking up the Ground Beetle Tracker..." overlay can NEVER stick (the path
@@ -133,6 +138,9 @@ ui <- bslib::page_fillable(
     )))
   ),
   useShinyjs(),
+  # The skip link targets <main>, which stays visible after a site load hides
+  # the picker; tabindex -1 lets it take focus.
+  tags$a(class = "visually-hidden-focusable", href = "#main", "Skip to main content"),
 
   # ---- persistent top control bar (theme + help) -------------------------
   # v2 flow: the sidebar is gone. The picker map IS the way to select a site,
@@ -146,7 +154,7 @@ ui <- bslib::page_fillable(
       tags$span(class = "tb-mark", "\U0001FAB2"),  # beetle
       tags$span(class = "tb-title", "Ground Beetle Tracker")),
     div(class = "top-bar-actions",
-      actionButton("help", tagList(bs_icon("question-circle"), " How it works"),
+      actionButton("help", tagList(bs_icon("question-circle"), span(class = "tb-help-label", " How it works")),
                    class = "btn-outline-secondary btn-sm tb-help"),
       div(class = "tb-theme",
         tags$span(class = "tb-theme-lab", bs_icon("circle-half")),
@@ -157,8 +165,9 @@ ui <- bslib::page_fillable(
   div(id = "bootOverlay", class = "boot-overlay",
     div(class = "load-spin mascot-spin", MASCOT_CRITTER),
     div(class = "boot-msg", "Waking up the Ground Beetle Tracker…"),
-    div(class = "boot-sub", "Loading 46 NEON sites")),
+    div(class = "boot-sub", "Loading NEON sites")),
 
+  tags$main(id = "main", tabindex = "-1",
   # ---- hero + stats ------------------------------------------------------
   hidden(div(id = "loadedHero", class = "app-hero",
     h2(class = "app-title", "NEON Ground Beetle Tracker",
@@ -171,7 +180,6 @@ ui <- bslib::page_fillable(
   div(id = "splashHome",
     ground_beetle_poster(),
     div(class = "splash-guide",
-      div(class = "sg-bubble", "Pick a site to start!"),
       div(class = "sg-mascot", MASCOT_CRITTER)),
     uiOutput("splash"),
     div(id = "site-picker-start", class = "splash-picker", tabindex = "-1",
@@ -194,7 +202,7 @@ ui <- bslib::page_fillable(
       # loadBtn, surpriseBtn, reportPdf, reportCsv, compareSite) so server.R is
       # untouched.
       div(class = "select-panel",
-        div(class = "sp-head", bs_icon("sliders"),
+        h2(class = "sp-head", bs_icon("sliders"),
             " Or pick a site by name, and set the date window"),
         div(class = "sp-row",
           div(class = "sp-field",
@@ -215,7 +223,7 @@ ui <- bslib::page_fillable(
                        class = "btn-outline-success sp-surprise")),
         div(class = "demo-hint", bs_icon("info-circle"),
             if (isTRUE(LIVE_FETCH))
-              " Picking a site loads it automatically. Bundled sites are instant; live NEON pulls take a moment. Adjust the date window and tap Explore to refine."
+              " Picking a site loads it automatically. Live NEON pulls take a moment. Adjust the date window and tap Explore to refine."
             else
               " Picking a site loads it automatically. The date window snaps to that site's coverage. Narrow it and tap Explore to zoom in."),
         uiOutput("srcNote"),
@@ -247,10 +255,17 @@ ui <- bslib::page_fillable(
                   tags$b(ord$site[i]), sprintf(" · %s ", ord$name[i]),
                   tags$span(class = "pll-meta",
                     sprintf("%s · %s caught",
-                            ord$state[i] %||% "—",
+                            ord$state[i] %||% "\u2013",
                             format(ord$individuals[i], big.mark = ",")))))))
         }
-      }))),
+      }),
+      # The other NEON explorers, reachable before a site loads (same registry as
+      # the About tab's suite block).
+      tags$details(class = "picker-list suite-more",
+        tags$summary(class = "picker-list-summary",
+          tags$span(class = "pls-label", bs_icon("grid-3x3-gap-fill"), " More NEON explorers"),
+          tags$span(class = "pls-chevron", bs_icon("chevron-down"))),
+        suite_sibling_grid()))),
 
   # ---- tabs --------------------------------------------------------------
   div(id = "mainTabsWrap",
@@ -260,27 +275,26 @@ ui <- bslib::page_fillable(
         title = tagList(bs_icon("collection"), " Overview"), value = "overview",
         uiOutput("overviewVerdict"),
         card(full_screen = TRUE,
-          card_head("bar-chart-line-fill", "Carabid community, most abundant first",
+          card_head("bar-chart-line-fill", "Carabid community, most abundant first", chip = scope_chip(),
             info_pop("Community composition",
               p("Each bar is a species; length is total ", tags$b("individuals"),
                 " caught, and the label shows ", tags$b("catch per 100 trap-nights"),
                 " so effort is accounted for."),
-              p(tags$b("Activity, not density."), " Pitfall catch \U221D activity \U00D7 density, so fast, large, surface-active hunters (tiger beetles, ", tags$em("Pasimachus"), ") score high regardless of true abundance, so compare like body plans, not a tiger beetle against a litter specialist."),
-              p("Pitfall catch is activity times density, so active surface hunters score high \U2014 it is not a head count."))),
+              p(tags$b("Activity, not density."), " Pitfall catch \U221D activity \U00D7 density, so fast, large, surface-active hunters (tiger beetles, ", tags$em("Pasimachus"), ") score high regardless of true abundance, so compare like body plans, not a tiger beetle against a litter specialist."))),
           pinnable_chart("commBarBox", "community", "commBar", height = "460px",
             hint = "Tap a bar to list that species' records")),
         card(full_screen = TRUE,
-          card_head("pin-map-fill", "Most frequently detected species",
+          card_head("pin-map-fill", "Most frequently detected species", chip = scope_chip(),
             info_pop("Detection frequency (not occupancy)",
               p("The share of sampled ", tags$b("plot × collection bouts"), " in which each species was caught at least once. The denominator comes from collected trap records, including valid bouts with zero Carabidae."),
               p(tags$b("This is not occupancy."), " It is not corrected for imperfect detection, and a pitfall encounter depends on movement as well as presence. Species-level IDs only."))),
           spin(plotlyOutput("occupancyPlot", height = "420px"))),
-        h4(class = "section-title", bs_icon("binoculars"), " Meet the beetles"),
+        h3(class = "section-title", bs_icon("binoculars"), " Meet the beetles"),
         uiOutput("meetBeetles"),
         card(full_screen = FALSE,
           card_head("clipboard-check", "Data-quality review",
             info_pop("Data-quality flags",
-              p("A quick honesty pass over this site's records. Each flag is a ",
+              p("A quick look over this site's records. Each flag is a ",
                 tags$b("verify, not wrong"), " note: something worth a second look, not an error."),
               p("Tap a flag to list the exact records behind it, and download any flag (or the whole report) as a CSV."))),
           uiOutput("qcReview"))
@@ -292,7 +306,7 @@ ui <- bslib::page_fillable(
         uiOutput("qaNote"),
         layout_columns(col_widths = c(5, 7),
           card(full_screen = TRUE,
-            card_head("diagram-3-fill", "Diversity profile, effective species",
+            card_head("diagram-3-fill", "Diversity profile, effective species", chip = scope_chip(),
               info_pop("Hill numbers",
                 p("Diversity in one unit, an ", tags$b("effective number of species"), ":"),
                 tags$ul(
@@ -303,19 +317,19 @@ ui <- bslib::page_fillable(
             spin(plotlyOutput("hillPlot", height = "300px")),
             uiOutput("hillNote")),
           card(full_screen = TRUE,
-            card_head("graph-up", "Rarefaction, richness at equal sample size",
+            card_head("graph-up", "Rarefaction, richness at equal sample size", chip = scope_chip(),
               info_pop("Rarefaction",
                 p("Expected species in a random subsample of ", tags$b("n individuals"),
                   " (Hurlbert 1971), with an ", tags$b("approximate \U00B11 SD"), " band (an independent-species approximation; Heck et al. 1975). Comparing at equal n stops a site that simply caught more beetles from looking falsely richer."))),
             spin(plotlyOutput("rarePlot", height = "300px")))
         ),
         card(full_screen = TRUE,
-          card_head("graph-up-arrow", "Species accumulation across bouts",
+          card_head("graph-up-arrow", "Species accumulation across bouts", chip = scope_chip(),
             info_pop("Accumulation",
               p("As pitfall ", tags$b("bouts"), " accumulate, how many species have appeared? A flattening curve means the site's fauna is well sampled (averaged over random bout orders; Gotelli & Colwell 2001)."))),
           spin(plotlyOutput("accumPlot", height = "360px"))),
         card(full_screen = TRUE,
-          card_head("bar-chart-steps", "Rank-abundance, the dominance curve",
+          card_head("bar-chart-steps", "Rank-abundance, the dominance curve", chip = scope_chip(),
             info_pop("Rank-abundance (Whittaker)",
               p("Species ranked from most to least abundant (log scale). The ", tags$b("shape"), " is the evenness story: a steep drop means a few species dominate; a shallow line means an even community, the same signal the Hill numbers above put into one number."))),
           pinnable_chart("rankAbundanceBox", "rank-abundance", "rankAbundance", height = "360px",
@@ -334,13 +348,12 @@ ui <- bslib::page_fillable(
                 p("For every co-located NEON driver, we scan lags 0–12 months and keep the ", tags$b("strongest correlation"), " with monthly catch-per-effort, after ", tags$b("deseasonalizing"), " both (so r reflects year-to-year anomalies, not the shared summer peak)."),
                 p(tags$b("Reading r:"), " it runs −1…+1, where sign is the direction and size is how tightly they move together. It is ", tags$b("not"), " the % of activity explained (that's r²). Colour encodes the driver's identity; bar side-of-0 encodes the sign."),
                 p(class = "qa-cite", bs_icon("exclamation-triangle"), " Correlation, not cause. Drivers co-vary and many lags are scanned, so read it as a lead to investigate."))),
-            # LEAD with the prior-first seasonal read; the best-of-52 dredge is
+            # LEAD with the prior-first seasonal read; the best-of-N dredge is
             # demoted below it (and dimmed when its permutation isn't significant).
             uiOutput("seasonalDriver"),
             div(id = "envDredgeBlock", class = "env-dredge",
               div(class = "env-dredge-head",
-                tags$span(class = "env-dredge-eyebrow", bs_icon("search"),
-                  " Exploratory best-of-52 driver search"),
+                uiOutput("envDredgeEyebrow", inline = TRUE),
                 info_pop("Why this 'best driver' is probably not a real signal",
                   uiOutput("envHonestNote"))),
               uiOutput("envDredgeSub"),
@@ -368,7 +381,7 @@ ui <- bslib::page_fillable(
                   div(class = "env-lag-hint", "0 = same month · 3 = driver leads by 3 months"))),
               uiOutput("envSourceNote")))),
         card(full_screen = TRUE,
-          card_head("activity", "Activity-density by month (catch per 100 trap-nights)",
+          card_head("activity", "Activity-density by month (catch per 100 trap-nights)", chip = scope_chip(),
             info_pop("Seasonality",
               p("Mean ", tags$b("catch per 100 trap-nights"), " by calendar month, the whole-community activity curve, pooling ", tags$b("every ground beetle (Carabidae) trapped"), " at this site, including records left at genus/family. Toggle to split it by the top species."))),
           div(class = "season-toggle",
@@ -376,7 +389,7 @@ ui <- bslib::page_fillable(
           pinnable_chart("seasonPlotBox", "seasonality", "seasonPlot", height = "440px",
             hint = "Tap a month to pin it")),
         card(full_screen = TRUE,
-          card_head("grid-3x3", "Phenology heatmap, each species' active months",
+          card_head("grid-3x3", "Phenology heatmap, each species' active months", chip = scope_chip(),
             info_pop("Phenology heatmap",
               p("Top species (rows) × calendar month (columns); each cell is that month's ", tags$b("catch per 100 trap-nights"), ", darker = more active. A month sampled but with none of that species is a real ", tags$b("0"), "; a month never sampled is left ", tags$b("blank"), " (a gap, not a zero). The pooled activity curve above hides that species peak at different times."))),
           spin(plotlyOutput("phenoHeat", height = "420px"))),
@@ -391,13 +404,14 @@ ui <- bslib::page_fillable(
       nav_panel(
         title = tagList(bs_icon("graph-up-arrow"), " Trends"), value = "trends",
         div(class = "tab-intro", bs_icon("info-circle"),
-            " Are the beetles holding steady, booming, or declining? NEON's standardized effort makes year-to-year catch comparable, the backbone of insect-decline science."),
+            " Are the beetles holding steady, booming, or declining? NEON's standardized effort makes year-to-year catch comparable."),
         uiOutput("trendVerdict"),
         card(full_screen = TRUE,
-          card_head("graph-up-arrow", "Catch-per-effort by year, with fitted trend",
+          card_head("graph-up-arrow", "Catch-per-effort by year, with fitted trend", chip = scope_chip(),
             info_pop("Inter-annual trend",
               p("Annual ", tags$b("catch per 100 trap-nights"), " (or raw counts when a bundle lacks effort), with an ordinary-least-squares trend line."),
-              p("The slope and its p-value drive the verdict above. Short series (a few years) are noisy, so read the direction, not the decimal."))),
+              p("The slope and its p-value drive the verdict above. Short series (a few years) are noisy, so read the direction, not the decimal."),
+              p("A hollow marker is a year with a partial season, when some of the usual trapping months were not sampled. A trend is called clear only if it also holds with those years left out."))),
           pinnable_chart("trendPlotBox", "trend", "trendPlot", height = "440px",
             hint = "Tap a year to pin its catch"))
       ),
@@ -406,7 +420,7 @@ ui <- bslib::page_fillable(
         title = tagList(bs_icon("map-fill"), " Biogeography"), value = "biogeo",
         div(class = "tab-head",
           div(class = "tab-head-text",
-            h4("Carabid richness across NEON"),
+            h3("Carabid richness across NEON"),
             p("Each marker is a NEON site with beetle data. With no species picked every site gets the same dot; choose a species to map its range, sized by local abundance. Tap a site to load it.")),
           div(class = "map-controls",
             selectInput("rangeSpecies", tagList(bs_icon("search"), " Map a species' range"),
@@ -414,7 +428,7 @@ ui <- bslib::page_fillable(
         uiOutput("biogeoVerdict"),
         spin(leafletOutput("map", height = "540px")),
         card(full_screen = TRUE,
-          card_head("diagram-2", "Community ordination, who resembles whom",
+          card_head("diagram-2", "Community ordination, who resembles whom", chip = scope_chip(all = TRUE),
             info_pop("PCoA ordination",
               p("Every point is a ", tags$b("site × year"), " beetle community, placed by ",
                 tags$b("Bray–Curtis"), " dissimilarity (PCoA) so similar communities sit close together."),
@@ -422,7 +436,7 @@ ui <- bslib::page_fillable(
           pinnable_chart("ordPlotBox", "ordination", "ordPlot", height = "440px",
             hint = "Tap a point to reveal that site \U00D7 year community")),
         card(full_screen = TRUE,
-          card_head("award", "Indicator species, each site's signature beetles",
+          card_head("award", "Indicator species, each site's signature beetles", chip = scope_chip(all = TRUE),
             info_pop("Indicator value (IndVal)",
               p("The ", tags$b("Dufrêne–Legendre IndVal"), " (0–100) flags species that are both ",
                 tags$b("concentrated in"), " and ", tags$b("reliably found at"), " one site."),
@@ -431,7 +445,7 @@ ui <- bslib::page_fillable(
                 tags$li(tags$b("Fidelity"), ": share of that site's samples where it turns up")),
               p("High on both = a genuine signature of that place. Computed across all bundled sites; samples are plot × year."))),
           spin(DT::DTOutput("indicatorTable"))),
-        card(card_head("table", "Site comparison"),
+        card(card_head("table", "Site comparison", chip = scope_chip(all = TRUE)),
              spin(DT::DTOutput("siteTable")),
              p(class = "qa-cite", style = "margin:6px 0 0; font-size:12px;",
                "Observed totals. Sites differ in habitat, years sampled and trapping effort, so these counts are not a ranking."))
@@ -441,8 +455,8 @@ ui <- bslib::page_fillable(
         title = tagList(bs_icon("search"), " Search"), value = "search",
         div(class = "tab-head",
           div(class = "tab-head-text",
-            h4("Search the network"),
-            p("Look across every NEON site at once. Find one beetle and see everywhere it has been caught, or pull up the sites that match a number. This searches a small bundled index, so it is instant and never goes online."))),
+            h3("Search the network"),
+            p("Look across every NEON site at once. Find one beetle and see everywhere it has been caught, or pull up the sites that match a number."))),
         div(class = "search-modeswitch",
           radioButtons("searchMode", NULL, inline = TRUE,
             choices = c("Find a beetle" = "taxon", "Filter sites" = "thresh"),
@@ -452,7 +466,7 @@ ui <- bslib::page_fillable(
         conditionalPanel(
           "input.searchMode == 'taxon'",
           card(
-            card_head("bug", "Find a beetle, see where it lives"),
+            card_head("bug", "Find a beetle, see where it lives", chip = scope_chip(all = TRUE)),
             div(class = "search-controls",
               selectizeInput("searchTaxon", "Pick a beetle (type to filter)",
                              choices = NULL, width = "420px",
@@ -468,7 +482,7 @@ ui <- bslib::page_fillable(
         conditionalPanel(
           "input.searchMode == 'thresh'",
           card(
-            card_head("funnel", "Filter the network"),
+            card_head("funnel", "Filter the network", chip = scope_chip(all = TRUE)),
             div(class = "search-controls",
               radioButtons("searchThreshKind", NULL, inline = TRUE,
                 choices = c("Introduced (European) species, and where" = "intro",
@@ -491,7 +505,7 @@ ui <- bslib::page_fillable(
         uiOutput("aboutPanel")
       )
     )
-  ),
+  )),
 
   # ---- footer ------------------------------------------------------------
   div(class = "ddl-footer",

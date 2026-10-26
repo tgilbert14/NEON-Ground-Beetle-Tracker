@@ -127,6 +127,20 @@ jobs:
       - name: Source the complete app offline
         run: Rscript --vanilla -e 'Sys.setenv(GBT_LIVE="0"); source("global.R"); source("ui.R"); server_candidate <- source("server.R")$value; stopifnot(inherits(ui, "shiny.tag.list") || inherits(ui, "shiny.tag"), is.function(server_candidate))'
 
+      - name: Require the shell build digest to equal DDL_BUILD
+        run: |
+          set -euo pipefail
+          # post-deploy.yml expects the live marker build=<digest> from
+          # scripts/build_digest.sh, so it must agree with the app's DDL_BUILD.
+          shell_digest=$(bash scripts/build_digest.sh)
+          # shellcheck disable=SC2016 # R code, not shell expansions
+          r_digest=$(Rscript --vanilla -e 'Sys.setenv(GBT_LIVE="0"); suppressMessages(source("global.R")); cat(DDL_BUILD)')
+          echo "build_digest.sh=${shell_digest} DDL_BUILD=${r_digest}"
+          if [[ -z "$shell_digest" || "$shell_digest" != "$r_digest" ]]; then
+            echo "::error title=Build digest mismatch::scripts/build_digest.sh printed '${shell_digest}' but global.R DDL_BUILD is '${r_digest}'."
+            exit 1
+          fi
+
       - name: Upload validated manifest candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

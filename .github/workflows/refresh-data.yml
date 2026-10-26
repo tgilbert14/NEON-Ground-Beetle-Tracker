@@ -4,7 +4,10 @@ name: Propose NEON data refresh
 # staging directory; the committed known-good bundle is replaced only after the
 # exact canonical site roster exists. The validator rebuilds every derived index
 # and the manifest, verifies the complete candidate, and uploads immutable bytes.
-# Only the final job can write, and it publishes a review PR — never main.
+# Only the final job can write: it pushes automation/ground-beetle-data-refresh,
+# never main, and never opens its own PR (a reviewer opens it from the compare URL).
+#
+# Public repo: GitHub disables this schedule after 60 days without repository activity; a merged commit re-arms it. The keepalive job is a trial guard.
 
 on:
   schedule:
@@ -33,6 +36,9 @@ env:
   OPENBLAS_NUM_THREADS: "1"
   OMP_NUM_THREADS: "1"
   GBT_LIVE: "0"
+  # Pinned NEON release for DP1.10022.001. Bumping this value in a reviewed PR is
+  # the only way to adopt a new NEON release; release_watch warns when one is out.
+  GBT_RELEASE: "RELEASE-2026"
 
 jobs:
   gate:
@@ -113,8 +119,6 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: read
-    env:
-      NEON_TOKEN: ${{ secrets.NEON_TOKEN }}
     steps:
       - name: Checkout the immutable source revision
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -156,6 +160,7 @@ jobs:
       - name: Build the full site bundle in an empty staging directory
         if: ${{ github.event.inputs.skip_download != 'true' }}
         env:
+          NEON_TOKEN: ${{ secrets.NEON_TOKEN }}
           GBT_SITE_OUT_DIR: ${{ runner.temp }}/ground-beetle-sites
           GBT_REFRESH_BUILD_ONLY: "1"
         run: |
@@ -171,6 +176,54 @@ jobs:
           set -euo pipefail
           rm -f data/sites/*.rds
           cp -- "$GBT_SITE_OUT_DIR"/*.rds data/sites/
+
+      - name: Record the pinned NEON release (anonymous product endpoint, no token)
+        # A skip run keeps the committed bundles, so it must not stamp a newly
+        # bumped GBT_RELEASE onto old data.
+        if: ${{ github.event.inputs.skip_download != 'true' }}
+        run: Rscript --vanilla scripts/record_release.R
+
+      - name: Sync environmental overlays from the Small Mammal Tracker
+        if: ${{ github.event.inputs.skip_download != 'true' }}
+        env:
+          SMALL_MAMMAL_REPO: https://github.com/tgilbert14/NEON-Small-Mammal-Tracker-App.git
+        run: |
+          # data/env/<SITE>.rds is shared with the Small Mammal Tracker. Copy a
+          # site's file only when it keeps exactly the committed column names and
+          # types; otherwise keep the committed file and warn, naming the site.
+          set -euo pipefail
+          src="$RUNNER_TEMP/small-mammal-tracker"
+          rm -rf "$src"
+          git clone --depth 1 --quiet "$SMALL_MAMMAL_REPO" "$src"
+          # shellcheck disable=SC2016 # R code, not shell expansions
+          GBT_ENV_SRC="$src/data/env" Rscript --vanilla -e '
+            src <- Sys.getenv("GBT_ENV_SRC")
+            roster <- sort(sub("[.]rds$", "", list.files("data/sites", pattern = "[.]rds$")))
+            sig <- function(x) if (is.data.frame(x)) paste(names(x), vapply(x, function(col) class(col)[1], ""), sep = ":") else NA_character_
+            committed <- list.files("data/env", pattern = "[.]rds$", full.names = TRUE)
+            shared <- unique(lapply(committed, function(f) sig(readRDS(f))))
+            copied <- 0L
+            for (site in roster) {
+              from <- file.path(src, paste0(site, ".rds"))
+              to <- file.path("data/env", paste0(site, ".rds"))
+              if (!file.exists(from)) {
+                cat(sprintf("::warning title=Env overlay kept::%s has no data/env file upstream; keeping ours.\n", site))
+                next
+              }
+              want <- if (file.exists(to)) sig(readRDS(to)) else if (length(shared) == 1L) shared[[1]] else NA_character_
+              cand <- tryCatch(readRDS(from), error = function(e) NULL)
+              ok <- !anyNA(want) && !is.null(cand) && identical(sig(cand), want) &&
+                nrow(cand) > 0L && all(as.character(cand$siteID) == site)
+              if (!ok) {
+                cat(sprintf("::warning title=Env overlay kept::%s upstream file does not match our committed columns and types (or siteID); keeping ours.\n", site))
+                next
+              }
+              stopifnot(file.copy(from, to, overwrite = TRUE))
+              copied <- copied + 1L
+            }
+            cat(sprintf("Env overlay sync: copied %d of %d roster sites from the Small Mammal Tracker.\n", copied, length(roster)),
+                file = Sys.getenv("GITHUB_STEP_SUMMARY"), append = TRUE)
+          '
 
       - name: Rebuild derived indexes
         run: |
@@ -216,6 +269,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write
     steps:
       - name: Checkout the validated source revision
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -239,10 +293,29 @@ jobs:
             echo "Producer revision does not contain current main; refusing stale publication."
             exit 1
           fi
+          candidate="$RUNNER_TEMP/refresh-candidate/ground-beetle-refresh.tgz"
+          # Every member must be manifest.json or under data/: no absolute paths
+          # and no ".." segments, checked before anything is extracted.
+          members=$(tar -tzf "$candidate")
+          if [ -z "$members" ]; then
+            echo "Candidate tarball lists no members; refusing publication."
+            exit 1
+          fi
+          while IFS= read -r member; do
+            case "$member" in
+              /*|..|../*|*/../*|*/..)
+                echo "Candidate member has an absolute or parent path: $member"; exit 1 ;;
+              manifest.json|data/*) ;;
+              *)
+                echo "Candidate member is outside data/ and manifest.json: $member"; exit 1 ;;
+            esac
+          done <<< "$members"
           [[ -d data && ! -L data ]]
           find data -mindepth 1 -delete
-          tar -xzf "$RUNNER_TEMP/refresh-candidate/ground-beetle-refresh.tgz"
-          if git diff --quiet -- data manifest.json; then
+          tar -xzf "$candidate"
+          # Stage first so a new untracked bundle (for example a new site) counts.
+          git add -A -- data manifest.json
+          if git diff --cached --quiet; then
             echo "No validated data change; no review branch created."
             exit 0
           fi
@@ -292,6 +365,21 @@ jobs:
               echo "- [Open the reviewer-authenticated PR]($compare_url)"
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::notice title=Validated review branch ready::Open a reviewer-authenticated PR from $branch to main after reviewing run ${GITHUB_RUN_ID}; that PR event is the exact-head CI trigger."
+            # One review-request issue, never duplicated: update it when it exists.
+            issue_title="Data refresh ready for review: ground-beetle"
+            # shellcheck disable=SC2016 # literal Markdown backticks and jq variables
+            issue_body=$(printf '%s\n\n- Compare and open the PR: %s\n- Exact head: `%s`\n- Validator run: %s\n' \
+              "A validated ground-beetle data refresh is on \`$branch\`. Review it, then open a reviewer-authenticated PR to main." \
+              "$compare_url" "$published_commit" \
+              "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
+            issue_number=$(gh issue list --state open --search "\"$issue_title\" in:title" --json number,title \
+              | jq -r --arg t "$issue_title" '[.[] | select(.title == $t)][0].number // empty')
+            if [ -n "$issue_number" ]; then
+              gh issue edit "$issue_number" --body "$issue_body"
+              gh issue comment "$issue_number" --body "Updated to exact head \`$published_commit\` by ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}."
+            else
+              gh issue create --title "$issue_title" --body "$issue_body"
+            fi
             exit 0
           fi
 
@@ -312,3 +400,111 @@ jobs:
           gh pr comment "$pr_url" \
             --body "Updated from ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. GitHub will hold the pull_request synchronize checks triggered by this automation update for approval; a repository write user must select **Approve workflows to run**. Do not merge until checks are green on exact head ${published_commit}."
           echo "::notice title=Approve exact-head PR checks::Existing PR updated to $published_commit. A repository write user must select Approve workflows to run, then verify green checks on that exact head."
+
+  keepalive:
+    # Trial keepalive: re-enabling an already enabled workflow is meant to keep the
+    # 60-day inactivity clock from disabling the schedule. It cannot revive a
+    # schedule that GitHub has already disabled; only a merged commit or a manual
+    # enable does that. Independent of the gate; it never fails the run.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Report workflow state and re-enable the schedule (trial)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          state=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/refresh-data.yml" --jq .state 2>/dev/null) || state="unknown"
+          echo "Refresh workflow state before keepalive: ${state:-unknown}" | tee -a "$GITHUB_STEP_SUMMARY"
+          if gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/refresh-data.yml/enable" >/dev/null 2>&1; then
+            echo "Trial keepalive: enable call accepted." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=Keepalive call failed::The trial enable call for refresh-data.yml did not succeed; the schedule still re-arms on the next merged commit."
+            echo "Trial keepalive: enable call failed (warning only)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  release_watch:
+    # Anonymous NEON product metadata only; no NEON token is mapped here. A network
+    # or parse failure is a warning, never a failed run.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Compare NEON releases and change logs with the pinned release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PRODUCT_URL: https://data.neonscience.org/api/v0/products/DP1.10022.001
+        run: |
+          set -uo pipefail
+          meta=$(mktemp)
+          if ! curl -sS --fail --retry 3 --retry-all-errors --max-time 60 -o "$meta" "$PRODUCT_URL" \
+               || ! jq -e '.data.releases | length > 0' "$meta" >/dev/null 2>&1; then
+            echo "::warning title=NEON release watch skipped::Could not read $PRODUCT_URL; no release or change-log verdict this run."
+            echo "NEON release watch: product metadata unavailable; skipped." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Every NEON field written to the summary or issue has CR and LF
+          # stripped, and only a ^RELEASE-[0-9]{4}$ tag counts as a release.
+          newest=$(jq -r '[.data.releases[].release | strings | select(test("\\ARELEASE-[0-9]{4}\\z"))] | sort | last // empty' "$meta" | tr -d '\r\n')
+          if ! [[ "$newest" =~ ^RELEASE-[0-9]{4}$ ]]; then
+            newest=""
+          fi
+          pinned_date=$(jq -r --arg r "$GBT_RELEASE" '[.data.releases[] | select(.release == $r) | .generationDate][0] // empty' "$meta" | tr -d '\r\n')
+          new_release=""
+          if [ -n "$newest" ] && [ "$newest" != "$GBT_RELEASE" ]; then
+            new_release="$newest"
+            echo "::warning title=New NEON release::NEON $newest is out; bump GBT_RELEASE after review"
+          fi
+          if [ -z "$pinned_date" ]; then
+            echo "::warning title=Pinned release not listed::$GBT_RELEASE is not in the product release list; change logs are not filtered."
+            pinned_date="0000"
+          fi
+          changes=$(jq -r --arg d "$pinned_date" '
+            def clean: tostring | gsub("[\\r\\n]+"; " ") | gsub("\\|"; "/");
+            [.data.changeLogs[]? | select((.issueDate // "") > $d)]
+            | sort_by(.issueDate)[]
+            | "| \((.id // "") | clean) | \((.issueDate // "") | clean) | \((.locationAffected // "") | clean) | \((.issue // "") | clean | .[0:140]) |"' "$meta" | tr -d '\r')
+          {
+            echo "### NEON release watch: DP1.10022.001"
+            echo "- Pinned release: \`$GBT_RELEASE\` (generated ${pinned_date})"
+            echo "- Newest RELEASE tag: \`${newest:-none}\`"
+            if [ -n "$changes" ]; then
+              echo ""
+              echo "Change-log entries issued after the pinned release:"
+              echo ""
+              echo "| id | issueDate | locationAffected | issue (first 140 chars) |"
+              echo "| --- | --- | --- | --- |"
+              echo "$changes"
+            else
+              echo "- No change-log entries issued after the pinned release."
+            fi
+          } > "$RUNNER_TEMP/release-watch.md"
+          cat "$RUNNER_TEMP/release-watch.md" >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$meta"
+          if [ -z "$new_release" ] && [ -z "$changes" ]; then
+            exit 0
+          fi
+          title="NEON release or change log needs review: ground-beetle"
+          body=$(cat "$RUNNER_TEMP/release-watch.md")
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          number=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            | jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty') || {
+            echo "::warning title=Release watch issue not updated::Could not list issues."; exit 0; }
+          if [ -z "$number" ]; then
+            gh issue create --title "$title" --body "$body" \
+              || echo "::warning title=Release watch issue not created::gh issue create failed."
+          else
+            current=$(gh issue view "$number" --json body --jq .body 2>/dev/null) || current=""
+            if [ "$current" != "$body" ]; then
+              gh issue edit "$number" --body "$body" \
+                && gh issue comment "$number" --body "Release watch content changed. Run: $run_url" \
+                || echo "::warning title=Release watch issue not updated::gh issue edit failed."
+            else
+              echo "Release watch issue #$number is already current." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi

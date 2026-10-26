@@ -255,6 +255,128 @@ assert(identical(tc_old$clear, tc_old$sig_all) && isTRUE(tc_old$clear),
 t_flat_old <- annual_trend(trend_fixture(yrs_old, 50 + noise))
 assert(isFALSE(trend_call(t_flat_old)$clear), "a flat series without 2023 must not be clear")
 assert(identical(trend_call(annual_trend(trend_fixture(2019:2022, c(5, 8, 9, 12))))$kind, "few"),
-       "under five years must stay the 'few' call")
+       "under six years must stay the 'few' call")
+assert(identical(trend_call(annual_trend(trend_fixture(2016:2020, 100 - 10 * (0:4))))$kind, "few"),
+       "five years is below the suite gate of six and must be the 'few' call")
+
+# Partial seasons: a year that sampled only part of the core season is flagged
+# `partial`, keeps its plotted value, and is left out of the season check.
+season_fixture <- function(rows) {
+  data.frame(siteID = "TEST", plotID = "P1",
+             collectDate = as.Date(sprintf("%d-%02d-15", rows$year, rows$mon)),
+             trapnights = 100, individualCount = rows$count,
+             scientificName = "Carabus nemoralis", stringsAsFactors = FALSE)
+}
+full_mon <- data.frame(mon = 5:8, base = c(20, 80, 80, 20))
+season_rows <- do.call(rbind, lapply(2012:2019, function(y)
+  data.frame(year = y, mon = full_mon$mon, count = full_mon$base + c(1, -1, 2, -2) * ((y %% 3) - 1))))
+season_rows <- rbind(season_rows, data.frame(year = 2020, mon = c(6, 7), count = c(80, 80)))
+t_part <- annual_trend(season_fixture(season_rows))
+assert(identical(attr(t_part, "years_partial"), 2020L) && isTRUE(t_part$partial[t_part$year == 2020]) &&
+         all(t_part$partial[t_part$year != 2020] %in% FALSE),
+       "a year with only two sampled months must be the only partial year")
+assert(isTRUE(all.equal(t_part$cpn[t_part$year == 2020], 80)) &&
+         isTRUE(all.equal(t_part$cpn[t_part$year == 2012], 100 * sum(season_rows$count[season_rows$year == 2012]) / 400)),
+       "the partial flag must leave the plotted calendar-year cpn unchanged")
+assert(identical(attr(t_part, "n_core"), 8L), "n_core must count the full-season years")
+assert(identical(trend_call(t_part)$years_partial, 2020L) &&
+         grepl("here: 2020", trend_partial_note(trend_call(t_part))),
+       "the verdict must name the partial year")
+# A significant all-years decline that comes only from two short final seasons
+# (sampled in the low shoulder months) is apparent, not clear.
+drop_rows <- do.call(rbind, lapply(2012:2017, function(y)
+  data.frame(year = y, mon = full_mon$mon, count = full_mon$base + c(3, -3, 2, -2) * ((y %% 3) - 1))))
+drop_rows <- rbind(drop_rows,
+  data.frame(year = c(2018, 2018, 2019, 2019), mon = c(5, 8, 5, 8), count = c(19, 21, 20, 18)))
+t_drop <- annual_trend(season_fixture(drop_rows))
+tc_drop <- trend_call(t_drop)
+assert(identical(tc_drop$kind, "fit") && isTRUE(tc_drop$sig_all) && tc_drop$slope < 0,
+       "fixture: the all-years decline must be significant")
+assert(identical(attr(t_drop, "years_partial"), c(2018L, 2019L)) && identical(tc_drop$n_core, 6L),
+       "both short seasons must be partial, leaving six full-season years")
+assert(isFALSE(tc_drop$clear) && isTRUE(tc_drop$partial_fail) && isFALSE(tc_drop$holds_core) &&
+         isFALSE(tc_drop$rests_on_2023),
+       "a slope that disappears without the partial years must not be clear")
+assert(grepl("partial season are left out", trend_fail_clause(tc_drop)),
+       "the verdict must name the failed season check")
+
+assert(identical(tc_drop$check_season, "fail") && !grepl("cannot be confirmed", trend_fail_clause(tc_drop)),
+       "a season check that ran and failed must read as a failure")
+
+# Both exclusions together (audit wave 2 review): with 2023 in the series the
+# season check refits on full-season years other than 2023. Here each check
+# passes on its own (the calendar series without 2023, and the full-season
+# series with 2023), but the full-season series without 2023 does not, so the
+# call is not clear. The two early partial years sampled only peak months.
+both_v <- 50 - 0.2 * (0:8) + noise
+both_v <- c(both_v, both_v[9] - 6)
+both_rows <- rbind(
+  data.frame(year = rep(2012:2013, each = 2), mon = c(6, 7, 6, 7), count = 80),
+  do.call(rbind, lapply(seq_along(2014:2023), function(i)
+    data.frame(year = (2014:2023)[i], mon = full_mon$mon, count = full_mon$base * both_v[i] / 50))))
+t_both <- annual_trend(season_fixture(both_rows))
+tc_both <- trend_call(t_both)
+assert(isTRUE(tc_both$sig_all) && is.finite(tc_both$p_ex2023) && tc_both$p_ex2023 < 0.05 &&
+         sign(tc_both$slope_ex2023) == sign(tc_both$slope),
+       "fixture: the 2023 check must pass on its own")
+assert(is.finite(attr(t_both, "p_core")) && attr(t_both, "p_core") < 0.05 &&
+         sign(attr(t_both, "slope_core")) == sign(tc_both$slope) && attr(t_both, "n_core") >= 6,
+       "fixture: the season check with 2023 kept must pass on its own")
+assert(identical(attr(t_both, "n_core_ex2023"), 9L) && attr(t_both, "p_core_ex2023") >= 0.05,
+       "the season refit without 2023 must count 9 full-season years and not be significant")
+assert(isFALSE(tc_both$clear) && isTRUE(tc_both$partial_fail) && identical(tc_both$check_2023, "pass") &&
+         identical(tc_both$check_season, "fail"),
+       "a trend that fails only with both exclusions applied must not be clear")
+assert(grepl("partial season and 2023 are left out", trend_fail_clause(tc_both)),
+       "the verdict must name the combined season check")
+assert(is.null(attr(t_part, "n_core_ex2023")) && identical(trend_call(t_part)$season_n, 8L),
+       "without 2023 the season check must use the core fit")
+
+# A check that could not run reads as "cannot be confirmed", not as a failure:
+# six years with 2023 leave five without it, too few to test.
+t_six <- annual_trend(trend_fixture(2018:2023, 100 - 10 * (0:5) + noise[1:6]))
+tc_six <- trend_call(t_six)
+assert(isTRUE(tc_six$sig_all) && identical(tc_six$check_2023, "unconfirmed") &&
+         identical(tc_six$check_season, "unconfirmed") && isFALSE(tc_six$clear),
+       "six years with 2023 must leave both checks unconfirmed")
+six_txt <- trend_fail_clause(tc_six)
+assert(grepl("^which cannot be confirmed without the 2023 value", six_txt) &&
+         grepl("too few comparable years remain$", six_txt) && !grepl("does not hold up", six_txt),
+       "an unrun check must read as cannot be confirmed, not as a failure")
+
+# Sampled-zero site (effort rows, no carabid catch): community_table() is NULL
+# and the precomputed site_index row still builds, with zeros and no dominant.
+zero_row <- site_index_row(zero_d, "TEST")
+assert(nrow(zero_row) == 1L && zero_row$richness == 0L && zero_row$individuals == 0 &&
+         zero_row$individuals_species == 0 && is.na(zero_row$dominant) &&
+         identical(zero_row$years, 1L),
+       "a sampled-zero bundle must give richness 0, individuals 0, no dominant, years from effort")
+assert(zero_row$trapnights == 20 && zero_row$cpn == 0,
+       "a sampled-zero site keeps its trap-nights and a real zero catch rate")
+d_row <- site_index_row(d, "TEST")
+assert(d_row$trapnights == 20 && abs(d_row$cpn - 25) < 1e-10 && d_row$individuals == 9,
+       "site_index cpn counts only eligible catch over the unique effort anchors")
+
+# Accumulation and per-species seasonality with an effort-only bout: three
+# sampled plot-bouts, catch in one, so the curve runs over 3 bouts and July (a
+# sampled month with no catch) reads 0 for each species.
+acc_fx <- data.frame(
+  siteID = "TEST", plotID = c("P1", "P1", "P1", "P2", "P1"),
+  collectDate = as.Date(c("2024-06-10", "2024-06-10", "2024-06-10", "2024-06-10", "2024-07-10")),
+  taxonID = c("T1", "T2", NA, NA, NA),
+  scientificName = c("Carabus nemoralis", "Harpalus pensylvanicus", NA, NA, NA),
+  taxonRank = c("species", "species", NA, NA, NA),
+  individualCount = c(3, 2, 0, 0, 0), trapnights = 10,
+  record_type = c("catch", "catch", "effort", "effort", "effort"),
+  traps_sampled = 3L, effort_records = 3L,
+  effort_status = "valid_sample_collected", stringsAsFactors = FALSE)
+acc_d <- clean_beetle(acc_fx)
+acc <- accumulation_by_bout(acc_d)
+assert(!is.null(acc) && nrow(acc) == 3L && max(acc$richness) == 2,
+       "accumulation must count every sampled plot-bout, including effort-only ones")
+seas_sp <- seasonality(acc_d, by_species = TRUE)
+jul <- seas_sp[seas_sp$mon == 7L, , drop = FALSE]
+assert(nrow(jul) == 2L && all(jul$cpn == 0),
+       "a sampled month with no catch of a species must read 0, not a missing row")
 
 cat("OK: Ground Beetle effort, zero-catch, taxonomy, detection, QC, and legacy contracts passed.\n")

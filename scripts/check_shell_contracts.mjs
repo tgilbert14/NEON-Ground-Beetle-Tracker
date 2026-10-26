@@ -96,10 +96,20 @@ const verdictCount = count(/class\s*=\s*"verdict-text"/g, server);
 if (verdictCount !== 9) fail(`server.R must have 9 class = "verdict-text" banner spans; found ${verdictCount}`);
 if (!/\.verdict-text\s*\{[^}]*min-width:\s*0/.test(css)) fail("www/styles.css must define a .verdict-text rule with min-width: 0");
 
-// Item 23: Space on a role=button QC flag must not scroll the page.
-const qcKeydown = (server.match(/onkeydown\s*=\s*sprintf\("([^"]*beetleQcInspect[^"]*)"/) || [])[1] || "";
-if (!qcKeydown) fail("server.R QC flag onkeydown handler not found");
-else if (!/event\.preventDefault\(\)/.test(qcKeydown)) fail("server.R QC flag onkeydown must call event.preventDefault()");
+// Item 23: Space on a role=button QC flag must not scroll the page. One delegated
+// keydown handler in ui.R covers every flag; no inline onkeydown on the flags.
+const qcHandler = ui.split("\n").find((line) =>
+  /addEventListener\(\s*'keydown'/.test(line) && /qc-flag-click/.test(line)) || "";
+if (!qcHandler) fail("ui.R must define one delegated document keydown handler for .qc-flag-click");
+else {
+  if (!/preventDefault\(\)/.test(qcHandler)) fail("ui.R QC keydown handler must call preventDefault()");
+  if (!/'Enter'/.test(qcHandler) || !/' '/.test(qcHandler)) fail("ui.R QC keydown handler must handle Enter and Space");
+  if (!/\.click\(\)/.test(qcHandler)) fail("ui.R QC keydown handler must click the flag");
+}
+if (/onkeydown\s*=/.test(server)) fail("server.R must not put an inline onkeydown on QC flags (use the delegated handler)");
+if (!/qc-flag-click[\s\S]{0,400}onclick\s*=\s*sprintf\("Shiny\.setInputValue\('beetleQcInspect'/.test(server)) {
+  fail("server.R QC flags must keep the beetleQcInspect onclick");
+}
 
 // Item 18: marker-bound popups must close before a map is hidden. leaflet's
 // clearPopups() does not touch them, so the client helper must exist, run on
@@ -163,5 +173,31 @@ const pickerCall = (server.match(/mapPickerServer\(\s*"picker"[\s\S]*?radius_met
 if (pickerCall.trim() !== "NULL") fail('server.R mapPickerServer("picker", ...) must pass radius_metric = NULL (fixed-size dots)');
 if (/Dot size is species richness/.test(ui)) fail("ui.R must not describe dot size as species richness (HELD)");
 if (/fewer \\U2192 more species|fewer → more species/.test(ui)) fail("ui.R must not carry the richness dot-size legend (HELD)");
+
+// HELD: the two Search tables default to state then site order, never to an
+// activity-density or richness ordering (the columns stay sortable by click).
+for (const name of ["search_taxon_rows", "search_thresh_rows"]) {
+  const at = server.indexOf(`${name} <- reactive(`);
+  const body = at < 0 ? "" : braceBody(server, at);
+  if (!body) { fail(`server.R ${name} reactive not found`); continue; }
+  if (/order\([^\n]*(activity_density|richness|individuals)/.test(body) ||
+      /(arrange|desc)\([^\n]*(activity_density|richness)/.test(body)) {
+    fail(`server.R ${name} must not order by activity-density or richness (HELD)`);
+  }
+  if (!/order\(\s*r\$state\s*,\s*r\$siteID/.test(body)) {
+    fail(`server.R ${name} must default to state then site order`);
+  }
+}
+for (const name of ["searchTaxonTable", "searchThreshTable"]) {
+  const at = server.indexOf(`output$${name} <- DT::renderDT(`);
+  const body = at < 0 ? "" : braceBody(server, at);
+  if (!body) { fail(`server.R output$${name} not found`); continue; }
+  if (/order\s*=\s*list\(\s*list\(/.test(body)) {
+    fail(`server.R output$${name} must not set a default DT column order (HELD)`);
+  }
+  if (!/order\s*=\s*list\(\s*\)/.test(body)) {
+    fail(`server.R output$${name} must pass order = list() so the row order is kept`);
+  }
+}
 
 if (!process.exitCode) console.log("OK: Ground Beetle shell contracts passed");
