@@ -778,7 +778,8 @@ beetle_blurb <- function(scientificName) {
 # "most abundant / dominant" verdict reads backwards — a dominant European beetle
 # requires non-native context. Keyed on the exact binomial (not genus:
 # most Pterostichus/Carabus are native) so only the established invaders flag.
-# Refs: Bousquet 2012 (Carabidae of America N of Mexico); Lindroth 1961-69.
+# Refs: Bousquet 2012 (Carabidae of America N of Mexico); Lindroth 1961-69;
+# Liebherr & Takumi 2002 (Trechus obtusus in Hawaii).
 INTRODUCED_CARABIDS <- c(
   "Pterostichus melanarius",   # common black ground beetle — widespread European invader
   "Carabus nemoralis",         # European bronze carabid, established across the N US
@@ -792,7 +793,9 @@ INTRODUCED_CARABIDS <- c(
   "Pseudoophonus rufipes",
   "Amara aenea",
   "Trechus quadristriatus",
-  "Anisodactylus binotatus"
+  "Anisodactylus binotatus",
+  "Trechus obtusus",           # Palearctic; introduced to Hawaii (Liebherr & Takumi 2002, Pacific Science 56:365-375), dominant at PUUM
+  "Agonum muelleri"            # Palearctic; adventive in North America and Hawaii (Bousquet 2012)
 )
 # TRUE for an introduced/non-native European carabid (exact-binomial match, so a
 # subgenus tag or trailing author string is tolerated; vectorised).
