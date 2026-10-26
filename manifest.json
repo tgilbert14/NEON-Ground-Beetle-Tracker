@@ -3248,10 +3248,13 @@
       "checksum": "09eaf8b677d24ddcc48b6fa0e23e6040"
     },
     "data/precomputed.rds": {
-      "checksum": "2751c4e7ccaa667576484601780b11fd"
+      "checksum": "7dd6828b8cd94ba15d70645bb57c1895"
+    },
+    "data/release.rds": {
+      "checksum": "1a9fd86b7d809f985707437a8f54de63"
     },
     "data/search_index.rds": {
-      "checksum": "aef70f713229a45c4536f02352d1698a"
+      "checksum": "e59037b1cc4d1c8061f7d9cc16a46b1f"
     },
     "data/sites/ABBY.rds": {
       "checksum": "a1c6dab3ea9a0c832ebc11b0a6bf2de1"
@@ -3340,6 +3343,9 @@
     "data/sites/OSBS.rds": {
       "checksum": "18d0cfaa0414df899a09eb30049c328b"
     },
+    "data/sites/PUUM.rds": {
+      "checksum": "397a97066fdfe3cc3467c7467145c94f"
+    },
     "data/sites/RMNP.rds": {
       "checksum": "bcffbcd6a903eeea4b57764f2d611fc0"
     },
@@ -3392,28 +3398,28 @@
       "checksum": "16d8f0cc826b436eac0cf2f6d479ec78"
     },
     "global.R": {
-      "checksum": "25446f8b5de8f2fdb2da5527fb1f3e61"
+      "checksum": "4414b2b39398fd0ab233d6581b0b67dc"
     },
     "R/helpers.R": {
-      "checksum": "e25eb10497735e6f999457d79907ea6f"
+      "checksum": "072f9963cce1b51888c2c4b3706666bb"
     },
     "R/map_picker.R": {
       "checksum": "898c4ede149a0ca0f4d8bf226b883657"
     },
     "R/report_pdf.R": {
-      "checksum": "5ae6bfdf7a75490eb9de4d27dbafda47"
+      "checksum": "ac8a26376cf59ee3219ec1c8f1cd77c1"
     },
     "R/seasonal_env.R": {
       "checksum": "dac63e6aa78b665e297bfc608b7e86b0"
     },
     "R/site_metadata.R": {
-      "checksum": "78f85ef17669abcf1d86cda178609c7b"
+      "checksum": "216c332786e2afdd9ca9656aa4601d84"
     },
     "server.R": {
-      "checksum": "6cf6466dc621ac9a7f117fe8ba8f7a89"
+      "checksum": "63d8a5bd6a5f04d967aa44f84001f4d8"
     },
     "ui.R": {
-      "checksum": "7df7f7d9ac6810dcb462995570ed8af1"
+      "checksum": "d82fa06d7921eb5db41b21a88fd67207"
     },
     "www/assets/ground-beetle-living-poster-840.webp": {
       "checksum": "a6f6ee5226fb85db35d1b850b44ee16e"
@@ -3425,10 +3431,10 @@
       "checksum": "5a93a5d1cf564d2d512048aafc3d17c6"
     },
     "www/pincards.js": {
-      "checksum": "8067bcf56d41f0c9006b6ada0e82f6f4"
+      "checksum": "a3a848d1415565367be6d0d032ed5169"
     },
     "www/styles.css": {
-      "checksum": "8491e26a370561f7d544de3a6487058e"
+      "checksum": "235e11a8a7095100f531c854e8e152cf"
     },
     "www/vendor/html-to-image-1.11.11.js": {
       "checksum": "1b01c7cd9fb375bd1fb395b3dfd31450"
