@@ -11,6 +11,12 @@ bundles, labels, exports, and Driver integration.
   the terrestrial sites and dates represented by the committed source data.
 - Primary outcome: Carabidae individuals caught, reconciled to the authoritative
   expert taxonomic identification where available.
+- Release policy: the bundle holds released data only, pinned to one NEON release
+  (`GBT_RELEASE`, today RELEASE-2026, DOI https://doi.org/10.48443/q9ne-6b77) with
+  `include.provisional = FALSE`. Expert identifications arrive after NEON's
+  provisional window, so provisional records stay out until a release includes
+  them. Adopting a newer release is a reviewed change to `GBT_RELEASE`; the refresh
+  workflow's release watch opens an issue when NEON publishes one.
 - Interpretation: effort-normalized catch is **activity-density**, not absolute
   population density, site health, habitat quality, or a causal climate response.
 
@@ -76,8 +82,20 @@ For an eligible scope:
   with earlier years. Trend charts and the PDF carry design-change markers at 2018
   and 2023 and the copy must not claim the 2023 change is normalised away. A
   plot-matched estimator is a separate HK-reviewed methods decision.
+- A trend is tested only with at least 6 years (the suite standard); fewer years
+  get a direction-only reading.
 - A trend verdict may say "statistically clear" only when the fit also holds,
-  with the same sign, after dropping the 2023 value (and at least 5 years remain).
+  with the same sign, after dropping the 2023 value (and at least 6 years remain),
+  and when it also holds on a season-standardised series: core months are those
+  sampled in at least 75% of years, a year missing a core month is a partial
+  season (for example 2020, when NEON reduced sampling for COVID), and the check
+  refits on full-coverage years only (at least 6). When 2023 is in the series the
+  season check also leaves 2023 out, so both exclusions apply together. A check
+  that lacks 6 comparable years is reported as "cannot be confirmed", not as a
+  failure.
+- The seasonal climate card correlates only comparable years: partial-season
+  years and 2023 are left out of its annual response before the n >= 6 and
+  adjusted-p gates apply.
   When significance rests on 2023 the verdict reads as an apparent change that
   depends on a non-comparable year; the plotted values and the slope are unchanged.
 - Preserve the existing small-series gate and show the number of supported years.
@@ -101,6 +119,8 @@ For an eligible scope:
 - Show species-level observed richness, composition, introduced-species context,
   seasonal activity, and exploratory environmental associations with their stated
   gates and caveats.
+- Treat PUUM (Hawaii, NEON domain D20) richness as a floor: NEON reports some
+  state-listed taxa there only above species rank.
 
 ### CANNOT
 

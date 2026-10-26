@@ -181,3 +181,55 @@ correct, still descriptive) and **`HOLD`** for any annual activity series that
 includes 2023 until a plot-matched estimator is reviewed. No Driver artifact byte
 changed. Next dependency: an HK-reviewed plot-matched annual estimator, then the
 existing separately reviewed Driver adapter with measured join and support.
+
+## 2026-10-21 22:15 MST - wave 2 production closeout
+
+PR #24 merged exact head `eb9351c` as `9680014e647580a67932988e7ac0bb89560c8172`,
+which is now both the runtime and the data/science authority. Exact-head CI
+`39692994645`, merged-main validation `39726281467`, Pages `39726280935` and
+semantic production `39726281393` passed. A headless Chromium harness confirmed
+the deployed Connect app serves the merged code (stylesheet md5, title and lang)
+and measured the species-key, rank-removal, 2023-verdict and site-picker fixes
+live; the measurements are in `docs/BUILD-TEST-HANDOFF.md`.
+
+Engineering learning for the suite: derived indexes that contain an ordination
+must be built in the pinned runtime. A macOS build of `data/precomputed.rds`
+differed from the pinned Linux build only in PCoA coordinates (at most 2.3e-15),
+which is enough to make a scheduled refresh propose a false data change. CI now
+rebuilds both indexes before its committed-bytes check.
+
+Driver decision for this closeout: **`NONE`** beyond the addendum above, which
+stands (`CONTEXT` for composition and richness, `HOLD` for any annual series that
+includes 2023). No Driver artifact byte changed. Next dependency: record this pass
+in the Driver suite register and implication backlog, then the HK-reviewed
+plot-matched annual estimator.
+
+## 2026-10-26 MST - audit finish addendum (PR #25 candidate)
+
+What changed for Driver use, all on PR #25 (not merged at the time of writing):
+
+- **Release identity is now explicit.** The bundle is pinned to NEON RELEASE-2026
+  (DOI https://doi.org/10.48443/q9ne-6b77, generated 2026-01-23, released data only,
+  data through 2023-12-20) and recorded in `data/release.rds`. A `release_watch`
+  job opens an issue when NEON publishes a newer release or a change-log entry
+  newer than the pinned release (today: the DELA closure, 2026-01-29).
+- **Roster: 47 sites.** PUUM (Hawaii, D20) joined from RELEASE-2026: 5 years
+  (2019 to 2023), 538 sampled plot-bouts, 6,970 beetles, 15 species. Its dominant
+  species, *Trechus obtusus* (58%), is introduced; some state-listed taxa there are
+  reported only above species rank, so its richness is a floor.
+- **Trend verdicts are stricter.** "Statistically clear" now needs at least 6
+  years and must hold without 2023 and on a season-standardised series with
+  partial seasons and 2023 left out together. On the 46 sites present before PUUM
+  that leaves BLAN and DELA declining and OSBS rising; 8 sites show only an
+  apparent change. The plotted annual values are unchanged.
+- **New site-index columns:** total trap-nights and catch per 100 trap-nights per
+  site, checked by an independent oracle in `scripts/verify_bundle.R`.
+
+Engineering learning: a full refresh with download reproduced all 46 existing site
+bundles byte for byte, so the producer is deterministic end to end; only the new
+PUUM bundle and the derived files changed.
+
+Driver decision for this addendum: **`NONE`** beyond the 2026-10-21 addendum, which
+stands (`CONTEXT` for composition and richness, `HOLD` for any annual series that
+includes 2023). PUUM adds one site outside the current Driver calendar; it changes no
+Driver input until the adapter is reviewed. No Driver artifact byte changed.

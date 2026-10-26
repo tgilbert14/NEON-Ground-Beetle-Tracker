@@ -12,6 +12,18 @@
 # never replace the committed known-good bundle.
 # Run from the project root:   Rscript scripts/refresh_data.R
 #
+# RELEASE-PINNED: every download asks NEON for exactly one tagged release,
+# GBT_RELEASE (default "RELEASE-2026"), with include.provisional = FALSE, so the
+# bundle never mixes provisional rows into a release build. The refresh workflow
+# sets GBT_RELEASE at workflow level. Downloads need NEON_TOKEN; the script stops
+# before the first download when it is empty.
+#
+# Companion steps that live outside this script:
+#   - data/env/<SITE>.rds (precip / air temp / phenology overlays) is synced from
+#     the Small Mammal repo by a step in the refresh workflow, not built here.
+#   - data/release.rds (release tag, generation date, DOI, citation, data-through
+#     date) is written by scripts/record_release.R after the bundle is complete.
+#
 # Verify table/column names once before a full run:
 #   names(neonUtilities::loadByProduct("DP1.10022.001", site="KONZ",
 #         startdate="2018-05", enddate="2018-09", check.size="F"))
@@ -27,32 +39,43 @@ suppressMessages({
 source("R/site_metadata.R")  # canonical site list
 source("R/helpers.R")        # assemble_beetles()
 
-out_dir <- Sys.getenv("GBT_SITE_OUT_DIR", unset = "data/sites")
+out_dir <- Sys.getenv("GBT_SITE_OUT_DIR", unset = "")
+if (!nzchar(out_dir)) out_dir <- "data/sites"   # an empty value counts as unset
 build_only <- identical(Sys.getenv("GBT_REFRESH_BUILD_ONLY", unset = "0"), "1")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 start_d <- "2013-01"
 end_d   <- format(Sys.Date(), "%Y-%m")
 sites   <- neon_sites$site
+GBT_RELEASE <- Sys.getenv("GBT_RELEASE", unset = "RELEASE-2026")
+if (!nzchar(GBT_RELEASE)) GBT_RELEASE <- "RELEASE-2026"
+if (!grepl("^RELEASE-[0-9]{4}$", GBT_RELEASE))
+  stop(sprintf("GBT_RELEASE must look like RELEASE-YYYY, got '%s'", GBT_RELEASE))
+neon_token <- Sys.getenv("NEON_TOKEN", unset = "")
 
-cat(sprintf("Refreshing %d sites (%s → %s) into %s/\n\n",
-            length(sites), start_d, end_d, out_dir))
+cat(sprintf("Refreshing %d sites (%s → %s, %s, no provisional) into %s/\n\n",
+            length(sites), start_d, end_d, GBT_RELEASE, out_dir))
 
 for (s in sites) {
   out <- file.path(out_dir, paste0(s, ".rds"))
   if (file.exists(out)) { cat(sprintf("• %-5s skip (exists, %.2f MB)\n", s, file.size(out)/1e6)); next }
 
+  if (!nzchar(neon_token)) stop("NEON_TOKEN is unset: data downloads need a token")
   cat(sprintf("• %-5s downloading…\n", s))
   raw <- tryCatch(
     loadByProduct(dpID = "DP1.10022.001", site = s, startdate = start_d, enddate = end_d,
-                  package = "basic", check.size = "F",
-                  token = Sys.getenv("NEON_TOKEN", unset = "")),
+                  package = "basic", release = GBT_RELEASE,
+                  include.provisional = FALSE, check.size = "F",
+                  token = neon_token),
     error = function(e) { cat(sprintf("    ERROR %s: %s\n", s, conditionMessage(e))); NULL })
   if (is.null(raw)) next
 
   d <- tryCatch(assemble_beetles(raw), error = function(e) {
     cat(sprintf("    assemble error %s: %s\n", s, conditionMessage(e))); NULL })
-  if (is.null(d) || !nrow(d)) { cat(sprintf("    no carabid data for %s\n", s)); next }
+  # A site with effort anchors but no Carabidae catch is a real sampled-zero site
+  # and is saved; only a table with neither effort nor catch rows is skipped (and
+  # then fails the roster check below).
+  if (is.null(d) || !nrow(d)) { cat(sprintf("    no effort or catch rows for %s\n", s)); next }
 
   # Materialize EVERY column to a plain base vector before save. assemble_beetles()
   # returns arrow/ALTREP-backed columns: a cold readRDS() + bulk access (nrow/names)
@@ -92,6 +115,22 @@ if (!identical(built_sites, expected_sites)) {
     paste(setdiff(expected_sites, built_sites), collapse = ","),
     paste(setdiff(built_sites, expected_sites), collapse = ",")
   ))
+}
+# Every site file must carry explicit effort anchors. Zero catch rows is allowed:
+# a site whose valid sampled opportunities caught no Carabidae is a real
+# sampled-zero site, not a failed download.
+no_effort <- character(0)
+for (s in built_sites) {
+  b <- readRDS(file.path(out_dir, paste0(s, ".rds")))
+  rt <- if ("record_type" %in% names(b)) as.character(b$record_type) else character(0)
+  if (!any(rt == "effort", na.rm = TRUE)) no_effort <- c(no_effort, s)
+  else if (!any(rt == "catch", na.rm = TRUE))
+    cat(sprintf("  note: %s has effort anchors and no carabid catch (sampled-zero site)\n", s))
+}
+if (length(no_effort)) {
+  stop(sprintf(
+    "Site files without explicit effort anchors: [%s]; keeping the committed bundle untouched.",
+    paste(no_effort, collapse = ",")))
 }
 
 if (build_only) {

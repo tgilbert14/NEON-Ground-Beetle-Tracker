@@ -22,6 +22,30 @@ function requireText(pattern, message, source = html) {
   if (!pattern.test(source)) fail(message);
 }
 
+// Em dashes are forbidden in cover copy: the character, its three HTML entities,
+// and the R string escapes \U2014 / \u2014 (optional zero padding or braces).
+const EM_DASH = new RegExp(
+  `${String.fromCharCode(0x2014)}|&mdash;|&#8212;|&#x2014;|\\\\[uU]\\{?0*2014\\}?`, "gi");
+
+function emDashLines(source) {
+  const hits = [];
+  source.split("\n").forEach((line, index) => {
+    if (EM_DASH.test(line)) hits.push(index + 1);
+    EM_DASH.lastIndex = 0;
+  });
+  return hits;
+}
+
+// The in-app poster is the body of ground_beetle_poster() in ui.R: from its
+// definition to the next top-level assignment (a line starting with a name and <-).
+function posterSource(source) {
+  const start = source.search(/ground_beetle_poster\s*<-\s*function/);
+  if (start < 0) return "";
+  const rest = source.slice(start);
+  const next = rest.slice(1).search(/\n[A-Za-z_.][\w.]*\s*<-/);
+  return next < 0 ? rest : rest.slice(0, next + 1);
+}
+
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
@@ -45,6 +69,14 @@ requireText(/property="og:image:height" content="630"/, "Open Graph height must 
 requireText(/property="og:image:alt" content="[^"]+"/, "Open Graph image needs alternative text");
 requireText(/name="twitter:image:alt" content="[^"]+"/, "Twitter image needs alternative text");
 requireText(/What moves at ground level\?/i, "poster hook is missing");
+requireText(/<title>NEON Ground Beetle Tracker · What moves at ground level\?<\/title>/, "document title must read 'NEON Ground Beetle Tracker · What moves at ground level?'");
+requireText(/property="og:title" content="NEON Ground Beetle Tracker · What moves at ground level\?"/, "og:title must match the document title");
+requireText(/name="twitter:title" content="NEON Ground Beetle Tracker · What moves at ground level\?"/, "twitter:title must match the document title");
+requireText(/<h1>\s*<span>What moves<\/span>\s+<em>at ground level\?<\/em>\s*<\/h1>/, "h1 text must read 'What moves at ground level?' with a space between its two lines");
+{
+  const lines = emDashLines(html);
+  if (lines.length) fail(`docs/index.html contains an em dash (character or entity) on line(s) ${lines.join(", ")}; use a comma, colon or full stop`);
+}
 requireText(/Explore the ground beetles NEON pitfall traps encountered, site by site and season by season\./i, "poster promise is missing");
 requireText(/Pick a place/i, "poster CTA must be contextual");
 if (/Editorial illustration—not a field photograph or data record\./i.test(html) ||
@@ -56,8 +88,14 @@ requireText(/does not estimate population density or site health/i, "cover must 
 requireText(/detection frequency is not detection-corrected occupancy/i, "cover must distinguish detection frequency from occupancy");
 requireText(/DP1\.10022\.001/g, "cover must identify the source data product");
 if (count(/https:\/\/tgilbert14\.github\.io\/NEON-Driver-Cascade\//g) !== 1) {
-  fail("Pages poster face must contain exactly one Driver route");
+  fail("Pages poster face must contain exactly one Atlas route");
 }
+requireText(/class="suite-jump" href="https:\/\/tgilbert14\.github\.io\/NEON-Driver-Cascade\/">Whole suite: <strong>NEON Cross-Product Response Atlas<\/strong>/,
+  "the suite route must name the NEON Cross-Product Response Atlas");
+if (/Driver Cascade/.test(html.replace(/https:\/\/[^"\s]+/g, ""))) {
+  fail("docs/index.html still shows the old 'Driver Cascade' name; the hub is the NEON Cross-Product Response Atlas");
+}
+if (/Explore\s+\d+\s+places/i.test(html)) fail("cover must not hard-code the site count");
 
 requireText(/ground_beetle_poster\s*<-\s*function/, "in-app Living Poster component is missing", ui);
 requireText(/What moves at ground level\?/i, "in-app poster hook diverges from Pages", ui);
@@ -68,8 +106,27 @@ if (/Editorial illustration—not a field photograph or data record\./i.test(ui)
     /tags\$figcaption\s*\(/.test(ui) || /\.gbt-poster-art\s+figcaption\b/.test(css)) {
   fail("in-app poster must omit the redundant illustration badge and its dead CSS");
 }
-requireText(/activity index—not population density or site health/i, "in-app poster must state the claim boundary", ui);
-if (count(/NEON-Driver-Cascade\//g, ui) !== 1) fail("in-app poster must contain exactly one Driver route");
+requireText(/activity index[,.:;]?\s+not population density or site health/i, "in-app poster must state the claim boundary", ui);
+{
+  const poster = posterSource(ui);
+  if (!poster) fail("could not isolate ground_beetle_poster() in ui.R");
+  const lines = emDashLines(poster);
+  const offset = ui.slice(0, ui.indexOf(poster)).split("\n").length - 1;
+  if (lines.length) fail(`ui.R ground_beetle_poster() contains an em dash (character or entity) on line(s) ${lines.map((l) => l + offset).join(", ")}; use a comma, colon or full stop`);
+}
+{
+  // An R escape renders an em dash wherever it sits in ui.R, so scan the whole file.
+  const R_EM_DASH = /\\[uU]\{?0*2014\}?/;
+  const lines = ui.split("\n").flatMap((line, i) => (R_EM_DASH.test(line) ? [i + 1] : []));
+  if (lines.length) fail(`ui.R contains an R em-dash escape (\\U2014 or \\u2014) on line(s) ${lines.join(", ")}; use a comma, colon or full stop`);
+}
+if (count(/NEON-Driver-Cascade\//g, ui) !== 1) fail("in-app poster must contain exactly one Atlas route");
+{
+  const poster = posterSource(ui);
+  if (!/"Whole suite: ", tags\$strong\("NEON Cross-Product Response Atlas"\)/.test(poster) || /Driver Cascade/.test(poster)) {
+    fail("in-app poster suite link must name the NEON Cross-Product Response Atlas, not 'Driver Cascade'");
+  }
+}
 if (count(/\bh1\(/g, ui) !== 1) fail("in-app first-run surface must contain exactly one h1 constructor");
 requireText(/@media \(prefers-reduced-motion: reduce\)/, "poster CSS needs reduced-motion handling", css);
 requireText(/@media \(forced-colors: active\)/, "poster CSS needs forced-colors handling", css);

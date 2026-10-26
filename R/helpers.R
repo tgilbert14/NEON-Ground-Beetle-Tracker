@@ -226,8 +226,8 @@ community_table <- function(d) {
   eligible <- beetle_effort_eligible_catches(d)
   eligible_ind <- if (!is.null(eligible) && nrow(eligible))
     tapply(eligible$individualCount, eligible$scientificName, sum, na.rm = TRUE) else numeric(0)
-  cpn_num <- unname(eligible_ind[out$scientificName])
-  out$cpn <- if (is.finite(tn) && tn > 0) round(100 * cpn_num / tn, 2) else NA_real_
+  cpn_num <- as.vector(unname(eligible_ind[out$scientificName]))
+  out$cpn <- if (is.finite(tn) && tn > 0) as.vector(round(100 * cpn_num / tn, 2)) else NA_real_
   # species-level flag must match the rest of the app (rank-aware): prefer the
   # per-row flag clean_beetle() set from NEON's authoritative taxonRank, and fall
   # back to the name heuristic only when rank is absent (e.g. the demo CSV).
@@ -235,7 +235,7 @@ community_table <- function(d) {
   # set disagree with the QA note, ordination and indicators once a real bundle
   # (which carries taxonRank) is loaded.
   out$species_level <- if ("species_level" %in% names(catches)) {
-    unname(tapply(catches$species_level %in% TRUE, catches$scientificName, any)[out$scientificName])
+    as.vector(unname(tapply(catches$species_level %in% TRUE, catches$scientificName, any)[out$scientificName]))
   } else is_species_level(out$scientificName)
   attr(out, "qa") <- taxon_qa(d)
   out
@@ -275,6 +275,42 @@ effort_trapnights <- function(d) {
   sum(u$trapnights)
 }
 
+# One precomputed site_index row (global.R build_national_index()). A
+# sampled-zero site (effort rows, no carabid catch) has no community table: it
+# gets richness 0, individuals 0, no dominant species, and its years still come
+# from the effort rows. `trapnights` and `cpn` use the app helpers (unique effort
+# anchors; eligible catch only) and are checked independently by
+# scripts/verify_bundle.R.
+site_index_row <- function(d, site, meta = NULL) {
+  ct <- community_table(d)
+  sp <- if (is.null(ct)) NULL else ct[ct$species_level %in% TRUE, , drop = FALSE]   # richness = species only
+  tn <- effort_trapnights(d)
+  elig <- beetle_effort_eligible_catches(d)
+  elig_n <- if (is.null(elig) || !nrow(elig)) 0 else sum(elig$individualCount, na.rm = TRUE)
+  has_meta <- !is.null(meta) && nrow(meta) > 0
+  tibble::tibble(
+    site = site,
+    name = if (has_meta) meta$name[1] else site,
+    lat  = if (has_meta) meta$lat[1] else NA_real_,
+    lng  = if (has_meta) meta$lng[1] else NA_real_,
+    state = if (has_meta) meta$state[1] else NA_character_,
+    richness = if (is.null(sp)) 0L else nrow(sp),
+    individuals = if (is.null(ct)) 0 else sum(ct$individuals),
+    individuals_species = if (is.null(sp)) 0 else sum(sp$individuals, na.rm = TRUE),
+    trapnights = tn,
+    cpn = if (is.finite(tn) && tn > 0) 100 * elig_n / tn else NA_real_,
+    # Years sampled: count years with sampled effort rows when the bundle has
+    # them (zero-catch years still count as sampled), else years with catch.
+    years = {
+      rt <- if (any(d$record_type == "effort", na.rm = TRUE)) "effort" else "catch"
+      yy <- d$year[d$record_type %in% rt & !is.na(d$year)]
+      if (length(yy)) dplyr::n_distinct(yy) else NA_integer_
+    },
+    dominant = if (is.null(ct)) NA_character_
+               else if (nrow(sp)) sp$scientificName[1] else ct$scientificName[1],
+    source = attr(d, "source") %||% "neon")
+}
+
 # ---- diversity: Hill numbers ----------------------------------------------
 # Three views of diversity in one unit — an EFFECTIVE number of species —
 # indexed by q (how much rare species count): q0 = richness, q1 = exp(Shannon)
@@ -292,9 +328,12 @@ hill_numbers <- function(counts) {
 }
 
 # ---- individual-based rarefaction (Hurlbert 1971) -------------------------
-# Expected species E[S_n] in a random subsample of n individuals, with an
-# analytic SD (Heck et al. 1975). Lets you compare richness at equal sample
-# size instead of being fooled by who simply caught more beetles.
+# Expected species E[S_n] in a random subsample of n individuals. The +/-1 SD
+# band is an independence approximation (an upper bound on the Heck et al. 1975
+# variance): it sums each species' absence variance and leaves out the negative
+# covariance term, so the band is somewhat wider than the exact one. Lets you
+# compare richness at equal sample size instead of being fooled by who simply
+# caught more beetles.
 rarefaction_curve <- function(counts, step = NULL) {
   Ni <- counts[!is.na(counts) & counts > 0]
   N  <- sum(Ni)
@@ -309,7 +348,8 @@ rarefaction_curve <- function(counts, step = NULL) {
     pa <- exp(lchoose(N - Ni, n) - lcN[j])
     pa[!is.finite(pa)] <- 0
     es[j] <- sum(1 - pa)
-    # variance per Heck/Smith-Grassle approximation
+    # independence approximation: sum of per-species variances, no covariance
+    # term, so an upper bound on the Heck et al. 1975 variance
     term <- pa * (1 - pa)
     sd[j] <- sqrt(max(0, sum(term)))
   }
@@ -317,25 +357,30 @@ rarefaction_curve <- function(counts, step = NULL) {
 }
 
 # ---- species accumulation across bouts (sample-based) ---------------------
-# As trapping bouts accumulate, how many species have been seen? A flattening
-# curve means the site's beetle fauna is well sampled. Averaged over random
-# bout orderings (Gotelli & Colwell 2001) for a smooth, order-free curve.
+# As sampled plot-bouts accumulate, how many species have been seen? A
+# flattening curve means the site's beetle fauna is well sampled. Averaged over
+# random bout orderings (Gotelli & Colwell 2001) for a smooth, order-free curve.
+# The x-axis counts every sampled plot-bout (effort anchors, including bouts
+# with no named species), so zero-catch effort stays on the axis; legacy
+# bundles without effort rows fall back to the bouts that caught something.
 accumulation_by_bout <- function(d, perms = 50) {
   if (is.null(d) || nrow(d) == 0) return(NULL)
-  d <- species_only(d)              # richness curve = species-level only
-  if (is.null(d) || nrow(d) == 0) return(NULL)
-  d$boutid <- paste(d$plotID, d$collectDate)
-  bouts <- unique(d$boutid)
+  bsrc <- if (effort_opportunity_complete(d)) beetle_effort_rows(d) else beetle_catches(d)
+  if (is.null(bsrc) || !nrow(bsrc)) return(NULL)
+  bouts <- unique(paste(bsrc$plotID, bsrc$collectDate))
   K <- length(bouts)
   if (K < 2) return(NULL)
-  by_b <- split(d$scientificName, d$boutid)
+  sp <- species_only(beetle_catches(d))   # richness curve = species-level only
+  if (is.null(sp) || !nrow(sp)) return(NULL)
+  by_b <- split(sp$scientificName, paste(sp$plotID, sp$collectDate))
   set.seed(1)
   acc <- matrix(NA_real_, nrow = perms, ncol = K)
   for (p in seq_len(perms)) {
     ord <- sample(bouts)
     seen <- character(0)
     for (k in seq_len(K)) {
-      seen <- union(seen, by_b[[ord[k]]])
+      x <- by_b[[ord[k]]]
+      if (!is.null(x)) seen <- union(seen, x)
       acc[p, k] <- length(seen)
     }
   }
@@ -368,7 +413,13 @@ seasonality <- function(d, by_species = FALSE, top_n = 6) {
                      decreasing = TRUE))[seq_len(min(top_n, length(unique(ds$scientificName))))]
   sub <- ds[ds$scientificName %in% keep, ]
   cap <- stats::aggregate(individualCount ~ mon + scientificName, sub, sum)
-  m <- merge(cap, mon_eff, by = "mon")
+  # Species x sampled-month grid first, so a sampled month with no catch of a
+  # species is a real 0 (as in the pooled curve and the heatmap). Months never
+  # sampled stay absent.
+  grid <- expand.grid(mon = mon_eff$mon, scientificName = keep, stringsAsFactors = FALSE)
+  m <- merge(grid, cap, by = c("mon", "scientificName"), all.x = TRUE)
+  m$individualCount[is.na(m$individualCount)] <- 0
+  m <- merge(m, mon_eff, by = "mon")
   m$cpn <- 100 * m$individualCount / m$trapnights
   tibble::as_tibble(m[order(m$scientificName, m$mon), c("mon", "scientificName", "cpn")])
 }
@@ -502,14 +553,89 @@ annual_trend <- function(d) {
       }
     }
   }
+  # Season-standardised sensitivity series. A calendar-year total mixes in how
+  # much of the season was trapped (COVID 2020, first and last years), so build
+  # monthly catch per 100 trap-nights from the unique plot-bout effort, keep the
+  # "core" months sampled in at least 75% of the years with effort, and average
+  # the monthly rates over those months. A year missing any core month is
+  # `partial`; the slope is refitted on the full-season years only. The plotted
+  # cpn/metric columns and the attrs above are unchanged.
+  out$cpn_core <- NA_real_
+  out$partial <- NA
+  attr(out, "slope_core") <- NA_real_
+  attr(out, "p_core") <- NA_real_
+  attr(out, "n_core") <- 0L
+  attr(out, "years_partial") <- integer(0)
+  # When 2023 is in the series the season check also leaves 2023 out, so both
+  # exclusions apply together: full-season years other than 2023.
+  if (2023L %in% out$year) {
+    attr(out, "slope_core_ex2023") <- NA_real_
+    attr(out, "p_core_ex2023") <- NA_real_
+    attr(out, "n_core_ex2023") <- 0L
+  }
+  if (has_eff) {
+    em <- eff[is.finite(eff$trapnights) & eff$trapnights > 0 & !is.na(eff$year), , drop = FALSE]
+    em$mon <- as.integer(format(as.Date(em$collectDate), "%m"))
+    if (nrow(em)) {
+      mt <- stats::aggregate(list(trapnights = em$trapnights),
+                             list(year = em$year, mon = em$mon), sum)
+      if (!is.null(eligible) && nrow(eligible)) {
+        ec <- eligible
+        ec$year_ <- as.integer(format(as.Date(ec$collectDate), "%Y"))
+        ec$mon_ <- as.integer(format(as.Date(ec$collectDate), "%m"))
+        mc <- stats::aggregate(list(individuals = ec$individualCount),
+                               list(year = ec$year_, mon = ec$mon_), sum, na.rm = TRUE)
+        mt <- merge(mt, mc, by = c("year", "mon"), all.x = TRUE)
+      } else mt$individuals <- NA_real_
+      mt$individuals[is.na(mt$individuals)] <- 0
+      mt$cpn <- 100 * mt$individuals / mt$trapnights
+      n_yrs <- length(unique(mt$year))
+      yrs_per_mon <- tapply(mt$year, mt$mon, function(x) length(unique(x)))
+      core <- as.integer(names(yrs_per_mon)[yrs_per_mon >= 0.75 * n_yrs])
+      if (length(core)) {
+        mcore <- mt[mt$mon %in% core, , drop = FALSE]
+        for (i in seq_len(nrow(out))) {
+          yi <- mcore[mcore$year == out$year[i], , drop = FALSE]
+          out$cpn_core[i] <- if (nrow(yi)) mean(yi$cpn) else NA_real_
+          out$partial[i] <- !all(core %in% yi$mon)
+        }
+        full <- out[out$partial %in% FALSE & is.finite(out$cpn_core), , drop = FALSE]
+        attr(out, "n_core") <- nrow(full)
+        attr(out, "years_partial") <- sort(as.integer(out$year[out$partial %in% TRUE]))
+        if (nrow(full) >= 3) {
+          fit_c <- tryCatch(stats::lm(cpn_core ~ year, data = full), error = function(e) NULL)
+          co_c <- if (!is.null(fit_c)) suppressWarnings(summary(fit_c))$coefficients else NULL
+          if (!is.null(co_c) && "year" %in% rownames(co_c)) {
+            attr(out, "slope_core") <- co_c["year", "Estimate"]
+            attr(out, "p_core") <- co_c["year", "Pr(>|t|)"]
+          }
+        }
+        if (2023L %in% out$year) {
+          full_ex <- full[full$year != 2023L, , drop = FALSE]
+          attr(out, "n_core_ex2023") <- nrow(full_ex)
+          if (nrow(full_ex) >= 3) {
+            fit_ce <- tryCatch(stats::lm(cpn_core ~ year, data = full_ex), error = function(e) NULL)
+            co_ce <- if (!is.null(fit_ce)) suppressWarnings(summary(fit_ce))$coefficients else NULL
+            if (!is.null(co_ce) && "year" %in% rownames(co_ce)) {
+              attr(out, "slope_core_ex2023") <- co_ce["year", "Estimate"]
+              attr(out, "p_core_ex2023") <- co_ce["year", "Pr(>|t|)"]
+            }
+          }
+        }
+      } else out$partial <- FALSE
+    }
+  }
   out
 }
 
 # One trend call shared by the in-app verdict and the PDF, so they cannot
-# disagree. kind: "none" (no finite slope/p), "few" (< 5 years), else "fit".
-# For "fit", `clear` requires the trend to survive dropping the 2023 design-break
-# year (NEON cut plots from 10 to 6 per site); `rests_on_2023` and
-# `masked_by_2023` name the two ways the 2023 value can change the call.
+# disagree. kind: "none" (no finite slope/p), "few" (< 6 years, the suite
+# standard), else "fit". For "fit", `clear` requires the trend to survive
+# dropping the 2023 design-break year (NEON cut plots from 10 to 6 per site, at
+# least 6 years left) AND the season-standardised refit on full-season years
+# (`holds_core`: at least 6 such years, p < 0.05, same sign; when 2023 is in the
+# series the season refit also leaves 2023 out). `rests_on_2023`,
+# `partial_fail` and `masked_by_2023` name the ways the call can change.
 # "p = 0.012" style text that never prints "p = 0.000": very small p-values read
 # as "p < 0.001". Shared by the in-app trend verdict and the PDF report.
 fmt_p <- function(p, digits = 3) {
@@ -529,17 +655,84 @@ trend_call <- function(t) {
   out <- list(n = n, kind = "fit", slope = slope, p = p, pct = pct, has2023 = has2023,
               sig_all = sig_all, clear = NA, rests_on_2023 = NA, masked_by_2023 = NA,
               p_ex2023 = p_ex, slope_ex2023 = slope_ex, n_ex2023 = n_ex)
+  slope_core <- num("slope_core"); p_core <- num("p_core")
+  n_core <- num("n_core"); n_core <- if (is.finite(n_core)) as.integer(n_core) else 0L
+  yp <- if (is.null(t)) NULL else attr(t, "years_partial")
+  out$slope_core <- slope_core; out$p_core <- p_core; out$n_core <- n_core
+  out$years_partial <- if (length(yp)) sort(as.integer(yp)) else integer(0)
+  # The season check: with 2023 in the series it refits on full-season years
+  # other than 2023 (both exclusions together); without 2023 it is the core fit.
+  if (has2023) {
+    s_slope <- num("slope_core_ex2023"); s_p <- num("p_core_ex2023")
+    s_n <- num("n_core_ex2023"); s_n <- if (is.finite(s_n)) as.integer(s_n) else 0L
+  } else { s_slope <- slope_core; s_p <- p_core; s_n <- n_core }
+  out$season_slope <- s_slope; out$season_p <- s_p; out$season_n <- s_n
+  out$holds_core <- NA; out$partial_fail <- NA
+  out$check_2023 <- NA_character_; out$check_season <- NA_character_
   if (!is.finite(slope) || !is.finite(p)) { out$kind <- "none"; return(out) }
-  if (n < 5) { out$kind <- "few"; return(out) }
-  ex_ok <- has2023 && !is.na(n_ex) && n_ex >= 5
-  clear <- sig_all && (
-    if (!has2023) TRUE
+  if (n < 6) { out$kind <- "few"; return(out) }
+  ex_ok <- has2023 && !is.na(n_ex) && n_ex >= 6
+  holds_2023 <- if (!has2023) TRUE
     else if (ex_ok) is.finite(p_ex) && p_ex < 0.05 && is.finite(slope_ex) && sign(slope_ex) == sign(slope)
-    else FALSE)
+    else FALSE
+  holds_core <- s_n >= 6 && is.finite(s_p) && s_p < 0.05 &&
+    is.finite(s_slope) && sign(s_slope) == sign(slope)
+  clear <- sig_all && holds_2023 && holds_core
   out$clear <- clear
-  out$rests_on_2023 <- sig_all && has2023 && !clear
+  out$holds_core <- holds_core
+  out$rests_on_2023 <- sig_all && has2023 && !holds_2023
+  out$partial_fail <- sig_all && !holds_core
+  # Each check is "pass", "fail" (it ran and did not hold) or "unconfirmed" (it
+  # could not run: fewer than 6 comparable years). NA: the check does not apply
+  # (no 2023 value, or the all-years slope is not significant).
+  # Set only for a significant all-years slope, where the checks decide the call.
+  if (sig_all) {
+    out$check_2023 <- if (!has2023) NA_character_ else if (!ex_ok) "unconfirmed"
+      else if (holds_2023) "pass" else "fail"
+    out$check_season <- if (s_n < 6) "unconfirmed" else if (holds_core) "pass" else "fail"
+  }
   out$masked_by_2023 <- !sig_all && ex_ok && is.finite(p_ex) && p_ex < 0.05
   out
+}
+
+# The tail of the one-sentence verdict for an apparent (significant but not
+# clear) trend. A check that ran and failed "does not hold up"; a check that
+# could not run (fewer than 6 comparable years) "cannot be confirmed":
+#   "but it does not hold up without the 2023 value (p = 0.21)"
+#   "which cannot be confirmed without the 2023 value: too few comparable years remain"
+# Shared by the in-app verdict and the PDF.
+trend_fail_clause <- function(tc) {
+  season_txt <- if (isTRUE(tc$has2023)) "when years with a partial season and 2023 are left out"
+                else "when years with a partial season are left out"
+  failed <- character(0); unconf <- character(0)
+  if (isTRUE(tc$rests_on_2023)) {
+    if (identical(tc$check_2023, "unconfirmed")) unconf <- c(unconf, "without the 2023 value")
+    else failed <- c(failed, sprintf("without the 2023 value (%s)", fmt_p(tc$p_ex2023, 2)))
+  }
+  if (isTRUE(tc$partial_fail)) {
+    if (identical(tc$check_season, "unconfirmed")) unconf <- c(unconf, season_txt)
+    else if (is.finite(tc$season_p) && tc$season_p < 0.05 && is.finite(tc$season_slope) &&
+             sign(tc$season_slope) != sign(tc$slope))
+      failed <- c(failed, sprintf("%s (it runs the other way, %s)", season_txt, fmt_p(tc$season_p, 2)))
+    else failed <- c(failed, sprintf("%s (%s)", season_txt, fmt_p(tc$season_p, 2)))
+  }
+  f_txt <- if (length(failed)) paste("it does not hold up", paste(failed, collapse = " or ")) else ""
+  u_txt <- if (length(unconf))
+    paste0("cannot be confirmed ", paste(unconf, collapse = " or "), ": too few comparable years remain") else ""
+  if (nzchar(f_txt) && nzchar(u_txt)) paste0("but ", f_txt, ", and it ", u_txt)
+  else if (nzchar(f_txt)) paste("but", f_txt)
+  else if (nzchar(u_txt)) paste("which", u_txt)
+  else "but it does not hold up on the checks"
+}
+
+# "Years with a partial season (here: 2014, 2020) are left out of the season
+# check." At most three years are named; NULL when no year is partial.
+trend_partial_note <- function(tc) {
+  yp <- tc$years_partial
+  if (!length(yp)) return(NULL)
+  yrs <- if (length(yp) > 3) paste(paste(yp[1:3], collapse = ", "), "and others")
+         else paste(yp, collapse = ", ")
+  sprintf("Years with a partial season (here: %s) are left out of the season check.", yrs)
 }
 
 # Stable species -> color map so a species is the same color everywhere.
@@ -585,7 +778,8 @@ beetle_blurb <- function(scientificName) {
 # "most abundant / dominant" verdict reads backwards — a dominant European beetle
 # requires non-native context. Keyed on the exact binomial (not genus:
 # most Pterostichus/Carabus are native) so only the established invaders flag.
-# Refs: Bousquet 2012 (Carabidae of America N of Mexico); Lindroth 1961-69.
+# Refs: Bousquet 2012 (Carabidae of America N of Mexico); Lindroth 1961-69;
+# Liebherr & Takumi 2002 (Trechus obtusus in Hawaii).
 INTRODUCED_CARABIDS <- c(
   "Pterostichus melanarius",   # common black ground beetle — widespread European invader
   "Carabus nemoralis",         # European bronze carabid, established across the N US
@@ -599,7 +793,9 @@ INTRODUCED_CARABIDS <- c(
   "Pseudoophonus rufipes",
   "Amara aenea",
   "Trechus quadristriatus",
-  "Anisodactylus binotatus"
+  "Anisodactylus binotatus",
+  "Trechus obtusus",           # Palearctic; introduced to Hawaii (Liebherr & Takumi 2002, Pacific Science 56:365-375), dominant at PUUM
+  "Agonum muelleri"            # Palearctic; adventive in North America and Hawaii (Bousquet 2012)
 )
 # TRUE for an introduced/non-native European carabid (exact-binomial match, so a
 # subgenus tag or trailing author string is tolerated; vectorised).

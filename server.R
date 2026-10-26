@@ -215,12 +215,12 @@ function(input, output, session) {
   # observer below runs the SAME load path the dropdown cascade uses.
   site_popup_html <- function(row) {
     code  <- row$site[1]
-    nm    <- row$name[1] %||% code
-    where <- paste(stats::na.omit(c(as.character(row$state[1]),
+    nm    <- htmltools::htmlEscape(row$name[1] %||% code)
+    where <- htmltools::htmlEscape(paste(stats::na.omit(c(as.character(row$state[1]),
       { m <- neon_sites[neon_sites$site == code, ]; if (nrow(m)) paste("NEON", m$domain[1]) else NA })),
-      collapse = " · ")
+      collapse = " · "))
     dom <- if (!is.na(row$dominant[1]))
-      sprintf("<div class='pm-pop-sp'>Dominant: <i>%s</i></div>", row$dominant[1]) else ""
+      sprintf("<div class='pm-pop-sp'>Dominant: <i>%s</i></div>", htmltools::htmlEscape(row$dominant[1])) else ""
     demo <- if (identical(row$source[1], "demo"))
       "<div class='sp-years'><b>demo data</b></div>" else ""
     htmltools::HTML(sprintf(
@@ -234,7 +234,7 @@ function(input, output, session) {
            <button type='button' class='sp-btn sp-info' onclick=\"Shiny.setInputValue('siteInfo','%s',{priority:'event'});\">About this site</button>
          </div>
        </div>",
-      nm, code, where, row$richness[1] %||% "?", fmt_int(row$individuals[1] %||% 0),
+      nm, htmltools::htmlEscape(code), where, row$richness[1] %||% "?", fmt_int(row$individuals[1] %||% 0),
       dom, demo, code, code))
   }
 
@@ -242,16 +242,18 @@ function(input, output, session) {
     row <- if (!is.null(SITE_INDEX)) SITE_INDEX[SITE_INDEX$site == code, ] else NULL
     m   <- neon_sites[neon_sites$site == code, ]
     if (is.null(row) || !nrow(row))
-      return(modalDialog(title = "Site info", easyClose = TRUE, footer = modalButton("Close"),
-                         p("No details are available for this site.")))
-    dash <- function(x) if (length(x) == 0 || is.na(x) || !nzchar(as.character(x))) "—" else as.character(x)
+      return(labelled_modal(title = "Site info", label_id = "gbt-siteinfo-title",
+                            easyClose = TRUE, footer = modalButton("Close"),
+                            p("No details are available for this site.")))
+    dash <- function(x) if (length(x) == 0 || is.na(x) || !nzchar(as.character(x))) "\u2013" else as.character(x)
     coords <- if (nrow(m) && !is.na(m$lat[1]) && !is.na(m$lng[1]))
-      sprintf("%.3f, %.3f", m$lat[1], m$lng[1]) else "—"
+      sprintf("%.3f, %.3f", m$lat[1], m$lng[1]) else "\u2013"
     stat <- function(v, lab) div(class = "si-stat",
-      div(class = "si-stat-n", if (is.na(v)) "—" else format(v, big.mark = ",")),
+      div(class = "si-stat-n", if (is.na(v)) "\u2013" else format(v, big.mark = ",")),
       div(class = "si-stat-l", lab))
-    modalDialog(
-      title = HTML(sprintf("\U0001FAB2 %s <span class='si-code'>(%s)</span>", row$name[1] %||% code, code)),
+    labelled_modal(label_id = "gbt-siteinfo-title",
+      title = HTML(sprintf("\U0001FAB2 %s <span class='si-code'>(%s)</span>",
+                           htmltools::htmlEscape(row$name[1] %||% code), htmltools::htmlEscape(code))),
       easyClose = TRUE, size = "m",
       footer = tagList(
         modalButton("Close"),
@@ -300,8 +302,8 @@ function(input, output, session) {
         color_fn = function(s) pal_clamp(ifelse(is.finite(s$individuals), s$individuals, 0)),
         label_fn = function(r) sprintf(
           "<b>%s</b> · %s, %s<br><b>%s</b> species · <b>%s</b> individuals<br>dominant: <i>%s</i>%s",
-          r$site, r$name %||% r$site, r$state %||% "", r$richness %||% "?",
-          fmt_int(r$individuals %||% 0), r$dominant %||% "?",
+          r$site, htmltools::htmlEscape(r$name %||% r$site), htmltools::htmlEscape(r$state %||% ""),
+          r$richness %||% "?", fmt_int(r$individuals %||% 0), htmltools::htmlEscape(r$dominant %||% "?"),
           if (identical(r$source, "demo")) "<br><b>demo data</b>" else ""),
         popup_fn = site_popup_html)
     }
@@ -378,16 +380,17 @@ function(input, output, session) {
 
   # ---- first-visit welcome (once per browser; gated client-side) -----------
   # Shared by the first-visit gate AND the top-bar "How it works" button.
-  welcome_modal <- function() modalDialog(
-    title = NULL, easyClose = TRUE, footer = NULL,
+  welcome_modal <- function() labelled_modal(
+    title = NULL, label_id = "gbt-welcome-title", easyClose = TRUE, footer = NULL,
     div(class = "welcome",
-      div(class = "welcome-bug", "\U0001FAB2"),
-      h3("Welcome to the Ground Beetle Tracker"),
-      p("Explore ground-beetle (Carabidae) biodiversity across ", tags$b("46 NEON sites"),
+      div(class = "welcome-bug", `aria-hidden` = "true", "\U0001FAB2"),
+      h2(id = "gbt-welcome-title", "Welcome to the Ground Beetle Tracker"),
+      p("Explore ground-beetle (Carabidae) biodiversity across ",
+        tags$b(sprintf("%d NEON sites", if (!is.null(SITE_INDEX)) nrow(SITE_INDEX) else 0L)),
         ": who lives where, how diverse each site is, when beetles are active, and whether they're holding steady. NEON is the National Ecological Observatory Network, a US program that takes the same ecological measurements the same way at field sites across the country, year after year, and publishes the data for anyone to use."),
       tags$ul(class = "welcome-list",
         tags$li(tags$b("Tap a site on the map"), " to explore it, or pick one from the Browse-all list."),
-        tags$li(tags$b("Set the date window"), " in the panel beside the map before you explore."),
+        tags$li(tags$b("Set the date window"), " in the panel below the map before you explore."),
         tags$li(tags$b("Compare two sites"), " to contrast a desert with a forest.")),
       div(class = "welcome-cta",
         actionButton("welcomeSurprise", tagList(bs_icon("shuffle"), " Surprise me"), class = "btn-success"),
@@ -407,14 +410,14 @@ function(input, output, session) {
   # ---- splash + hero ------------------------------------------------------
   output$splash <- renderUI({
     if (!is.null(rv$data)) return(NULL)
+    if (is.null(SITE_INDEX)) return(NULL)
+    n <- nrow(SITE_INDEX)
+    thr <- release_through_label("%B %Y"); rel <- release_tag()
     div(class = "splash",
-      div(class = "splash-icon", "\U0001FAB2"),
-      h3("Pick a site to begin"),
-      p("Tap a dot on the map below and it ", tags$b("loads automatically"),
-        ", or pick a site by name in the panel beside the map."),
-      if (!is.null(SITE_INDEX))
-        p(class = "splash-sub", sprintf("%d site%s with beetle data available.",
-          nrow(SITE_INDEX), if (nrow(SITE_INDEX) == 1) "" else "s")))
+      p(class = "splash-sub", sprintf("%d NEON site%s with released beetle data%s%s.",
+        n, if (n == 1) "" else "s",
+        if (!is.na(thr)) paste0(" through ", thr) else "",
+        if (!is.na(rel)) sprintf(" (%s)", rel) else "")))
   })
 
   output$heroStats <- renderUI({
@@ -550,6 +553,10 @@ function(input, output, session) {
         sprintf("Date window:  %s to %s", win[1], win[2]),
         sprintf("Rows:         %d", nrow(out)),
         sprintf("Source:       %s", attr(d, "source") %||% "neon"),
+        sprintf("Release:      %s%s; provisional records not included%s",
+                if (!is.na(release_tag())) release_tag() else "NEON released data",
+                if (!is.na(release_doi())) sprintf(" (%s)", release_doi()) else "",
+                if (!is.na(release_through())) sprintf("; data through %s", format(release_through())) else ""),
         sprintf("Exported:     %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
         "",
         "Files",
@@ -578,8 +585,8 @@ function(input, output, session) {
         "An educational data-exploration tool by Desert Data Labs. Not affiliated with",
         "NEON, Battelle, or the NSF.",
         "",
-        "Source: NEON DP1.10022.001, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/);",
-        "aggregated and derived by this app."
+        sprintf("Citation: %s", release_citation()),
+        "License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); aggregated and derived by this app."
       ), f_rm)
       zip_files <- c(f_data, f_cb, env_csv, env_cb_csv, f_rm)
       zip_files <- zip_files[!vapply(zip_files, is.null, logical(1))]
@@ -608,8 +615,8 @@ function(input, output, session) {
         div(class = "qc-flags", lapply(qf, function(f) div(
           class = paste0("qc-flag qc-flag-", f$level, " qc-flag-click"),
           role = "button", tabindex = "0",
+          # Enter/Space reach this click through the one delegated keydown handler in ui.R.
           onclick = sprintf("Shiny.setInputValue('beetleQcInspect','%s',{priority:'event'})", f$key),
-          onkeydown = sprintf("if(event.key==='Enter'||event.key===' '){event.preventDefault();Shiny.setInputValue('beetleQcInspect','%s',{priority:'event'});}", f$key),
           bs_icon(qc_icon(f$level)),
           div(class = "qcf-body",
             div(class = "qcf-title", f$title, tags$span(class = "qcf-n", f$n)),
@@ -712,7 +719,7 @@ function(input, output, session) {
     cap <- sprintf("<b><i>%s</i></b> at %s: <b>%s</b> individuals across <b>%d</b> sampling bout%s and <b>%d</b> plot%s.%s",
       htmltools::htmlEscape(sp), rv$siteCode %||% "this site", fmt_int(ind),
       nb, if (nb == 1) "" else "s", np, if (np == 1) "" else "s", intro)
-    showModal(modalDialog(
+    showModal(labelled_modal(label_id = "gbt-reveal-title",
       title = HTML(sprintf("\U0001FAB2 Records for <i>%s</i>", htmltools::htmlEscape(sp))),
       easyClose = TRUE, size = "l",
       footer = tagList(
@@ -769,8 +776,8 @@ function(input, output, session) {
         div(class = "reveal-cta", bs_icon("hand-index-thumb"),
           HTML(sprintf(" Load <b>%s</b> (tap it on the map, or pick it under 'change site') to explore its community.", scode))))
     }
-    showModal(modalDialog(
-      title = HTML(sprintf("\U0001F4CD %s \U00B7 %s community", scode, parts[2])),
+    showModal(labelled_modal(label_id = "gbt-reveal-title",
+      title = sprintf("\U0001F4CD %s \U00B7 %s community", scode, parts[2]),
       easyClose = TRUE, size = "l",
       footer = tagList(
         if (loaded) downloadButton("revealOrdCsv", "Download (CSV)", class = "btn-outline-secondary btn-sm"),
@@ -800,7 +807,7 @@ function(input, output, session) {
     div(class = paste("trend-verdict", cls), bs_icon("bar-chart-line-fill"),
       span(class = "verdict-text",
         HTML(sprintf(" <b>%d</b> carabid species identified here. Most abundant: <b><i>%s</i></b>, <b>%d%%</b> of named individuals (%s per 100 trap-nights).",
-          nrow(sp), top$scientificName, share, top$cpn)),
+          nrow(sp), htmltools::htmlEscape(top$scientificName), share, top$cpn)),
         # When the #1 species is an introduced European carabid, a clickable marker so
         # "most abundant" isn't read as intact native fauna (the caveat is behind the dot).
         if (is_introduced(top$scientificName)) introduced_marker(top$scientificName) else NULL))
@@ -842,7 +849,7 @@ function(input, output, session) {
         font = list(color = if (is_dark()) "#9fb0a6" else "#6b7a89", size = 11))
     if (n_more > 0)
       p <- p %>% plotly::add_annotations(
-        text = sprintf("+ %d more species pooled (%s individuals) \U2014 all are in the diversity tab and the data export",
+        text = sprintf("+ %d more species pooled (%s individuals). All are in the Diversity tab and the data export",
                        n_more, fmt_int(more_ind)),
         x = 0, y = -0.12, xref = "paper", yref = "paper", xanchor = "left", showarrow = FALSE,
         font = list(color = if (is_dark()) "#9fb0a6" else "#6b7a89", size = 11.5))
@@ -953,15 +960,18 @@ function(input, output, session) {
   output$qaNote <- renderUI({
     d <- rv$data; req(d)
     qa <- attr(ct_rx(), "qa")
+    # PUUM: NEON withholds some state-listed species names, so richness is a floor.
+    puum <- if (identical(rv$siteCode, "PUUM"))
+      " At PUUM (Hawaii) NEON reports some state-listed species only above species rank, so richness here is a floor." else ""
     if (is.null(qa) || qa$higher_taxa == 0)
       return(div(class = "qa-note qa-clean", bs_icon("patch-check-fill"),
         span(class = "verdict-text",
-          HTML(sprintf(" All %d taxa here are identified to species, so richness counts are clean.", qa$species %||% 0)))))
+          HTML(sprintf(" All %d taxa here are identified to species, so richness counts are clean.%s", qa$species %||% 0, puum)))))
     div(class = "qa-note qa-flag", bs_icon("funnel-fill"), span(class = "verdict-text",
-      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d name%s not resolved to a single species (genus or family IDs, or a species-group call whose member species is already counted) cover %s individuals, %.1f%% of the catch. They are <b>excluded from richness, diversity and ordination</b> (they'd otherwise inflate the species count) but still counted in total abundance. <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
+      HTML(sprintf(" Richness counts <b>%d species</b> over <b>%s individuals</b> identified to species. %d name%s not resolved to a single species (genus or family IDs, or a species-group call whose member species is already counted) cover %s individuals, %.1f%% of the catch. They are <b>excluded from richness, diversity and ordination</b> (they'd otherwise inflate the species count) but still counted in total abundance.%s <span class='qa-cite'>(NEON beetle design: Hoekman et al. 2017)</span>",
         qa$species, fmt_int(qa$ind_total - qa$ind_higher),
         qa$higher_taxa, if (qa$higher_taxa == 1) "" else "s",
-        fmt_int(qa$ind_higher), qa$pct_ind_higher))))
+        fmt_int(qa$ind_higher), qa$pct_ind_higher, puum))))
   })
 
   output$hillPlot <- renderPlotly({
@@ -1041,10 +1051,12 @@ function(input, output, session) {
                 line = list(width = 0), showlegend = FALSE, hoverinfo = "skip") %>%
       add_trace(x = rc$n, y = rc$lo, type = "scatter", mode = "lines", fill = "tonexty",
                 fillcolor = "rgba(19,99,43,0.14)", line = list(width = 0),
-                name = "approximate \U00B11 SD", hoverinfo = "skip") %>%
+                name = "\U00B11 SD, an independence approximation (an upper bound on the Heck et al. 1975 variance)",
+                hoverinfo = "skip") %>%
       add_trace(x = rc$n, y = rc$richness, type = "scatter", mode = "lines",
                 line = list(color = "#36d98a", width = 3), name = "expected species",
-                hovertemplate = "%{x} individuals<br>%{y:.1f} species<extra></extra>") %>%
+                hovertemplate = paste0("%{x} individuals<br>%{y:.1f} species",
+                  "<br><span style='font-size:11px'>band: \U00B11 SD, an independence approximation<br>(an upper bound on the Heck et al. 1975 variance)</span><extra></extra>")) %>%
       plotly_theme(legend = FALSE) %>%
       plotly::layout(xaxis = list(title = "individuals sampled"),
                      yaxis = list(title = "expected species"))
@@ -1063,9 +1075,9 @@ function(input, output, session) {
       add_trace(x = ac$bouts, y = ac$richness, type = "scatter", mode = "lines+markers",
                 line = list(color = "#43b8e8", width = 3), marker = list(size = 5),
                 name = "species found",
-                hovertemplate = "after %{x} bouts<br>%{y:.1f} species<extra></extra>") %>%
+                hovertemplate = "after %{x} sampled plot-bouts<br>%{y:.1f} species<extra></extra>") %>%
       plotly_theme(legend = FALSE) %>%
-      plotly::layout(xaxis = list(title = "trapping bouts"),
+      plotly::layout(xaxis = list(title = "sampled plot-bouts"),
                      yaxis = list(title = "cumulative species"))
   })
 
@@ -1080,9 +1092,9 @@ function(input, output, session) {
       return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"), span(class = "verdict-text",
         HTML(sprintf(" Only %d years of data, too few to fit a trend yet.", nrow(t))))))
     }
-    # Under ~5 years a regression p-value is noise — show the apparent direction
-    # but don't dress it up with a decimal the info-popover itself says to ignore.
-    if (nrow(t) < 5) {
+    # Under 6 years (the suite standard) a regression p-value is noise: show the
+    # apparent direction but don't dress it up with a decimal.
+    if (nrow(t) < 6) {
       appdir <- if (slope > 0) "an apparent rise" else if (slope < 0) "an apparent decline" else "little change"
       pcttxt <- if (is.finite(pct) && abs(pct) <= 40) sprintf(" (~%+.0f%%/yr)", pct) else ""
       return(div(class = "trend-verdict trend-flat", bs_icon("dash-circle"), span(class = "verdict-text",
@@ -1099,17 +1111,16 @@ function(input, output, session) {
     raw_txt <- if (identical(attr(t, "metric_kind"), "count"))
       " <i>(raw counts; this bundle has no effort data)</i>" else ""
     # A trend is "statistically clear" only if it also holds without the 2023
-    # design-break value (trend_call(), shared with the PDF report).
+    # design-break value and with partial-season years left out (trend_call(),
+    # shared with the PDF report).
     body <- if (clear) {
       sprintf(" Over %d years, catch-per-effort is <b>%s</b>%s, statistically clear (%s).",
         nrow(t), if (slope > 0) "rising" else "declining", pcttxt, fmt_p(p))
-    } else if (isTRUE(tc$rests_on_2023)) {
-      extxt <- if (!is.na(tc$n_ex2023) && tc$n_ex2023 >= 5 && is.finite(tc$p_ex2023))
-        sprintf("without 2023 it is not statistically clear (%s)", fmt_p(tc$p_ex2023, 2))
-        else "without 2023 there are too few years to test"
-      sprintf(" Over %d years, catch-per-effort shows <b>an apparent %s</b> (%s%s), but it rests on the 2023 value: %s.",
+    } else if (isTRUE(tc$sig_all)) {
+      sprintf(" Over %d years, catch-per-effort shows <b>an apparent %s</b> (%s%s), %s.",
         nrow(t), if (slope > 0) "rise" else "decline",
-        if (is.finite(pct) && abs(pct) <= 40) sprintf("~%+.0f%%/yr, ", pct) else "", fmt_p(p), extxt)
+        if (is.finite(pct) && abs(pct) <= 40) sprintf("~%+.0f%%/yr, ", pct) else "", fmt_p(p),
+        trend_fail_clause(tc))
     } else {
       sigtxt <- if (is.finite(p)) sprintf("not statistically distinguishable from no change (%s)", fmt_p(p, 2))
                 else "not statistically distinguishable from no change"
@@ -1120,6 +1131,8 @@ function(input, output, session) {
     }
     if (isTRUE(tc$has2023))
       body <- paste0(body, " 2023 follows NEON's cut from 10 plots to 6 per site, so that year is not directly comparable with earlier years.")
+    pnote <- trend_partial_note(tc)
+    if (!is.null(pnote)) body <- paste0(body, " ", pnote)
     div(class = paste("trend-verdict", paste0("trend-", dir)), bs_icon(icon), span(class = "verdict-text",
       HTML(paste0(body, raw_txt))))
   })
@@ -1132,12 +1145,18 @@ function(input, output, session) {
     ytitle <- if (kind == "cpn") "catch per 100 trap-nights" else "individuals caught"
     t_tip <- pin_card_html(title = paste0(t$year, " at ", input$site %||% "this site"),
       lines = sprintf("%.1f %s", t$metric, ytitle), tag = paste0("year-", t$year))
+    # Years missing part of the core season get hollow markers (they are left
+    # out of the season check in trend_call()); the plotted value is unchanged.
+    part <- if ("partial" %in% names(t)) t$partial %in% TRUE else rep(FALSE, nrow(t))
     p <- plot_ly(x = ~t$year, y = ~t$metric, type = "scatter", mode = "lines+markers",
       name = "observed", customdata = t_tip, line = list(color = "#36d98a", width = 3),
-      marker = list(size = 9, color = "#36d98a"),
-      hovertemplate = paste0("%{x}: %{y:.1f} ", ytitle, "<extra></extra>"))
+      marker = list(size = 9, color = "#36d98a",
+                    symbol = ifelse(part, "circle-open", "circle"),
+                    line = list(color = "#36d98a", width = 2)),
+      text = ifelse(part, " (partial season)", ""),
+      hovertemplate = paste0("%{x}: %{y:.1f} ", ytitle, "%{text}<extra></extra>"))
     pred <- attr(t, "pred")
-    if (!is.null(pred) && length(pred) == nrow(t) && nrow(t) >= 5) {
+    if (!is.null(pred) && length(pred) == nrow(t) && nrow(t) >= 6) {
       p <- p %>% add_trace(x = t$year, y = pred, mode = "lines", name = "trend",
         line = list(color = "#e0b43a", width = 2, dash = "dash"),
         hoverinfo = "skip", inherit = FALSE)
@@ -1186,9 +1205,13 @@ function(input, output, session) {
     if (identical(attr(e, "source") %||% "neon", "demo"))
       div(class = "env-source env-demo", bs_icon("exclamation-triangle"),
           HTML(" Illustrative <b>demo</b> environment, not real NEON values."))
-    else
+    else {
+      no_rain <- !"precip_mm" %in% names(e) ||
+        all(is.na(suppressWarnings(as.numeric(e$precip_mm))))
       div(class = "env-source env-real", bs_icon("patch-check"),
-          HTML(" Co-located NEON env products for this site (precip / air temperature / plant phenology)."))
+          HTML(" Co-located NEON env products for this site (precip / air temperature / plant phenology)."),
+          if (no_rain) tags$div("Rainfall is not available for this site in the bundled environment data."))
+    }
   })
 
   output$envDriverRank <- renderPlotly({
@@ -1346,13 +1369,13 @@ function(input, output, session) {
       p("This panel hunts through dozens of driver-and-lag combinations and shows you the strongest match it finds. That is a fishing expedition, not a test, so treat the headline gently."),
       p(luck), p(lagp), p(noisep),
       p(tags$b("Read this panel as a place to generate ideas, not proof that weather drives beetle activity."),
-        if (water) " The honest next step is a within-season look at the monsoon months, not a longer lag."
-        else " The honest next step is a within-season look, not a longer lag."))
+        if (water) " The next step is a within-season look at the monsoon months, not a longer lag."
+        else " The next step is a within-season look, not a longer lag."))
   })
 
   # The DEMOTED dredge block (BE4): the static #envDredgeBlock in ui.R holds the
   # headline (envCorrNote) + bars (envDriverRank) below the prior-first seasonal
-  # read, already framed by the "exploratory best-of-52" eyebrow + honest popover.
+  # read, already framed by the "exploratory best-of-N" eyebrow + honest popover.
   # Here we (a) fill the sub-label and (b) DIM the whole block when the permutation
   # isn't significant, so a reader can't mistake a big grey r for a finding. We use
   # the SAME not_sig gate (env_pval, p >= 0.05) the headline already uses — env_corr_pvalue
@@ -1366,6 +1389,19 @@ function(input, output, session) {
     shinyjs::toggleClass("envDredgeBlock", "env-dredge-muted",
                          condition = !is.null(rk) && nrow(rk) > 0 && isTRUE(env_dredge_notsig()))
   })
+  # Search size for the eyebrow and sub-label: the permutation's own n_search,
+  # else drivers x 13 lags. It varies by site (fewer drivers where a layer is thin).
+  env_n_search <- reactive({
+    pv <- env_pval(); rk <- env_rank()
+    if (!is.null(pv) && is.finite(pv$n_search %||% NA_real_)) as.integer(pv$n_search)
+    else if (!is.null(rk) && nrow(rk)) nrow(rk) * 13L else NA_integer_
+  })
+  output$envDredgeEyebrow <- renderUI({
+    ns <- env_n_search()
+    tags$span(class = "env-dredge-eyebrow", bs_icon("search"),
+      if (is.finite(ns)) sprintf(" Exploratory best-of-%d driver search", ns)
+      else " Exploratory driver search")
+  })
   output$envDredgeSub <- renderUI({
     rk <- env_rank(); if (is.null(rk) || !nrow(rk)) return(NULL)
     if (isTRUE(env_dredge_notsig()))
@@ -1375,25 +1411,32 @@ function(input, output, session) {
     else
       div(class = "env-dredge-sub",
           bs_icon("info-circle"),
-          " A best-of-52 driver \U00D7 lag search. Strongest match shown, so read it as a lead to chase, not a result.")
+          sprintf(" A best-of-%d driver \U00D7 lag search. Strongest match shown, so read it as a lead to chase, not a result.",
+                  env_n_search()))
   })
 
   # ---- Seasonal climate: the cascade read (the desert/degree-day fix) -------
   # The monthly scan above DESEASONALIZES monthly catch vs monthly driver, so it
   # CANNOT see "a big summer monsoon -> that year's beetle activity" — the
   # monsoon is averaged out of the very annual cycle it subtracts. This card uses
-  # the Driver Cascade's method: aggregate the driver by SEASON (monsoon Jul-Sep,
+  # the NEON Cross-Product Response Atlas method: aggregate the driver by SEASON (monsoon Jul-Sep,
   # winter Oct-Mar, spring temp Mar-May) into one value per year and correlate at
   # the prior's lag. Beetles are a FAST within-season responder (like mosquitoes),
   # so monsoon -> activity is LAG 0 (NOT lag 1 as for the slow seed-eater boom).
   # Temperate sites lead with warm-spring degree-days -> emergence (also lag 0).
   # Per-site annual n is tiny (6-10 yrs) — SUGGESTIVE, not a verdict; the pooled
-  # cross-site test lives in the Driver Cascade app.
+  # cross-site test lives in the NEON Cross-Product Response Atlas.
   output$seasonalDriver <- renderUI({
     d <- rv$data; if (is.null(d) || is.null(rv$env)) return(NULL)
     at <- tryCatch(annual_trend(d), error = function(e) NULL)   # the app's OWN annual catch-per-100-trap-nights
     if (is.null(at) || !nrow(at) || !"cpn" %in% names(at)) return(NULL)
     resp <- data.frame(year = at$year, value = at$cpn)
+    # Comparable years only: a partial-season year (annual_trend()'s `partial`)
+    # and 2023 (NEON's cut from 10 plots to 6) get no response value, so the
+    # card's n counts only comparable years before the n < 6 and p_adj gates.
+    noncomp <- (if ("partial" %in% names(at)) at$partial %in% TRUE else FALSE) |
+      as.integer(at$year) %in% 2023L
+    resp$value[noncomp] <- NA_real_
     resp <- resp[is.finite(resp$year) & is.finite(resp$value), , drop = FALSE]
     if (nrow(resp) < 3) return(NULL)
     site_code <- rv$siteCode %||% (if ("siteID" %in% names(d)) {
@@ -1406,10 +1449,10 @@ function(input, output, session) {
       lags = c(precip_monsoon = 0L, precip_winter = 0L, temp_spring = 0L)),
       error = function(e) NULL)
     eyebrow <- div(class = "ec-eyebrow", bs_icon("calendar-range"),
-                   tags$span("seasonal climate \U00B7 the cascade read"),
+                   tags$span("seasonal climate"),
                    info_pop("The seasonal read",
                      p("Beetle activity tracks the season that ", tags$b("limits it here"), ": warm springs at temperate sites (degree-days drive emergence), summer-monsoon water in the desert. A single annual rain or temperature average mixes that limiting season into the rest of the year and blurs the signal."),
-                     p("Here we aggregate the driver by season and correlate it against this site's yearly catch rate, the way the Driver Cascade does. Beetles respond ", tags$b("within the same year"), " (lag 0), unlike the seed-eater boom that lands a year later. ", tags$b("Per-site n is only a handful of years"), ", so this is suggestive, not significant. The honest test pools many sites in the Driver Cascade app.")))
+                     p("Here we aggregate the driver by season and correlate it against this site's yearly catch rate, the way the NEON Cross-Product Response Atlas does. Beetles respond ", tags$b("within the same year"), " (lag 0), unlike the seed-eater boom that lands a year later. ", tags$b("Per-site n is only a handful of years"), ", so this is suggestive, not significant. The multi-site test, pooling many sites, is in the NEON Cross-Product Response Atlas.")))
     if (is.null(links) || !nrow(links)) {
       return(div(class = "ec ec-seasonal rail-weak", style = "margin-top:14px;", eyebrow,
         div(class = "ec-hero", div(class = "ec-hero-text",
@@ -1418,11 +1461,16 @@ function(input, output, session) {
     lead <- links[links$expected, , drop = FALSE]; if (!nrow(lead)) lead <- links
     L <- lead[1, ]; pos <- L$r >= 0; dir <- if (pos) "more" else "fewer"
     strength <- abs(L$r)
-    rail <- if (strength >= 0.6) "rail-strong" else if (strength >= 0.35) "rail-mod" else "rail-weak"
+    # Colour and wording follow the season-corrected p, not |r| alone: a link
+    # that does not clear p_adj < 0.05 stays on the weak rail and reads Apparent.
+    sig <- is.finite(L$p_adj) && L$p_adj < 0.05
+    rail <- if (!sig) "rail-weak" else if (strength >= 0.6) "rail-strong" else "rail-mod"
     sub  <- tolower(L$label)
     lead_txt <- sprintf("%s %s tracks %s beetles%s",
       if (grepl("precip", L$driver)) "A wetter" else "A warmer", sub, dir,
       if (L$lag >= 1) " the next year" else " the same year")
+    if (!sig) lead_txt <- paste0("Apparent: ", lead_txt)
+    if (is.finite(L$n) && L$n < 6) lead_txt <- sprintf("Only %d years here, too few to read a link", as.integer(L$n))
     mr <- tryCatch(env_corr_scan(d, rv$env, if (grepl("temp", L$driver)) "temp" else "precip")$r,
                    error = function(e) NA_real_)
     pstr <- if (is.finite(L$p)) sprintf("p = %.2f", L$p) else sprintf("%d yrs, too few for a p", L$n)
@@ -1440,13 +1488,12 @@ function(input, output, session) {
         if (is.finite(L$p_adj)) tagList(tags$span(class = "ec-meta-dot"),
           tags$span(class = "ec-meta", title = "p after accounting for testing several seasons",
                     HTML(sprintf("season-corrected p = %.2f", L$p_adj))))),
-      div(class = "ec-seasonal-note",
-        if (is.finite(mr))
-          HTML(sprintf("The month-to-month overlay shows only about <b>r %+.2f</b> for the plain monthly driver. Splitting the year by season recovers the limiting-season signal a single annual average blends away.", mr))
-        else "Splitting the year by season recovers the limiting-season signal a single annual average blends away."),
+      if (sig && is.finite(mr) && abs(L$r) > abs(mr))
+        div(class = "ec-seasonal-note",
+          HTML(sprintf("The month-to-month overlay shows only about <b>r %+.2f</b> for the plain monthly driver. Splitting the year by season recovers the limiting-season signal a single annual average blends away.", mr))),
       div(class = "ec-seasonal-caveat", bs_icon("info-circle"),
-        HTML(" One site, a handful of years, so suggestive not settled. The cross-site test that pools many sites is in the "),
-        tags$a(href = "https://tgilbert14.github.io/NEON-Driver-Cascade/", target = "_blank", "Driver Cascade app"), "."))
+        HTML(" One site, a handful of years, so suggestive not settled. The multi-site test, pooling many sites, is in the "),
+        tags$a(href = "https://tgilbert14.github.io/NEON-Driver-Cascade/", target = "_blank", "NEON Cross-Product Response Atlas"), "."))
   })
 
   output$envScatter <- renderPlotly({
@@ -1602,7 +1649,9 @@ function(input, output, session) {
     if (sp == "" || is.null(SEARCH_TAXA)) return(NULL)
     r <- SEARCH_TAXA[SEARCH_TAXA$scientificName == sp, , drop = FALSE]
     if (!nrow(r)) return(NULL)
-    r[order(-r$activity_density %in% NA, dplyr::desc(r$activity_density)), , drop = FALSE]
+    # Default order is state then site, not activity-density: cross-site
+    # orderings are HELD. The columns stay sortable.
+    r[order(r$state, r$siteID), , drop = FALSE]
   })
 
   output$searchTaxonCount <- renderUI({
@@ -1616,7 +1665,7 @@ function(input, output, session) {
     intro <- any(r$is_introduced)
     div(class = "search-count",
       HTML(sprintf("<b><i>%s</i></b> found at <b>%d of %d</b> NEON sites%s.",
-        sp, nrow(r), n_sites,
+        htmltools::htmlEscape(sp), nrow(r), n_sites,
         if (intro) " &middot; <span class='intro-inline'>introduced European species</span>" else "")))
   })
 
@@ -1629,25 +1678,36 @@ function(input, output, session) {
       `Activity-density` = r$activity_density, Individuals = r$individuals,
       Years = yr, Go = vapply(r$siteID, search_go_btn, character(1)),
       check.names = FALSE, stringsAsFactors = FALSE)
-    DT::datatable(tab, rownames = FALSE, escape = FALSE, selection = "none",
-      options = list(pageLength = 10, dom = "tp", scrollX = TRUE,
+    # Escape every column but the Go button (column 7), so a bundled name is text.
+    DT::datatable(tab, rownames = FALSE, escape = 1:6, selection = "none",
+      options = list(pageLength = 10, dom = "tp", scrollX = TRUE, order = list(),
                      columnDefs = list(list(orderable = FALSE, targets = 6)))) %>%
       DT::formatCurrency("Individuals", currency = "", interval = 3, mark = ",", digits = 0)
   })
 
   # (b) THRESHOLD QUERY ----------------------------------------------------
+  # The cutoff actually applied: blank or non-numeric runs at 0, and a negative
+  # value is raised to 0 (activity-density is never below 0). The count label
+  # prints this value, not the raw input.
+  search_ad_cut <- reactive({
+    cut <- suppressWarnings(as.numeric(input$searchAdMin))
+    if (!length(cut) || !is.finite(cut[1])) cut <- 0
+    max(0, cut[1])
+  })
   search_thresh_rows <- reactive({
     if (is.null(SEARCH_TAXA)) return(NULL)
     kind <- input$searchThreshKind %||% "intro"
     if (kind == "intro") {
       r <- SEARCH_TAXA[SEARCH_TAXA$is_introduced %in% TRUE, , drop = FALSE]
     } else {
-      cut <- suppressWarnings(as.numeric(input$searchAdMin)); if (!is.finite(cut)) cut <- 0
+      cut <- search_ad_cut()
       r <- SEARCH_TAXA[is.finite(SEARCH_TAXA$activity_density) &
                        SEARCH_TAXA$activity_density >= cut, , drop = FALSE]
     }
     if (!nrow(r)) return(r)
-    r[order(dplyr::desc(r$activity_density)), , drop = FALSE]
+    # Default order is state, site, then species, not activity-density:
+    # cross-site orderings are HELD. The columns stay sortable.
+    r[order(r$state, r$siteID, r$scientificName), , drop = FALSE]
   })
 
   output$searchThreshCount <- renderUI({
@@ -1660,7 +1720,7 @@ function(input, output, session) {
     hit_sites <- length(unique(r$siteID))
     lbl <- if (kind == "intro") "introduced taxon-site records"
            else sprintf("taxon-site records at or above %s per 100 trap-nights",
-                        format(input$searchAdMin))
+                        format(search_ad_cut()))
     div(class = "search-count",
       HTML(sprintf("<b>%d</b> %s across <b>%d of %d</b> NEON sites.",
         nrow(r), lbl, hit_sites, n_sites)))
@@ -1671,15 +1731,17 @@ function(input, output, session) {
     yr <- ifelse(is.na(r$year_min), "", ifelse(r$year_min == r$year_max,
             as.character(r$year_min), paste0(r$year_min, "-", r$year_max)))
     tab <- data.frame(
-      Species = sprintf("<i>%s</i>", r$scientificName),
+      Species = r$scientificName,
       Site = r$siteID, State = r$state,
       `Activity-density` = r$activity_density, Individuals = r$individuals,
       Years = yr, Go = vapply(r$siteID, search_go_btn, character(1)),
       check.names = FALSE, stringsAsFactors = FALSE)
-    DT::datatable(tab, rownames = FALSE, escape = FALSE, selection = "none",
+    # Escape every column but the Go button (column 7); italics come from CSS.
+    DT::datatable(tab, rownames = FALSE, escape = 1:6, selection = "none",
       options = list(pageLength = 12, dom = "tp", scrollX = TRUE,
-                     order = list(list(3, "desc")),
+                     order = list(),
                      columnDefs = list(list(orderable = FALSE, targets = 6)))) %>%
+      DT::formatStyle("Species", fontStyle = "italic") %>%
       DT::formatCurrency("Individuals", currency = "", interval = 3, mark = ",", digits = 0)
   })
 
@@ -1726,7 +1788,7 @@ function(input, output, session) {
         radius = ~pmax(12, sqrt(individualCount) * 2.2), color = "#36d98a",
         fillOpacity = 0.75, stroke = TRUE, weight = 1.5,
         label = ~lapply(sprintf("<b>%s</b><br><i>%s</i>: %s individuals",
-          siteID, sp, fmt_int(individualCount)), htmltools::HTML)))
+          siteID, htmltools::htmlEscape(sp), fmt_int(individualCount)), htmltools::HTML)))
     }
     pal <- c(neon = "#36d98a", demo = "#e0b43a")
     # CLICK opens the same Explore | About choice popup as the splash picker — no
@@ -1742,11 +1804,11 @@ function(input, output, session) {
           autoPan = TRUE, autoPanPadding = c(40, 55), keepInView = FALSE,
           closeButton = TRUE, closeOnClick = FALSE, className = "pm-pop-card"),
         label = ~lapply(sprintf("<b>%s</b> · %s<br>%d species · %s individuals%s<br>dominant: <i>%s</i>%s",
-          site, name, richness, fmt_int(individuals),
+          site, htmltools::htmlEscape(name), richness, fmt_int(individuals),
           if ("years" %in% names(si))
             ifelse(is.na(years), "", sprintf("<br>%d years sampled", as.integer(years)))
           else "",
-          dominant,
+          htmltools::htmlEscape(dominant),
           ifelse(source == "demo", "<br><b>demo data</b>", "")), htmltools::HTML))
     cur <- isolate(rv$siteCode)   # ring the loaded site so the map ↔ single-site view connect
     if (!is.null(cur)) {
@@ -1836,6 +1898,7 @@ function(input, output, session) {
       p("The ", tags$b("NEON Ground Beetle Tracker"), " explores carabid beetle biodiversity from ",
         tags$a(href = "https://data.neonscience.org/data-products/DP1.10022.001", target = "_blank",
                "NEON DP1.10022.001 · Ground beetles sampled from pitfall traps"), "."),
+      release_line_ui(),
       p("Pitfall catches describe carabid encounters and activity under a standardized protocol. They can provide community and disturbance context, but they are not a stand-alone measure of ecosystem or site health."),
       h4("What you can explore"),
       tags$ul(
@@ -1854,7 +1917,7 @@ function(input, output, session) {
                 tags$b("inflates richness and diversity"), ", so all richness-type metrics (richness, Hill numbers, rarefaction, accumulation, ordination, indicator species) use ",
                 tags$b("species-level records only"), ". Total ", tags$b("abundance"),
                 " still counts every beetle trapped. The Diversity tab shows exactly how many records this excludes."),
-        tags$li(tags$b("How current is this?"), " NEON publishes ground-beetle records after the specimens are sorted and an expert taxonomist confirms the IDs, so the most recent year or two of trapping is usually not in the data yet. The latest season you see here lags real time by about two years. A site looking quiet at the end of its record often just means those bouts have not been published, not that the beetles vanished."),
+        tags$li(tags$b("How current is this?"), " ", release_currency_text()),
         tags$li("Hill numbers (Hill 1973; Jost 2006); Hurlbert (1971) rarefaction; Gotelli & Colwell (2001) accumulation; Dufrêne & Legendre (1997) indicator value; NEON ground-beetle sampling design (Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744)."),
         tags$li("Real bundles reconcile parataxonomist IDs with authoritative ", tags$b("expert IDs", .noWS = "after"),
                 ". Per-trap-night effort absorbs the 2018 change from 4 to 3 traps per plot. In 2023 NEON cut sampling from 10 plots to 6, and the plots it kept can catch more or fewer beetles than the old set, so the 2023 value is not directly comparable with earlier years."),
@@ -1879,14 +1942,8 @@ function(input, output, session) {
       # ---- Part of the NEON suite: in-app sibling links --------------------
       div(class = "suite-block",
         h4(class = "suite-h", bs_icon("grid-3x3-gap-fill"), " Part of the NEON suite"),
-        p(class = "suite-lead", "Sibling explorers from Desert Data Labs, each built on a different NEON dataset. They all share this look and the same honest-numbers approach."),
-        div(class = "suite-grid",
-          lapply(SUITE_SIBLINGS, function(s)
-            tags$a(class = "suite-card", href = s$url, target = "_blank", rel = "noopener",
-              tags$span(class = "suite-emoji", s$emoji),
-              div(class = "suite-card-body",
-                div(class = "suite-name", s$name, bs_icon("box-arrow-up-right")),
-                div(class = "suite-blurb", s$blurb)))))),
+        p(class = "suite-lead", "The ten NEON explorers from Desert Data Labs, each built on a different NEON dataset."),
+        suite_sibling_grid()),
       p(style = "margin-top:16px", "An educational data-exploration tool by Desert Data Labs. Not affiliated with NEON, Battelle, or the NSF."),
       p(class = "qa-cite", style = "margin-top:6px",
         "Built with data from the National Ecological Observatory Network (NEON), a U.S. National Science Foundation program operated by Battelle. NEON data are provided under a Creative Commons Attribution 4.0 International (CC BY 4.0) license (",
@@ -1897,7 +1954,7 @@ function(input, output, session) {
 
   # ---- "Methods & sources" modal (single (i) for the methods + references) --
   observeEvent(input$methodsModalBtn, {
-    showModal(modalDialog(
+    showModal(labelled_modal(label_id = "gbt-methods-title",
       title = HTML("\U0001FAB2 Methods &amp; sources"),
       easyClose = TRUE, size = "l", footer = modalButton("Close"),
       div(class = "about",
@@ -1908,7 +1965,8 @@ function(input, output, session) {
           tags$li(tags$b("Diversity."), " Hill numbers (Hill 1973; Jost 2006); individual-based rarefaction with an approximate analytic SD (Hurlbert 1971; Heck et al. 1975); sample-based accumulation averaged over random bout orders (Gotelli & Colwell 2001)."),
           tags$li(tags$b("Biogeography."), " A Bray-Curtis PCoA places each site x year community, coloured by biome; indicator species use the Dufrene-Legendre IndVal (1997)."),
           tags$li(tags$b("Environment overlays."), " For each co-located NEON driver we deseasonalise both series and scan lags 0 to 12 months, then a permutation null asks whether the best-of-dredge correlation beats chance before any verdict is shown. The overlay defaults to None so nothing is drawn until the link is real or you pick a driver yourself."),
-          tags$li(tags$b("How current is this?"), " NEON publishes ground-beetle records after specimens are sorted and an expert taxonomist confirms the IDs, so the most recent year or two of trapping is usually not in the data yet. A quiet-looking end of a record often just means those bouts have not been published.")),
+          tags$li(tags$b("How current is this?"), " ", release_currency_text())),
+        release_line_ui(),
         h4("References"),
         tags$ul(class = "ref-list",
           tags$li("Hoekman et al. 2017, ", tags$em("Ecosphere"), " 8(4):e01744 (NEON ground-beetle design)."),

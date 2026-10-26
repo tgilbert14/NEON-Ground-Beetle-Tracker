@@ -1,5 +1,9 @@
 /* =========================================================================
-   pincards.js — tap-to-pin cards + export-with-pins for the Ground Beetle charts.
+   copied from tgilbert14/NEON-Plant-Diversity@b555d14 on 2026-06-23 (beetle commit
+   890c2b4), itself a port of the Small Mammal Tracker pin cards
+   (tgilbert14/NEON-Small-Mammal-Tracker-App@21fed28); adapted for the Ground Beetle Tracker since.
+
+   pincards.js: tap-to-pin cards + export-with-pins for the Ground Beetle charts.
 
    Ported from the flagship Small Mammal Tracker pin-card system (via the Plant
    Diversity / Veg Structure ports) onto PLOTLY: a draggable / resizable card +
@@ -105,7 +109,10 @@
     var pin = document.createElement("div");
     pin.className = "smt-pin";
     pin.__box = box; pin.__key = key; pin.__dx = dx; pin.__dy = dy;
-    pin.innerHTML = "<button class='smt-pin-close' title='Close'>&times;</button>" + html;
+    pin.setAttribute("role", "dialog");
+    pin.setAttribute("aria-label", "Pinned detail");
+    pin.tabIndex = -1;
+    pin.innerHTML = "<button type='button' class='smt-pin-close' aria-label='Close pin'>&times;</button>" + html;
     pin.querySelectorAll("em.smt-pin-hint").forEach(function (em) {
       var br = em.previousElementSibling;
       if (br && br.tagName === "BR") br.remove();
@@ -121,6 +128,8 @@
     pin.style.left = Math.max(4, Math.min(a.ax + 24, bR.width - 250)) + "px";
     pin.style.top = Math.max(4, Math.min(a.ay + 14, bR.height - 150)) + "px";
     box.appendChild(pin);
+    /* move focus to the new card so keyboard and screen-reader users land on it */
+    try { pin.focus({ preventScroll: true }); } catch (e) { pin.focus(); }
 
     var layer = linesLayer(box);
     var ln = document.createElementNS(NS, "line");
@@ -138,6 +147,13 @@
 
     pin.querySelector(".smt-pin-close").addEventListener("click", function () {
       ln.remove(); dot.remove(); pin.remove();
+    });
+    /* Escape on a focused card (or anything inside it) closes it */
+    pin.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Escape" && ev.key !== "Esc") return;
+      ev.preventDefault(); ev.stopPropagation();
+      var btn = pin.querySelector(".smt-pin-close");
+      if (btn) btn.click();
     });
 
     /* drag-to-move (clamped so a fat-thumb drag can't fling the card off-box).
@@ -307,7 +323,7 @@
           n.classList.contains("smt-pin-resize") || n.classList.contains("smt-snap-btn") ||
           n.classList.contains("smt-clear-btn"))); } })   // keep cards + leader lines; drop chrome buttons
         .then(function (url) { downloadUrl(url, name); toastDone("Saved ✓"); })
-        .catch(function () { toastDone("Render failed — try again", true); })
+        .catch(function () { toastDone("Render failed. Try again.", true); })
         .then(function () { saving = false; });
     }, 90);
   }
