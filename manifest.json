@@ -3254,7 +3254,7 @@
       "checksum": "1a9fd86b7d809f985707437a8f54de63"
     },
     "data/search_index.rds": {
-      "checksum": "e59037b1cc4d1c8061f7d9cc16a46b1f"
+      "checksum": "1b595814537bd1a24dd1bcb0352f057d"
     },
     "data/sites/ABBY.rds": {
       "checksum": "a1c6dab3ea9a0c832ebc11b0a6bf2de1"
@@ -3401,7 +3401,7 @@
       "checksum": "4414b2b39398fd0ab233d6581b0b67dc"
     },
     "R/helpers.R": {
-      "checksum": "072f9963cce1b51888c2c4b3706666bb"
+      "checksum": "c9fcc015ada099fad7fbb4c094a5b145"
     },
     "R/map_picker.R": {
       "checksum": "898c4ede149a0ca0f4d8bf226b883657"
